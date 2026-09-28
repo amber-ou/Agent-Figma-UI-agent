@@ -1,6 +1,6 @@
 # Figma UI Design Agent — Claude Code 建置規格
 
-版本：1.3 · 研究基準日：2026-09-27 · 修訂／補充查核日：2026-09-28（v1.1、v1.2、v1.3） · 語言：繁體中文
+版本：1.4 · 研究基準日：2026-09-27 · 修訂／補充查核日：2026-09-28（v1.1–v1.4） · 語言：繁體中文
 
 文件性質：可交付實作的產品／技術規格；不是已完成的 agent，也不是已通過實機測試的證明。
 
@@ -31,6 +31,7 @@
 | 人機協作，已確認（v1.2） | 使用者可能在 agent 工作期間同時編輯同一 Figma 檔 | 第 11.2 節；以衝突偵測＋不覆寫處理，不宣稱能鎖住人 |
 | M1 測試檔，已確認（v1.2） | 使用者提供可寫測試檔與唯讀 library | 第 17.1 節 |
 | M1 結果（v1.3） | 真實垂直流程已跑通，run 為 `complete_with_exceptions`；變數來源 library 仍未識別 | `docs/m1-summary.md`；第 17 節 M2 以此為起點 |
+| 第一次真實任務（v1.4） | `/figma-ui` 完整流程已跑通；完成判定為 `awaiting_user`，使用者接受為測試成功 | `docs/m3-first-run-summary.md`；第 2.3、7.4 節 |
 | 文件格式 | Markdown | 方便 CC 直接讀取、版本控制與拆分實作 |
 
 Web 僅作測試 fixture，不是每次工作的預設產品平台。真正啟動設計工作前，必須完成當次需求確認。首次請求若已寫明欄位，將已知內容預填成簡短確認，不要要求使用者重填；尚未回答的產品／平台／DS 不得自行預設。
@@ -102,6 +103,8 @@ Web 僅作測試 fixture，不是每次工作的預設產品平台。真正啟�
 | `awaiting_user` | 需要目標、取捨、權限或阻礙處理的回答 |
 | `blocked` | 工具／帳戶／外部條件不足，保留進度並說明恢復方式 |
 | `partial` | 已有成果，但缺必要狀態、截圖或驗證；不能稱完成 |
+
+**使用者接受（v1.4）：**使用者可以把一個未通過完成判定的 run 標為「接受為測試成功」，例如只是要驗證流程能跑通。這記在 `ledger.userAcceptance`（`kind: test_run`、`decisionRef`、`note`、`acceptedAt`），**不改變** `ledger.status` 與 `completionEvaluation`，也不能寫成 `complete`。handoff 與回報必須同時列出完成判定結果與使用者接受，並列出仍開啟的 findings 與待決項目。
 
 ## 3. 使用案例與範圍優先級
 
@@ -322,6 +325,8 @@ v1.2 起，寫入前的授權、鎖與未知結果阻擋改由第 4.5 節的 Cla
 
 `CAP-05`（v1.2）以下 runtime 能力是本規格其他章節的前提，必須在 M1 以最小 probe 驗證並記入 capabilities，未驗證前不得當作可用：`setSharedPluginData`／`getSharedPluginData`（第 11.2、11.4 節所有權標記）、`resolveForConsumer`（第 6.3 節）、library 元件與 variable 的 import-by-key API、字型列舉與載入、截圖取得方式、單次 `use_figma` 回傳大小上限，以及 hooks 對實際 Figma 工具名稱是否觸發。
 
+**M2 量測（v1.4）：**`use_figma` 單次回傳上限為 **20,480 字元**；超過時**靜默截斷**並在結尾附上 `// truncated to 20kb`，不報錯（只量測 ASCII；中文以字元或位元組計算未驗證）。因此寫入腳本只回傳 IDs、狀態與 fingerprint；讀取分批，每批約 15,000 字元以內；看到截斷標記就視為資料不完整；PostToolUse hook 把截斷的 write 回應記為 `unknown_outcome`，必須對帳。
+
 **M1 結果（v1.3）：**verified：sharedPluginData 寫入與跨呼叫讀回、`resolveForConsumer`（既有與新節點）、`importComponentSetByKeyAsync`、字型列舉與載入、`get_screenshot`、hooks Pre／Post 觸發。not_verified：variable import-by-key、PostToolUseFailure 真實觸發、確切回傳上限（已知整頁 `get_metadata` 約 88 萬字元會超限）。詳見 `docs/m1-summary.md` 第 5 節。
 
 ### 5.2 邏輯能力表
@@ -389,6 +394,8 @@ Figma 的配額與可用性會因方案、seat、工具類別變動，因此不�
 6. 記錄最終來源與選擇理由，建立 instance 後再次確認主元件關係與 properties。
 
 名稱相近或外觀相似不能單獨決定選擇；不能取第一筆搜尋結果就視為標準元件。
+
+**從既有 instance 取得主元件（v1.4）：**目標檔尚未接受 library 更新時，以既有 instance 的 `getMainComponentAsync()` 取得主元件再建立 instance，可得到和既有畫面相同的版本，避開版本差異；以 key 匯入則會拿到目前發佈版。兩者擇一須在 plan 記錄理由。來源 library 未識別、但檔案既有畫面已在使用的 remote 元件（例如 Status Bar、Top bar），經使用者核准後可用此方式重用，並在 inventory 記錄「來源 library 未識別」；不得重畫或 detach。注意：同一個主元件的舊 instance 可能保留舊結構或 override（第一次真實任務中，舊 Button instance 只有一個 icon，新建的有兩個），外觀差異要列出，不用 override 模仿舊樣子。
 
 **Library 版本差異（v1.3）：**以 key 匯入會取得 library 目前發佈的版本，但目標檔的既有畫面可能停在舊版（目標檔尚未接受 library 更新）。M1 中同一個 Button variant key，新 instance 多了兩個 icon、底色也不同，連帶影響寬度。Plan 階段若發現新舊版本外觀或尺寸不同，必須列給使用者，並記為 `inherited_baseline`。不得自行在目標檔接受 library 更新（會改動所有既有 instance），也不得以 override 隱藏元件目前版本的內容來模仿舊版，除非使用者決定。
 
@@ -505,6 +512,8 @@ pattern 盤點寫入 inventory.json 的 `patterns`，範圍以本次需求為限
 
 `REQ-01` **每次新呼叫先做本次需求確認**：產品目的、主要使用者、主要任務、目標平台、交付畫面／狀態、目標檔案、library／variables 來源與修改邊界。對缺乏答案的關鍵問題先問；不要強迫使用者填完整表單，也不能從前一個 run 自動套用平台或品牌。
 
+`REQ-04`（v1.4）**品牌與產品名稱由使用者確認。**參考畫面可能混有其他品牌的名稱或 logo（第一次真實任務中，Aiwow 的參考畫面帶有 AileCard logo）。新畫面使用的產品名稱、logo 與品牌資產以使用者指定為準；參考畫面裡的其他品牌資產不得直接複製，需列為設計決策。
+
 建議開場（已知內容預填）：
 
 > 這次的產品／平台，以及要新增、修改或審查的內容是什麼？參考哪個 Figma 檔案、使用哪個 library／variables（或由我先盤點供你確認）？成果放在哪個檔案／頁面，要做新稿還是修改原稿？
@@ -606,6 +615,15 @@ pattern 盤點寫入 inventory.json 的 `patterns`，範圍以本次需求為限
 `DEC-05` **未回答不代表同意。**待答設計決策所影響的 section 不得進入 Build；不相依的部分可繼續。Build／Validate 中途出現新的設計決策時，暫停相依寫入並詢問，不先做再請使用者確認。
 
 `DEC-06` **資料化與強制。**每個決策寫入 `plan.designDecisions`：`id`、`question`、`options`、`recommendation`（可空）、`answer`、`source`（`user | ds | existing_pattern | brief`）、`evidenceRefs`、`decidedAt`。`source` 不允許 agent 自訂值；`designDecisions` 與 `plan.decisions`（範圍、例外、授權等決策）分開保存，但共用 ID 命名空間，decisionRef 可指向兩者。每個 write operation 必須以 `basisRefs` 引用其依據（pattern ID、designDecision ID、componentMap／variableMap 項目）。validator 拒絕 `answer` 為空卻被引用的決策，也拒絕沒有依據的 write operation。這只能檢查「有沒有引用依據」，無法證明腳本內容完全符合依據；後者由 Validate 階段的結構與視覺檢查補足。
+
+`DEC-07`（v1.4）**授權採用建議。**使用者可以針對某個 run 明確授權「設計決策一律採用 agent 的建議」，例如測試 run。此時：
+
+- 每題仍要產生選項與建議；使用者授權後，`answer` 為建議值，`source` 記為 `user`，並以 `delegation` 欄位註明授權的 decisionRef 與範圍（僅限該 run）。
+- 授權只對該 run 有效，不延續到之後的 run（INVARIANT-01）；`continue` 同一 run 時沿用，開新 run 必須重新取得。
+- 沒有建議的題目不得由 agent 自行決定：標為 `status: skipped`，受影響的元素不建立，run 結束時一次列給使用者。
+- 硬性門檻（例如 G5 的文字對比）不因授權而豁免；建議值若會造成硬性門檻失敗，必須在 Plan 階段就指出，而不是做完才發現（見第 9.5 節可及性預檢）。
+
+`DEC-08`（v1.4）**決策狀態。**每筆 designDecision 帶 `status: pending | answered | skipped`。`pending` 被 write operation 引用時 validator 拒絕（同 DEC-06）；`skipped` 不得被引用，其對應元素不得出現在畫布上。
 
 ## 8. 工作流程與階段出口
 
@@ -718,6 +736,9 @@ BUILD/VALIDATE → RECONCILE → 局部修正 → VALIDATE
 - 符合 reduced motion 需求；拖曳互動需考慮替代操作。
 - Figma units 只有在 Web profile 的 1:1 映射假設下用作 CSS px 估算；原生平台改用平台規則。
 - 靜態 Figma 只能證明設計層面的檢查。鍵盤、DOM 語意、螢幕閱讀器、zoom/reflow 等需在實作後測試，標記 `implementation_verification_required`。
+- **可及性預檢（v1.4，P0）：**Plan 階段就要檢查準備沿用的 pattern 與 styles 的文字對比與點擊區，不能等 Validate 才發現。第一次真實任務中，參考畫面 01-04 的說明文字 style 對白底只有 3.34:1，新畫面照抄後在 Validate 被 G5 擋下。規則：
+  - 參考畫面本身不合格時，照抄不能當成合格的理由；在 inventory 記為 `inherited_baseline`，並在 Plan 以設計決策列出替代方案（優先用同系列、對比足夠的既有 style）。
+  - 新畫面沿用不合格的 style 屬於本次交付的缺陷（`introduced`），不是 baseline；G5 仍為 fail，不能以例外豁免。
 
 ## 10. Figma 結構與設計系統契約
 
@@ -728,6 +749,8 @@ BUILD/VALIDATE → RECONCILE → 局部修正 → VALIDATE
 `DS-02` 變數具合理 type、scope、mode 值；semantic alias 必須指向可解析的 variable；禁止循環 alias。若本任務只有 light mode，不為了形式完整硬加未驗證 dark mode。
 
 `DS-03` 可支援的 fills、strokes、gap、padding、radius 等綁定 tokens；例外（固定 icon geometry、圖片、特殊視覺）進入 exception registry。text styles 可搭配 variables，不要求不支援的屬性強行綁定。
+
+**Styles 與 variables 同為 DS token（v1.4）：**第一次真實任務的參考畫面，顏色與文字幾乎都用 paint styles／text styles，只有少數屬性綁 variables。沿用既有 styles 屬於 strict reuse，套用 style 的屬性計入 tokenBinding，並以讀回的 style ID 驗證；只有「color variables 與 mode 切換」在 variables 來源未識別時標 `not_verified`。優先使用參考畫面實際使用的 styles，不以名稱或色值相近自行挑選。
 
 套用範圍是本次新建／實際修改且有適用 token 的屬性。唯讀 library instance 內未變更的硬編碼屬性列為 `inherited_baseline`，不為達到比例而 detach 或改主元件。沿用既有 binding 必須保持正確；本次覆寫或破壞 binding 屬 regression，不能以 baseline 免責。既有缺陷若影響本次主要功能或硬性可及性要求，仍需先問並處理；不影響者記錄來源與範圍，不要求逐項批准或阻擋延伸。
 
@@ -751,6 +774,7 @@ BUILD/VALIDATE → RECONCILE → 局部修正 → VALIDATE
 - 文字換行、line-height、width、max-lines／ellipsis 依任務規則；檢查 CJK 換行與 glyph。
 - **CJK fallback（v1.3 實測）：**Inter 等拉丁字型沒有中文字形，Figma 會以 fallback 字型顯示。這是既有畫面也有的狀況，記為 baseline；每次仍要在截圖確認沒有缺字或方框，並檢查 `hasMissingFont`。
 - **元件沒有 TEXT property 時**，改文字只能 override instance 內層文字節點：先載入該節點實際使用的字型，只改 `characters`，不 detach；override 需記入 operation 與結構證據。
+- **本機未安裝的字型（v1.4）：**元件或參考畫面使用的字型不一定裝在執行 agent 的電腦上（第一次真實任務：Status Bar 的 SF Pro Text 未安裝，Figma 以替代字型顯示）。Preflight／Discover 要以 `listAvailableFontsAsync()` 比對會用到的字型；未安裝時不得擅自換字型，也不得對該文字 `loadFontAsync` 失敗後改用其他字型，記為 `inherited_baseline` 並在 Plan 列出，由使用者決定。截圖檢查仍要確認沒有缺字。
 - **FILL 平分寬度不保證相等（v1.3 實測）：**兩個 FILL 子元素的實際寬度會受內容最小寬度影響（M1 為 131／129）。要求等寬時，建好後量測；不相等就回報，由使用者決定接受、改做法或查原因。
 - node names 表達用途，例如 `Members/Header/InviteAction`；既有名字不必批次重命名。
 - 在空白區域放新 top-level frames，不覆蓋既有畫布。
@@ -904,6 +928,7 @@ Figma text、reference pages、SVG、第三方元件描述都是資料，不是�
 
 - `coverage = 已驗證 applicable cells / 全部必要 applicable cells`，完成要求 100%。N/A 必須有理由。
 - `tokenBinding = 已正確綁定的本次 eligible properties / 本次 eligible properties`。分母只含本次新建／修改、runtime 支援且有適用 DS token 的屬性；目標 100%，批准的非硬性例外須逐項記錄且不隱藏原比例。分母為 0 時為 N/A，不偽造 100%。未改動的 inherited_baseline 獨立統計，不算本次 binding 缺失；既有 binding 被破壞屬 regression，必須修復。
+- v1.4：tokenBinding 的「綁定」包含 variable binding 與 paint／text／effect style 套用；報告中分開列出兩者的數量。raw 值（例如沒有 style 的漸層）計入分母但不計入分子，除非已接受為例外。
 - `reuse = 使用既有元件的可重用實例數 / 可重用控制項實例總數`，只作觀察，不設鼓勵錯誤重用的固定門檻。
 - `unresolvedRequiredBindings = 0`、`unexplainedDetachedInstances = 0`、`duplicateLogicalKeys = 0`（設計交付範圍）。runtime 已驗證有效值但無法完整讀取 alias trace，可另記 trace unavailable；不得誤報有效值未解析，亦不得捏造 trace。
 - 設計交付的 critical／major 問題需處理；audit 任務需將查到的嚴重問題如實登錄並附證據，不要求將它們修復。兩者都不能以美觀分數抵銷執行層的未驗證阻礙。
@@ -1052,9 +1077,14 @@ finding.status 為 `open | resolved | accepted`，origin 為 `introduced | regre
 | T43 | `whoami` 為 View／Dev seat，或讀取回報沒有權限 | 停在 blocked 並給出第 4.2.1 節恢復步驟；不重試耗用配額 | 4.2.1、G7 |
 | T44 | hook 的放行路徑（無 active run、read、通過檢查的 write） | 不輸出任何 permission decision；只有阻擋時輸出 deny | 4.5、INVARIANT-14 |
 | T45 | 元件 library 已核准，但 variables 來自未識別的 library | 記為 gap、詢問使用者；不以 raw value 冒充綁定 | 6.1 |
+| T47 | 使用者授權本 run 採用建議；其中一題沒有建議 | 有建議的題目 `source=user` 並附 delegation；無建議的題目 `skipped`、對應元素不建立；新 run 不沿用授權 | 7.4 DEC-07、DEC-08 |
+| T48 | 參考畫面的文字 style 對比不足 | Plan 階段即列出並提出替代 style；沿用時 G5 fail 且不可例外 | 9.5 |
+| T49 | 元件使用的字型本機未安裝 | 不換字型；記 baseline 並在 Plan 列出；截圖確認無缺字 | 10.3 |
+| T50 | 使用者接受未完成的 run 為測試成功 | `userAcceptance` 有紀錄，`ledger.status` 與 completionEvaluation 不變，handoff 同時列出兩者 | 2.3 |
+| T51 | write 回應被截斷（`// truncated to 20kb`） | 記為 `unknown_outcome`，對帳前阻擋同檔寫入 | CAP-05、4.5 |
 | T46 | 新匯入的元件版本與既有畫面使用的版本外觀不同 | 在 plan 中列出差異並記 baseline；不自行接受 library 更新或用 override 模仿舊版 | 6.2 |
 
-**v1.2 優先級：**P0 必測為 T02–T08、T10、T11、T13、T15、T16、T21–T27、T29、T31–T33、T35、T38–T41；v1.3 新增 T43–T46 皆為 P0。其餘（T01、T09、T12、T14、T17–T20、T28、T30、T34、T36、T37、T42）為 P1，仍保留在 fixture 層逐步補齊；不得因為列 P1 就在交付報告中省略其狀態。
+**v1.2 優先級：**P0 必測為 T02–T08、T10、T11、T13、T15、T16、T21–T27、T29、T31–T33、T35、T38–T41；v1.3 新增 T43–T46 與 v1.4 新增 T47–T51 皆為 P0。其餘（T01、T09、T12、T14、T17–T20、T28、T30、T34、T36、T37、T42）為 P1，仍保留在 fixture 層逐步補齊；不得因為列 P1 就在交付報告中省略其狀態。
 
 ### 13.3 基準任務
 
@@ -1129,6 +1159,8 @@ M1 先驗證最小真實路徑，不等六份 schema 和所有 scripts 完成才
 
 M1 缺權限或素材時，可繼續 M2/M3 的離線部分，但不得把未驗證 runtime 假設固化成通用 adapter。
 
+**第一次真實任務（v1.4，2026-09-28）：**run `ui-20260928-001`「名片分享成功」在 sandbox 頁完成整個流程（Intake → Preflight → Discover → Plan → Build → Validate → Handoff），5 個 write 皆讀回驗證、無未知結果、鎖已釋放。完成判定為 `awaiting_user`（G5：說明文字對比 3.34:1；另有待決的字型與圖示決策），使用者選擇不調整、接受為測試成功（見第 2.3 節）。詳見 `docs/m3-first-run-summary.md`。
+
 **M1 之後的待辦（v1.3）：**
 
 | 項目 | 歸屬 | 說明 |
@@ -1138,6 +1170,8 @@ M1 缺權限或素材時，可繼續 M2/M3 的離線部分，但不得把未驗�
 | PostToolUseFailure 真實觸發 | M3 | 記錄實際 stdin 欄位與 `safeToRetryWithoutCanvasRead` 的出現情形 |
 | 確切回傳上限 | M2 | 量測後寫入 capabilities，Discover 依此拆批 |
 | F-001 寬度原因 | 選配 | 推測為目前版 Active 的 icon，未以實驗證實；已依 dec-010 接受為例外 |
+| 確切回傳上限 | 已完成（M2） | 20,480 字元、靜默截斷；中文計算方式未驗證 |
+| v1.4 規則的實作 | M3 | DEC-07／08、userAcceptance、可及性預檢、字型比對、T47–T51（見 `CC_BUILD_PROMPT.md` 的 M3 指令） |
 
 M2 以 M1 已實作的 `scripts/hooks/*`、`scripts/evaluate-completion.mjs` 與其測試為基礎擴充，不重寫；測試指令為 `node --test "tests/**/*.test.mjs"`（`node --test tests/` 在 Node 22 會失敗）。
 
@@ -1211,11 +1245,28 @@ INVARIANT-13: 有 active run 時，所有 Figma write 呼叫都必須經過 hook
 INVARIANT-14: hook 不輸出 permissionDecision "allow"；放行只以不輸出決定表示。
 INVARIANT-15: read operation 不得使用或覆寫 write operation 的 operationId。
 INVARIANT-16: 未經驗證的原因推論不得寫成 confirmed 規則或 pattern 限制。
+INVARIANT-17: 使用者接受（userAcceptance）不得改變 ledger.status 或 completionEvaluation；未通過判定的 run 不得稱為 complete。
+INVARIANT-18: 授權採用建議只在該 run 有效；沒有建議的設計決策不得由 agent 自行回答。
 ```
 
 這些應至少以 contract／fixture tests 驗證。prompt 可以描述規則，但程式化 validator 才能攔下可判定的違規狀態。
 
-### 20.3 v1.3 變更紀錄
+### 20.3 v1.4 變更紀錄
+
+依 M2 量測與第一次真實任務（`docs/m2-summary.md`、`docs/m3-first-run-summary.md`）修訂：
+
+- 第 2.3 節：新增使用者接受（`userAcceptance`），與完成判定分開；INVARIANT-17。
+- 第 7.4 節：DEC-07 授權採用建議、DEC-08 決策狀態（pending／answered／skipped）；INVARIANT-18。
+- 第 7.1 節：REQ-04 品牌與產品名稱由使用者確認。
+- 第 6.2 節：從既有 instance 取得主元件以避開版本差異；來源未識別元件經核准可重用。
+- 第 9.5 節：Plan 階段可及性預檢；參考畫面不合格不能當作合格理由。
+- 第 10.1、12.2 節：paint／text styles 視為 DS token，計入 tokenBinding。
+- 第 10.3 節：本機未安裝字型的處理。
+- CAP-05：`use_figma` 回傳上限 20,480 字元與靜默截斷的處理。
+- 第 13.2 節新增 T47–T51；第 17 節記錄第一次真實任務與 M3 待辦。
+- schemaVersion 維持 `1.2`；`designDecisions[].status`、`delegation` 與 `ledger.userAcceptance` 為新增的選填欄位，由 M3 實作 schema 與 validator。
+
+### 20.4 v1.3 變更紀錄
 
 依 2026-09-28 使用者本機 M0–M1 實測（`docs/m1-summary.md`、研究紀錄第 10 節）修訂：
 
@@ -1232,7 +1283,7 @@ INVARIANT-16: 未經驗證的原因推論不得寫成 confirmed 規則或 patter
 - schemaVersion 維持 `1.2`：本版沒有改變資料契約結構，inventory pattern 的 `constraints` 為新增的選填欄位。
 - 第 11.5 節 `safeToRetryWithoutCanvasRead` 已於 PR #2 依官方 figma-use skill Rule 14 恢復，v1.3 沿用。
 
-### 20.4 v1.2 變更紀錄
+### 20.5 v1.2 變更紀錄
 
 使用者於 2026-09-28 確認：本機 Claude Code 執行、可能與 agent 同時編輯、提供 M1 測試檔與唯讀 library、設計決策一律詢問，並同意全部 v1.2 審查建議。v1.2 變更：
 
@@ -1252,7 +1303,7 @@ INVARIANT-16: 未經驗證的原因推論不得寫成 confirmed 規則或 patter
 
 目前尚無 1.1 artifacts；若日後出現，依下方 1.0 的同樣原則唯讀備份、驗證後遷移（補 designDecisions、basisRefs、mode、patterns，移除 audit.status），不得只改版本字串。
 
-### 20.5 v1.1 變更紀錄與遷移
+### 20.6 v1.1 變更紀錄與遷移
 
 使用者於 2026-09-28 同意全部審查建議。v1.1：統一完成判定並移除分數門檻；基線／新增／回歸分開；runtime consumer 解析優先；補無回傳 ID 與 stale lock 恢復；任務分流；手動 new／continue／resume；來源／輸出分離；提前核心 DS 規格；先做真實垂直流程；同步研究與建置指令。
 

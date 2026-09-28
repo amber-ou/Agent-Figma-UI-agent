@@ -1,8 +1,8 @@
 # Figma MCP UI 設計研究紀錄
 
-版本：1.3 · 原研究日期：2026-09-27 · 補充查核／修訂：2026-09-28（v1.1、v1.2、v1.3）。
+版本：1.4 · 原研究日期：2026-09-27 · 補充查核／修訂：2026-09-28（v1.1–v1.4）。
 
-目的：為「Claude Code 讀取指定檔案的 library／variables 並延伸 UI」提供來源與限制。規範以 FIGMA_UI_AGENT_SPEC.md v1.3 為唯一來源；本文件不另定義完成條件。
+目的：為「Claude Code 讀取指定檔案的 library／variables 並延伸 UI」提供來源與限制。規範以 FIGMA_UI_AGENT_SPEC.md v1.4 為唯一來源；本文件不另定義完成條件。
 
 ## 1. 研究方式與可信度
 
@@ -238,3 +238,16 @@ M1 在使用者授權的測試檔跑通真實垂直流程，run `ui-20260928-m1`
 
 以上屬 E（本環境觀察），以使用者本機 Claude Code 2.1.283、Figma plugin 2.2.118 為準；升級後需重測。
 
+## 12. v1.4 決策紀錄（第一次真實任務，2026-09-28）
+
+| 觀察（E） | 來源 | 主規格處理 |
+|---|---|---|
+| `use_figma` 回傳上限 20,480 字元，超過時靜默截斷並附 `// truncated to 20kb` | M2 唯讀量測（ASCII） | CAP-05；hook 把截斷的 write 記為 unknown_outcome |
+| 參考畫面的顏色與文字多用 paint／text styles，variables 很少 | 第一次真實任務 Discover | 第 10.1、12.2 節 |
+| 參考畫面的文字 style 對比不足（3.34:1），照抄後 G5 fail | 第一次真實任務 Validate | 第 9.5 節可及性預檢 |
+| 主元件字型（SF Pro Text）本機未安裝 | 第一次真實任務 Validate | 第 10.3 節 |
+| 同一主元件的舊 instance 與新 instance 結構不同（icon 數量） | 第一次真實任務 Validate（原因未驗證） | 第 6.2 節 |
+| 參考畫面帶有其他品牌 logo（AileCard） | 第一次真實任務 Plan | REQ-04 |
+| 使用者為測試授權採用建議；未通過判定的 run 接受為測試成功 | 使用者指示 | DEC-07、DEC-08、第 2.3 節 userAcceptance |
+
+使用者決定不做收尾調整、接受為測試成功。run `ui-20260928-001` 的完成判定維持 `awaiting_user`，見 `docs/m3-first-run-summary.md`。
