@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://figma-ui.local/schemas/ledger.schema.json",
+  "title": "ledger.json — single source of run.status (spec §11, §12.4, §20)",
+  "type": "object",
+  "required": ["schemaVersion", "runId", "phase", "status", "entities", "lastVerifiedOperationId", "pendingOperations", "pendingQuestions"],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "runId": { "$ref": "common.schema.json#/$defs/runId" },
+    "phase": { "$ref": "common.schema.json#/$defs/phase" },
+    "status": { "$ref": "common.schema.json#/$defs/runStatus" },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["logicalKey", "nodeId", "type", "fileKey", "active", "lastOperationId"],
+        "properties": {
+          "logicalKey": { "type": "string", "minLength": 1 },
+          "nodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "type": { "type": "string" },
+          "fileKey": { "$ref": "common.schema.json#/$defs/fileKey" },
+          "active": { "type": "boolean" },
+          "childNodeIds": { "$ref": "common.schema.json#/$defs/nodeIds" },
+          "agentFingerprint": { "type": "string", "pattern": "^fp[0-9]+:[0-9a-f]{8}$" },
+          "lastOperationId": { "$ref": "common.schema.json#/$defs/localId" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "importedRemoteNodeIds": { "$ref": "common.schema.json#/$defs/nodeIds" },
+    "lastVerifiedOperationId": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/localId" }] },
+    "pendingOperations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["operationId", "status"],
+        "properties": {
+          "operationId": { "$ref": "common.schema.json#/$defs/localId" },
+          "status": { "$ref": "common.schema.json#/$defs/operationStatus" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "pendingQuestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "question"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/localId" },
+          "question": { "type": "string" },
+          "blocking": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "gaps": { "type": "array", "items": { "type": "string" } },
+    "lock": {
+      "type": "object",
+      "properties": {
+        "released": { "type": "boolean" },
+        "acquiredAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "releasedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "by": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "completionEvaluatedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+  },
+  "additionalProperties": false
+}

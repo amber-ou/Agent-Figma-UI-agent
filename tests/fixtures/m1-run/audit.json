@@ -1,0 +1,297 @@
+{
+  "schemaVersion": "1.2",
+  "runId": "ui-20260928-m1",
+  "taskType": "extend",
+  "gates": [
+    {
+      "id": "G1",
+      "status": "pass",
+      "evidenceRefs": [
+        "ev-005"
+      ],
+      "note": "only page 34014:8 and owned nodes created/changed; no detach; no component edits; no library update"
+    },
+    {
+      "id": "G2",
+      "status": "pass",
+      "evidenceRefs": [
+        "ev-005",
+        "ev-006"
+      ],
+      "note": "the single applicable cell has current structure + screenshot evidence after the last mutation (op-0007)"
+    },
+    {
+      "id": "G3",
+      "status": "pass",
+      "evidenceRefs": [
+        "ev-005"
+      ]
+    },
+    {
+      "id": "G4",
+      "status": "pass",
+      "evidenceRefs": [
+        "ev-006"
+      ],
+      "note": "no clipping/overlap/missing glyphs; F-001 minor open"
+    },
+    {
+      "id": "G5",
+      "status": "pass",
+      "evidenceRefs": [
+        "ev-007"
+      ],
+      "note": "design-level only; keyboard / screen reader need implementation verification"
+    },
+    {
+      "id": "G6",
+      "status": "pass",
+      "evidenceRefs": [
+        "ev-005",
+        "ev-006"
+      ]
+    },
+    {
+      "id": "G7",
+      "status": "pass",
+      "note": "no pending questions or design decisions (dec-010 answered); no dispatched/unknown_outcome operations"
+    }
+  ],
+  "coverage": {
+    "applicable": 1,
+    "verified": 1
+  },
+  "metrics": {
+    "tokenBinding": "N/A (denominator 0: no new variable bindings per dec-004; gap-001)",
+    "reuse": "2/2 instances from Acme Library",
+    "detachedInstances": 0,
+    "duplicateLogicalKeys": 0
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "minor",
+      "subject": "design",
+      "origin": "introduced",
+      "affectsDelivery": true,
+      "category": "layout",
+      "nodeId": "34016:68",
+      "screenKey": "m1.button-row",
+      "observed": "Widths 131/129 vs example 130/130, unchanged after switching to 2-char labels (dec-008)",
+      "expected": "equal widths per P1 pattern",
+      "probableCause": "Label length ruled out (rd-0007). Only remaining layout difference vs the example is the two Return icons in the current Active variant (F-004 version drift, kept by dec-009). Likely, not proven by experiment.",
+      "status": "accepted",
+      "evidenceRefs": [
+        "ev-005",
+        "ev-006"
+      ],
+      "decisionRef": "dec-010",
+      "acceptedAt": "2026-09-28T11:38:49.425Z",
+      "causeStatus": "hypothesis"
+    },
+    {
+      "id": "F-002",
+      "severity": "minor",
+      "subject": "design",
+      "origin": "inherited_baseline",
+      "affectsDelivery": false,
+      "category": "content",
+      "nodeId": "34016:73",
+      "screenKey": "m1.button-row",
+      "observed": "Secondary variant renders a rotate/refresh icon before the label",
+      "expected": "to be decided",
+      "status": "resolved",
+      "evidenceRefs": [
+        "ev-002"
+      ],
+      "resolution": "not applicable: Secondary no longer used (dec-006)"
+    },
+    {
+      "id": "F-003",
+      "severity": "minor",
+      "subject": "design",
+      "origin": "introduced",
+      "affectsDelivery": false,
+      "category": "hierarchy",
+      "nodeId": "34016:68",
+      "screenKey": "m1.button-row",
+      "observed": "label 主要按鈕 sits on the visually weaker Default variant (grey text, light border); 次要按鈕 is on the blue outlined Secondary",
+      "expected": "label semantics match visual weight",
+      "status": "resolved",
+      "evidenceRefs": [
+        "ev-004"
+      ],
+      "resolution": "Default+Active per dec-007; hierarchy matches labels (ev-004)"
+    },
+    {
+      "id": "F-004",
+      "severity": "minor",
+      "subject": "design",
+      "origin": "inherited_baseline",
+      "affectsDelivery": false,
+      "category": "library_version_drift",
+      "nodeId": "34016:73",
+      "screenKey": "m1.button-row",
+      "observed": "Current published Acme Button type=Active has two Return icons around the label; the existing screens use an older version of the same variant key without icons (test file has not accepted library updates)",
+      "expected": "to be decided",
+      "status": "resolved",
+      "evidenceRefs": [
+        "ev-003",
+        "ev-004"
+      ],
+      "resolution": "reclassified as baseline observation bl-004 per dec-009 (keep current version; record only)",
+      "decisionRef": "dec-009"
+    }
+  ],
+  "baselineObservations": [
+    "bl-001 Button has no TEXT property; labels set via inner text override (overriddenFields: characters, styledTextSegments)",
+    "bl-002 Button colours are not bound to variables (only Stroke/Border, Space/400 bound)",
+    "bl-003 Label font is Inter Bold, which has no CJK glyphs; Figma renders CJK with fallback font (same as existing screens); hasMissingFont=false, no tofu in screenshot",
+    "bl-004 Library version drift: existing screens use an older version of Acme Button type=Active (no icons, fill #11A1E9); current published version has two Return icons and fill #2263EB; test file has not accepted library updates (dec-009: record only)",
+    "bl-005 Default Button border #E5E5E5 on white is 1.26:1; text button, boundary not required by WCAG 1.4.11; component-level, not changed"
+  ],
+  "evidence": [
+    {
+      "id": "ev-001",
+      "kind": "structure",
+      "nodeId": "34016:68",
+      "screenKey": "m1.button-row",
+      "toolRef": {
+        "tool": "mcp__figma__use_figma",
+        "operation": "rd-0003",
+        "capturedAt": "2026-09-28T11:13:24.283Z"
+      },
+      "artifactRef": null,
+      "reviewSummary": "instances linked to Acme set f90477…; variants Default/Secondary; not detached; bindings Stroke/Border=1, Space/400=16 resolved via resolveForConsumer on new nodes; Size collection mode 9:7 inherited, no explicit modes; marker + fingerprint persisted",
+      "operationIds": [
+        "op-0003"
+      ],
+      "validity": "superseded"
+    },
+    {
+      "id": "ev-002",
+      "kind": "screenshot",
+      "nodeId": "34014:9",
+      "screenKey": "m1.button-row",
+      "toolRef": {
+        "tool": "mcp__figma__get_screenshot",
+        "capturedAt": "2026-09-28T11:13:24.283Z"
+      },
+      "artifactRef": null,
+      "reviewSummary": "no clipping/overlap; CJK labels render with no missing glyphs; widths unequal (F-001); Secondary shows refresh icon (F-002); visual weight vs labels (F-003)",
+      "operationIds": [
+        "op-0003"
+      ],
+      "validity": "superseded"
+    },
+    {
+      "id": "ev-003",
+      "kind": "structure",
+      "nodeId": "34016:68",
+      "screenKey": "m1.button-row",
+      "toolRef": {
+        "tool": "mcp__figma__use_figma",
+        "operation": "rd-0005,rd-0006",
+        "capturedAt": "2026-09-28T11:17:58.342Z"
+      },
+      "artifactRef": null,
+      "reviewSummary": "same set/variant keys, padding 56/56, stroke and FILL as existing P1 example; widths 131/129 vs 130/130; Active (current library) has two Return icons, example Active (older version in test file) has none; bindings Stroke/Border=1 via resolveForConsumer, Size mode 9:7 inherited",
+      "operationIds": [
+        "op-0006"
+      ],
+      "validity": "superseded"
+    },
+    {
+      "id": "ev-004",
+      "kind": "screenshot",
+      "nodeId": "34014:9",
+      "screenKey": "m1.button-row",
+      "toolRef": {
+        "tool": "mcp__figma__get_screenshot",
+        "capturedAt": "2026-09-28T11:17:58.342Z"
+      },
+      "artifactRef": null,
+      "reviewSummary": "Default 次要按鈕 (grey outline) left, Active 主要按鈕 (blue fill, white text) right; hierarchy now matches labels; no clipping or overlap; CJK glyphs complete; two refresh icons around 主要按鈕; widths visually near-equal (131/129)",
+      "operationIds": [
+        "op-0006"
+      ],
+      "validity": "superseded"
+    },
+    {
+      "id": "ev-005",
+      "kind": "structure",
+      "nodeId": "34016:68",
+      "screenKey": "m1.button-row",
+      "toolRef": {
+        "tool": "mcp__figma__use_figma",
+        "operation": "rd-0007",
+        "capturedAt": "2026-09-28T11:29:43.645Z"
+      },
+      "artifactRef": null,
+      "reviewSummary": "labels 取消 (w28) / 確認 (w28); same set/variant keys, padding 56/56, FILL as example; only layout difference vs example: current Active has two 16px Return icons + 8px gaps; Active fill #2263EB vs example #11A1E9 (version drift); marker fp1:d9899c64 persisted",
+      "operationIds": [
+        "op-0007"
+      ],
+      "validity": "current"
+    },
+    {
+      "id": "ev-006",
+      "kind": "screenshot",
+      "nodeId": "34014:9",
+      "screenKey": "m1.button-row",
+      "toolRef": {
+        "tool": "mcp__figma__get_screenshot",
+        "capturedAt": "2026-09-28T11:29:43.645Z"
+      },
+      "artifactRef": null,
+      "reviewSummary": "取消 (grey outline) left, 確認 (blue fill, white text, refresh icons) right; no clipping/overlap; CJK complete; widths near-equal (131/129)",
+      "operationIds": [
+        "op-0007"
+      ],
+      "validity": "current"
+    },
+    {
+      "id": "ev-007",
+      "kind": "contrast",
+      "nodeId": "34016:68",
+      "screenKey": "m1.button-row",
+      "toolRef": {
+        "tool": "mcp__figma__use_figma + local calc",
+        "operation": "rd-0007",
+        "capturedAt": "2026-09-28T11:29:43.645Z"
+      },
+      "artifactRef": null,
+      "reviewSummary": "text #747474 on #FFFFFF 4.67:1; #FFFFFF on #2263EB 5.18:1 (14px Bold = normal text, needs 4.5); targets 131x45 and 129x45 >= 24x24; Default border #E5E5E5 1.26:1 is a text button boundary, not required by 1.4.11 -> bl-005",
+      "operationIds": [
+        "op-0007"
+      ],
+      "validity": "current"
+    }
+  ],
+  "implementationVerificationRequired": [
+    "keyboard-navigation",
+    "screen-reader"
+  ],
+  "acceptedExceptions": [
+    {
+      "id": "ex-001",
+      "findingId": "F-001",
+      "decisionRef": "dec-010",
+      "hard": false,
+      "scope": "m1.button-row (34016:68): button widths 131/129 instead of 130/130",
+      "reason": "user accepted; likely caused by icons in the current Active variant kept per dec-009",
+      "acceptedAt": "2026-09-28T11:38:49.425Z"
+    }
+  ],
+  "completionEvaluation": {
+    "ruleVersion": "12.1@1.2-m1min",
+    "eligible": true,
+    "result": "complete_with_exceptions",
+    "coverage": {
+      "applicable": 1,
+      "verified": 1
+    },
+    "reasons": [],
+    "evaluatedAt": "2026-09-28T11:38:49.529Z"
+  }
+}

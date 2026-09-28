@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://figma-ui.local/schemas/inventory.schema.json",
+  "title": "inventory.json (spec §6.1, §6.6, §20)",
+  "type": "object",
+  "required": ["schemaVersion", "runId", "sources", "discoveryCoverage", "components", "variables", "styles", "patterns", "baseline", "evidenceRefs"],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "runId": { "$ref": "common.schema.json#/$defs/runId" },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["fileKey", "role"],
+        "properties": {
+          "fileKey": { "$ref": "common.schema.json#/$defs/fileKey" },
+          "role": { "enum": ["reference", "output", "reference+output", "design_system"] },
+          "libraryKey": { "$ref": "common.schema.json#/$defs/libraryKey" },
+          "provides": { "type": "array", "items": { "enum": ["components", "variables", "styles", "screens"] } },
+          "nodeIds": { "$ref": "common.schema.json#/$defs/nodeIds" },
+          "pages": {
+            "description": "v1.3 §8.1: page list from figma.root.children, not get_metadata.",
+            "type": "array",
+            "items": { "type": "object", "required": ["id", "name"], "properties": { "id": { "$ref": "common.schema.json#/$defs/nodeId" }, "name": { "type": "string" } } }
+          },
+          "librariesAddedToFile": {
+            "description": "v1.3 §6.1: enabled only when get_libraries and runtime teamLibrary agree.",
+            "type": "object",
+            "properties": {
+              "getLibraries": { "type": "array", "items": { "type": "string" } },
+              "teamLibraryCollections": { "type": "array", "items": { "type": "string" } },
+              "agree": { "type": "boolean" }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "discoveryCoverage": {
+      "type": "object",
+      "required": ["components", "variables", "styles"],
+      "properties": {
+        "components": { "$ref": "common.schema.json#/$defs/coverage" },
+        "variables": { "$ref": "common.schema.json#/$defs/coverage" },
+        "styles": { "$ref": "common.schema.json#/$defs/coverage" },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/localId" },
+          "name": { "type": "string" },
+          "componentSetKey": { "$ref": "common.schema.json#/$defs/assetKey" },
+          "componentKey": { "$ref": "common.schema.json#/$defs/assetKey" },
+          "libraryKey": { "$ref": "common.schema.json#/$defs/libraryKey" },
+          "sourceNodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "variants": { "type": "array", "items": { "type": "string" } },
+          "textProperty": { "type": "boolean" },
+          "usedInScreens": { "type": "integer", "minimum": 0 },
+          "versionCheck": { "type": "object" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "variables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "collection"],
+        "properties": {
+          "name": { "type": "string" },
+          "key": { "$ref": "common.schema.json#/$defs/assetKey" },
+          "collection": { "type": "string" },
+          "collectionKey": { "$ref": "common.schema.json#/$defs/assetKey" },
+          "modes": { "type": "array", "items": { "type": "string" } },
+          "resolvedType": { "enum": ["COLOR", "FLOAT", "STRING", "BOOLEAN"] },
+          "remote": { "type": "boolean" },
+          "libraryKey": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/libraryKey" }] },
+          "sourceLibraryStatus": { "enum": ["identified", "unidentified"] },
+          "inheritedOnly": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "styles": { "type": "array" },
+    "patterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "sourceNodeIds", "measured", "evidenceRefs"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/localId" },
+          "description": { "type": "string" },
+          "sourceNodeIds": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/nodeId" }, "minItems": 1 },
+          "occurrences": { "type": "integer", "minimum": 1 },
+          "measured": { "type": "object" },
+          "components": { "type": "array", "items": { "type": "string" } },
+          "variables": { "type": "array", "items": { "type": "string" } },
+          "conflictsWith": { "$ref": "common.schema.json#/$defs/refs" },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "status", "statement", "evidenceRefs"],
+              "properties": {
+                "id": { "$ref": "common.schema.json#/$defs/localId" },
+                "status": { "enum": ["observed_not_confirmed", "confirmed"] },
+                "statement": { "type": "string" },
+                "measured": { "type": "string" },
+                "conclusion": { "type": "string" },
+                "hypothesis": { "type": "string" },
+                "requestedBy": { "type": "string" },
+                "experimentRefs": { "type": "array", "items": { "type": "string" } },
+                "evidenceRefs": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+              },
+              "additionalProperties": false,
+              "if": { "properties": { "status": { "const": "confirmed" } } },
+              "then": {
+                "description": "INVARIANT-16: only experimentally verified constraints may be confirmed, with measurements.",
+                "required": ["measured", "experimentRefs"],
+                "properties": { "experimentRefs": { "minItems": 1 } }
+              }
+            }
+          },
+          "evidenceRefs": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "baseline": { "type": "array", "items": { "type": "string" } },
+    "evidenceRefs": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

@@ -40,7 +40,16 @@ try {
     const status = header.mode === 'write' && flag !== true ? 'unknown_outcome' : 'failed_known';
     appendJsonl(journalFile, { operationId: header.operationId, status, toolUseId: input.tool_use_id, safeToRetryWithoutCanvasRead: flag, errorSummary: resultText, timestamps: { failedAt: nowIso() } });
   } else {
-    appendJsonl(journalFile, { operationId: header.operationId, status: 'applied', toolUseId: input.tool_use_id, resultSummary: resultText, timestamps: { appliedAt: nowIso() } });
+    // use_figma silently truncates responses above 20 KiB and appends "// truncated to 20kb"
+    // (measured in M2). A truncated write response may have lost created IDs: reconcile it.
+    const fullText = typeof rawResult === 'string' ? rawResult : JSON.stringify(rawResult ?? null);
+    const truncated = /truncated to \d+\s*kb/i.test(fullText);
+    const status = truncated && header.mode === 'write' ? 'unknown_outcome' : 'applied';
+    appendJsonl(journalFile, {
+      operationId: header.operationId, status, toolUseId: input.tool_use_id, resultSummary: resultText,
+      ...(truncated ? { effectSummary: { responseTruncated: true, note: 'tool response truncated; returned IDs may be incomplete' } } : {}),
+      timestamps: { appliedAt: nowIso() },
+    });
   }
 } catch (err) {
   // Post hooks cannot undo a call; surface the problem without blocking.

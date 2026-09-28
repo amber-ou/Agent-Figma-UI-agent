@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://figma-ui.local/schemas/plan.schema.json",
+  "title": "plan.json (spec §6.2, §6.3, §7.4, §8, §20)",
+  "type": "object",
+  "required": ["schemaVersion", "runId", "taskType", "status", "screens", "requiredCells", "componentMap", "variableMap", "patternRefs", "designDecisions", "scope", "baseline", "decisions"],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "runId": { "$ref": "common.schema.json#/$defs/runId" },
+    "taskType": { "$ref": "common.schema.json#/$defs/taskType" },
+    "status": { "enum": ["draft", "confirmed"] },
+    "screens": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["screenKey"],
+        "properties": {
+          "screenKey": { "$ref": "common.schema.json#/$defs/localId" },
+          "task": { "type": "string" },
+          "primaryAction": { "type": "string" },
+          "sections": { "type": "array", "items": { "type": "string" } },
+          "patternRefs": { "$ref": "common.schema.json#/$defs/refs" },
+          "decisionRefs": { "$ref": "common.schema.json#/$defs/refs" },
+          "contentLimits": { "type": "object" },
+          "destinations": { "type": "object" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "requiredCells": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "screenKey", "applicable", "evidence", "deliverable"],
+        "properties": {
+          "key": { "$ref": "common.schema.json#/$defs/localId" },
+          "screenKey": { "$ref": "common.schema.json#/$defs/localId" },
+          "checkId": { "type": "string" },
+          "viewport": { "type": ["string", "null"] },
+          "state": { "type": ["string", "null"] },
+          "mode": { "type": ["string", "null"] },
+          "applicable": { "type": "boolean" },
+          "reason": { "type": "string", "minLength": 1 },
+          "evidence": { "type": "array", "items": { "enum": ["structure", "screenshot", "contrast", "check"] }, "uniqueItems": true },
+          "deliverable": { "enum": ["frame", "variant", "annotation", "report"] },
+          "decisionRef": { "$ref": "common.schema.json#/$defs/localId" }
+        },
+        "additionalProperties": false,
+        "if": { "properties": { "applicable": { "const": false } } },
+        "then": { "required": ["reason"] }
+      }
+    },
+    "componentMap": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "logicalName", "source", "decision", "reason"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/localId" },
+          "logicalName": { "type": "string" },
+          "source": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": {
+              "kind": { "enum": ["published_library", "local", "remote_instance"] },
+              "libraryKey": { "$ref": "common.schema.json#/$defs/libraryKey" },
+              "sourceFileKey": { "$ref": "common.schema.json#/$defs/fileKey" },
+              "sourceNodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
+              "componentKey": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/assetKey" }] },
+              "componentSetKey": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/assetKey" }] }
+            },
+            "additionalProperties": false
+          },
+          "supportedVariants": { "type": "object" },
+          "textPropertyKeys": { "type": "array", "items": { "type": "string" } },
+          "instanceSwapPropertyKeys": { "type": "array", "items": { "type": "string" } },
+          "requiredStateGaps": { "type": "array", "items": { "type": "string" } },
+          "decision": { "enum": ["reuse", "wrap_proposed", "new_proposed", "blocked", "awaiting_user"] },
+          "reason": { "type": "string" },
+          "versionCheck": {
+            "description": "v1.3 §6.2: current published version vs the version used by existing screens.",
+            "type": "object",
+            "required": ["status"],
+            "properties": {
+              "status": { "enum": ["same", "differs", "not_checked"] },
+              "differences": { "type": "array", "items": { "type": "string" } },
+              "baselineRef": { "$ref": "common.schema.json#/$defs/localId" },
+              "listedToUserRef": { "$ref": "common.schema.json#/$defs/localId" }
+            },
+            "additionalProperties": false,
+            "if": { "properties": { "status": { "const": "differs" } } },
+            "then": { "required": ["differences", "baselineRef"] }
+          },
+          "evidenceRefs": { "$ref": "common.schema.json#/$defs/refs" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "variableMap": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "usage", "property", "name", "resolvedType", "sourceKind", "bindingStatus"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/localId" },
+          "usage": { "type": "string" },
+          "property": { "type": "string" },
+          "variableId": { "$ref": "common.schema.json#/$defs/realId" },
+          "variableKey": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/assetKey" }] },
+          "name": { "type": "string" },
+          "collectionKey": { "$ref": "common.schema.json#/$defs/assetKey" },
+          "collectionName": { "type": "string" },
+          "resolvedType": { "enum": ["COLOR", "FLOAT", "STRING", "BOOLEAN"] },
+          "sourceKind": { "enum": ["local", "remote"] },
+          "libraryKey": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/libraryKey" }] },
+          "modeSelection": { "type": "object" },
+          "aliasChain": { "type": "array", "items": { "type": "string" } },
+          "consumerNodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "resolutionMethod": { "enum": ["runtime", "manual_trace", "none"] },
+          "valueStatus": { "enum": ["verified", "unresolved", "unavailable"] },
+          "traceStatus": { "enum": ["complete", "partial", "unavailable"] },
+          "bindingStatus": { "enum": ["verified", "planned", "inherited_only", "gap", "not_verified"] },
+          "gapRef": { "$ref": "common.schema.json#/$defs/localId" },
+          "evidenceRefs": { "$ref": "common.schema.json#/$defs/refs" }
+        },
+        "additionalProperties": false,
+        "allOf": [
+          { "if": { "properties": { "bindingStatus": { "const": "gap" } } }, "then": { "required": ["gapRef"] } },
+          { "if": { "properties": { "bindingStatus": { "const": "verified" } } }, "then": { "required": ["variableKey", "consumerNodeId", "valueStatus"], "properties": { "resolutionMethod": { "const": "runtime" }, "valueStatus": { "const": "verified" } } } }
+        ]
+      }
+    },
+    "patternRefs": { "$ref": "common.schema.json#/$defs/refs" },
+    "designDecisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "question", "options", "recommendation", "answer", "source", "evidenceRefs", "decidedAt"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/localId" },
+          "question": { "type": "string", "minLength": 1 },
+          "context": { "type": "string" },
+          "options": { "type": "array", "items": { "type": "string" } },
+          "recommendation": { "type": ["string", "null"] },
+          "answer": { "type": ["string", "null"] },
+          "source": { "$ref": "common.schema.json#/$defs/decisionSource" },
+          "evidenceRefs": { "type": "array", "items": { "type": "string" } },
+          "decidedAt": { "$ref": "common.schema.json#/$defs/nullableDateTime" }
+        },
+        "additionalProperties": false,
+        "if": { "properties": { "answer": { "type": "string" } } },
+        "then": { "properties": { "decidedAt": { "$ref": "common.schema.json#/$defs/dateTime" } } }
+      }
+    },
+    "scope": { "type": "object" },
+    "baseline": {
+      "type": "object",
+      "required": ["observations"],
+      "properties": {
+        "pagesBefore": { "$ref": "common.schema.json#/$defs/nodeIds" },
+        "screenshots": { "$ref": "common.schema.json#/$defs/refs" },
+        "observations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "kind", "subject"],
+            "properties": {
+              "id": { "$ref": "common.schema.json#/$defs/localId" },
+              "kind": { "enum": ["inherited_baseline", "regression_risk", "note"] },
+              "subject": { "type": "string" },
+              "evidenceRefs": { "type": "array", "items": { "type": "string" } }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "decision", "scope", "decidedAt", "source"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/localId" },
+          "decision": { "type": "string" },
+          "scope": { "type": "string" },
+          "decidedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+          "source": { "enum": ["user"] },
+          "evidenceRefs": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

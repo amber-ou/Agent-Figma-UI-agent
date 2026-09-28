@@ -1,12 +1,13 @@
 #!/usr/bin/env node
-// Minimal implementation of the single completion rule (spec §12.1), used for M1.
-// M2 will add JSON Schema validation and the full cross-file checks of spec §20.
+// The single completion rule (spec §12.1). evaluateRun() first runs the §20 validator
+// (JSON Schema + cross-file checks); a run with contract errors can never be complete.
 // Usage: node scripts/evaluate-completion.mjs <runDir> [--write]
-import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateRun } from './validate-artifacts.mjs';
+import { atomicWriteJson } from './state-store.mjs';
 
-export const RULE_VERSION = '12.1@1.2-m1min';
+export const RULE_VERSION = '12.1@1.2';
 const GATES = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7'];
 const ALWAYS_PASS = new Set(['G1', 'G2', 'G6', 'G7']);
 const UNRESOLVED_OPS = new Set(['dispatched', 'unknown_outcome']);
@@ -74,21 +75,32 @@ export function evaluateCompletion(plan, audit, ledger, now = new Date().toISOSt
   };
 }
 
+// Validate the run, then evaluate. Contract errors make the run partial (never complete).
+export function evaluateRun(dir, now = new Date().toISOString()) {
+  const { schemaErrors, semanticErrors, run } = validateRun(dir);
+  const contractErrors = [...schemaErrors.map(e => `schema: ${e}`), ...semanticErrors.map(e => `contract: ${e}`)];
+  if (!run.plan || !run.audit || !run.ledger) {
+    return { evaluation: { ruleVersion: RULE_VERSION, eligible: false, result: 'partial', reasons: contractErrors.length ? contractErrors : ['plan/audit/ledger missing'], evaluatedAt: now }, run, contractErrors };
+  }
+  const evaluation = evaluateCompletion(run.plan, run.audit, run.ledger, now);
+  if (contractErrors.length) {
+    evaluation.reasons = [...contractErrors, ...evaluation.reasons];
+    if (evaluation.eligible) { evaluation.eligible = false; evaluation.result = 'partial'; }
+  }
+  return { evaluation, run, contractErrors };
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const dir = process.argv[2];
   if (!dir) { console.error('usage: evaluate-completion.mjs <runDir> [--write]'); process.exit(2); }
-  const read = f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
-  const plan = read('plan.json'), audit = read('audit.json'), ledger = read('ledger.json');
-  const result = evaluateCompletion(plan, audit, ledger);
-  if (process.argv.includes('--write')) {
-    audit.completionEvaluation = result;
-    ledger.status = result.result;
-    ledger.completionEvaluatedAt = result.evaluatedAt;
-    for (const [file, obj] of [['audit.json', audit], ['ledger.json', ledger]]) {
-      const tmp = path.join(dir, file + '.tmp');
-      fs.writeFileSync(tmp, JSON.stringify(obj, null, 2));
-      fs.renameSync(tmp, path.join(dir, file));
-    }
+  const { evaluation, run } = evaluateRun(dir);
+  if (process.argv.includes('--write') && run.audit && run.ledger) {
+    run.audit.completionEvaluation = evaluation;
+    run.ledger.status = evaluation.result;
+    run.ledger.completionEvaluatedAt = evaluation.evaluatedAt;
+    run.ledger.updatedAt = evaluation.evaluatedAt;
+    atomicWriteJson(path.join(dir, 'audit.json'), run.audit);
+    atomicWriteJson(path.join(dir, 'ledger.json'), run.ledger);
   }
-  console.log(JSON.stringify(result, null, 2));
+  console.log(JSON.stringify(evaluation, null, 2));
 }

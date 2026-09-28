@@ -1,0 +1,111 @@
+{
+  "schemaVersion": "1.2",
+  "runId": "ui-20260928-m1",
+  "workflow": "native_design",
+  "taskType": "extend",
+  "stage": "confirmed",
+  "goal": "M1 feasibility: place Acme Library Button instances (type=Default, type=Secondary) in an authorized sandbox, then verify main-component link, inherited variable bindings via resolveForConsumer, sharedPluginData write, hooks and screenshot",
+  "audience": [
+    "agent builder (M1 feasibility test)"
+  ],
+  "platform": "mobile_line_oa",
+  "locale": "zh-TW",
+  "sources": {
+    "referenceFiles": [
+      {
+        "fileUrl": "https://www.figma.com/design/FixtureOutputFile00001/fixture?node-id=14442-37607",
+        "fileKey": "FixtureOutputFile00001",
+        "nodeIds": [
+          "14442:37607"
+        ],
+        "purpose": "existing screens for layout pattern (read-only)",
+        "nodeTypes": {
+          "14442:37607": "PAGE"
+        }
+      }
+    ],
+    "designSystemFiles": [
+      {
+        "fileUrl": "https://www.figma.com/design/FixtureLibraryFile0001/fixture?node-id=0-1",
+        "fileKey": "FixtureLibraryFile0001",
+        "nodeIds": [
+          "1:1545"
+        ],
+        "purpose": "Acme Library components (read-only)",
+        "libraryKey": "lk-3180e49209920dd0e59ba17a586a957ac5374bb9b5675504443015977ef51f38",
+        "provides": [
+          "components"
+        ]
+      }
+    ],
+    "approvedLibraryKeys": [
+      "lk-3180e49209920dd0e59ba17a586a957ac5374bb9b5675504443015977ef51f38"
+    ],
+    "componentLibraryKeys": [
+      "lk-3180e49209920dd0e59ba17a586a957ac5374bb9b5675504443015977ef51f38"
+    ],
+    "variableLibraryKeys": []
+  },
+  "output": {
+    "fileUrl": "https://www.figma.com/design/FixtureOutputFile00001/fixture",
+    "fileKey": "FixtureOutputFile00001",
+    "pageId": "34014:8",
+    "pageName": "figma-ui sandbox",
+    "scopeRootIds": [
+      "34014:8"
+    ],
+    "createNewFile": false,
+    "placement": "new_draft",
+    "writeAllowed": true,
+    "decisionRef": "dec-000"
+  },
+  "designSystem": {
+    "discoverySource": "user_specified",
+    "reusePolicy": "strict",
+    "allowNewTokens": false,
+    "allowNewComponents": false,
+    "allowWrap": false,
+    "allowMainComponentEdits": false
+  },
+  "viewports": [],
+  "requiredScreens": [
+    "m1.button-row"
+  ],
+  "requiredStates": [
+    "default"
+  ],
+  "requiredModes": [],
+  "reviewScope": [],
+  "decisionRefs": [
+    "dec-000",
+    "dec-001",
+    "dec-002",
+    "dec-003"
+  ],
+  "constraints": [
+    "Only Acme Library components; bind no new variables; no background fill (user 2026-09-28)",
+    "Button label via override of inner text only; no detach, no component edits",
+    "Do not touch any existing page or node"
+  ],
+  "references": [],
+  "assumptions": [],
+  "gaps": [
+    {
+      "id": "gap-001",
+      "need": "variables library (collections Size / Global / Colors / System Colors)",
+      "searched": [
+        "get_libraries",
+        "teamLibrary.getAvailableLibraryVariableCollectionsAsync",
+        "search_design_system scoped to 4 org libraries"
+      ],
+      "status": "unresolved",
+      "impact": "no colour token binding and no mode-switch verification in M1; tokenBinding denominator 0 -> N/A"
+    }
+  ],
+  "openQuestions": [],
+  "approvalPolicy": "ask_on_problem",
+  "delivery": [
+    "figma",
+    "audit"
+  ]
+}

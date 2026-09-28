@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://figma-ui.local/schemas/capabilities.schema.json",
+  "title": "capabilities.json (spec §4.2.1, §5.1, §20)",
+  "type": "object",
+  "required": ["schemaVersion", "runId", "runtime", "server", "tools", "features", "checkedAt"],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "runId": { "$ref": "common.schema.json#/$defs/runId" },
+    "runtime": {
+      "type": "object",
+      "required": ["claudeCodeVersion"],
+      "properties": {
+        "claudeCodeVersion": { "type": "string" },
+        "os": { "type": "string" },
+        "node": { "type": "string" },
+        "figmaPlugin": {
+          "type": "object",
+          "properties": { "name": { "type": "string" }, "version": { "type": "string" }, "skills": { "type": "array", "items": { "type": "string" } } },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "server": {
+      "type": "object",
+      "required": ["name", "url", "toolPrefix"],
+      "properties": {
+        "name": { "type": "string" },
+        "url": { "type": "string" },
+        "transport": { "type": "string" },
+        "toolPrefix": { "type": "string", "pattern": "^mcp__.+__$" },
+        "health": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "account": {
+      "description": "CAP-03 / §4.2.1: plan references and seat only. No email or handle.",
+      "type": "object",
+      "required": ["status", "plans"],
+      "properties": {
+        "status": { "enum": ["ok", "blocked"] },
+        "plans": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["planRef", "seat"],
+            "properties": {
+              "planRef": { "type": "string" },
+              "tier": { "type": "string" },
+              "seat": { "enum": ["Full", "Dev", "Collab", "View"] },
+              "role": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "targetPlanRef": { "type": ["string", "null"] },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "recoverySteps": { "type": "array", "items": { "type": "string" } },
+        "checkedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+      },
+      "additionalProperties": false
+    },
+    "tools": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "status"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^mcp__.+__.+$" },
+          "status": { "$ref": "common.schema.json#/$defs/capabilityStatus" },
+          "evidence": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": false
+      }
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": { "$ref": "common.schema.json#/$defs/capabilityStatus" },
+          "evidence": { "type": "array", "items": { "type": "string" } },
+          "value": {},
+          "notes": { "type": "string" },
+          "checkedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+        },
+        "additionalProperties": false,
+        "if": { "properties": { "status": { "const": "verified" } } },
+        "then": { "required": ["evidence"], "properties": { "evidence": { "minItems": 1 } } }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "useFigmaReturnChars": {
+          "type": "object",
+          "properties": {
+            "status": { "$ref": "common.schema.json#/$defs/capabilityStatus" },
+            "maxObservedOk": { "type": ["integer", "null"] },
+            "firstFailure": { "type": ["integer", "null"] },
+            "behaviourAboveLimit": { "type": "string" },
+            "evidence": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        },
+        "getMetadataWholePage": { "type": "object" },
+        "searchDesignSystemQueriesPerCall": { "type": ["integer", "null"] }
+      }
+    },
+    "unverified": { "type": "array", "items": { "type": "string" } },
+    "checkedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+  },
+  "additionalProperties": false
+}
