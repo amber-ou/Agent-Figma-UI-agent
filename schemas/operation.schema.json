@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://figma-ui.local/schemas/operation.schema.json",
+  "title": "operation state, merged from operations.jsonl records (spec §11.3, §20)",
+  "description": "operations.jsonl is event-sourced: later records patch earlier ones by operationId. This schema validates the merged state of one operation. Individual patch lines are validated against #/$defs/record.",
+  "type": "object",
+  "required": ["operationId", "runId", "mode", "status", "timestamps"],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "operationId": { "$ref": "common.schema.json#/$defs/localId" },
+    "runId": { "$ref": "common.schema.json#/$defs/runId" },
+    "logicalKey": { "type": "string", "minLength": 1 },
+    "kind": { "type": "string", "minLength": 1 },
+    "mode": { "$ref": "common.schema.json#/$defs/operationMode" },
+    "status": { "$ref": "common.schema.json#/$defs/operationStatus" },
+    "fileKey": { "$ref": "common.schema.json#/$defs/fileKey" },
+    "pageId": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/nodeId" }] },
+    "scopeRootIds": { "$ref": "common.schema.json#/$defs/nodeIds" },
+    "basisRefs": { "$ref": "common.schema.json#/$defs/refs" },
+    "preconditions": { "type": "object" },
+    "intent": { "type": "string" },
+    "createdNodeIds": { "$ref": "common.schema.json#/$defs/nodeIds" },
+    "mutatedNodeIds": { "$ref": "common.schema.json#/$defs/nodeIds" },
+    "importedNodeIds": { "$ref": "common.schema.json#/$defs/nodeIds" },
+    "evidenceRefs": { "type": "array", "items": { "type": "string" } },
+    "fingerprint": { "type": "string", "pattern": "^fp[0-9]+:[0-9a-f]{8}$" },
+    "effectSummary": { "type": "object" },
+    "retry": { "type": "object" },
+    "toolUseId": { "type": "string" },
+    "codeSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "resultSummary": { "type": "string" },
+    "errorSummary": { "type": "string" },
+    "safeToRetryWithoutCanvasRead": { "type": ["boolean", "null"] },
+    "reconciliation": { "type": "object" },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "plannedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "dispatchedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "appliedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "verifiedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "failedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "cancelledAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "reconciledAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "mode": { "const": "write" } } },
+      "then": {
+        "required": ["logicalKey", "kind", "fileKey", "basisRefs", "preconditions"],
+        "properties": { "basisRefs": { "minItems": 1 } }
+      }
+    }
+  ],
+  "$defs": {
+    "record": {
+      "description": "One line of operations.jsonl (a full planned record or a patch).",
+      "type": "object",
+      "required": ["operationId"],
+      "properties": {
+        "operationId": { "$ref": "common.schema.json#/$defs/localId" },
+        "status": { "$ref": "common.schema.json#/$defs/operationStatus" },
+        "mode": { "$ref": "common.schema.json#/$defs/operationMode" }
+      }
+    }
+  }
+}

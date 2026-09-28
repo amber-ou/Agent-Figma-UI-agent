@@ -1,0 +1,171 @@
+{
+  "schemaVersion": "1.2",
+  "runId": "ui-20260928-m1",
+  "sources": [
+    {
+      "fileKey": "FixtureOutputFile00001",
+      "role": "reference+output",
+      "nodeIds": [
+        "14442:37607"
+      ],
+      "pages": [
+        {
+          "id": "1:81",
+          "name": "COVER"
+        },
+        {
+          "id": "1:82",
+          "name": "---"
+        },
+        {
+          "id": "14442:37607",
+          "name": "v1.1.2"
+        },
+        {
+          "id": "34014:8",
+          "name": "figma-ui sandbox"
+        }
+      ]
+    },
+    {
+      "fileKey": "FixtureLibraryFile0001",
+      "role": "design_system",
+      "libraryKey": "lk-3180e49209920dd0e59ba17a586a957ac5374bb9b5675504443015977ef51f38",
+      "provides": [
+        "components"
+      ]
+    }
+  ],
+  "discoveryCoverage": {
+    "components": "complete_for_requested_scope",
+    "variables": "partial",
+    "styles": "unavailable",
+    "note": "variables library not identified (gap-001)"
+  },
+  "components": [
+    {
+      "id": "cmap-Button",
+      "name": "Button",
+      "componentSetKey": "bb0d6c755865533790c89459c421fc692b6cce10",
+      "sourceNodeId": "1:1545",
+      "variants": [
+        "Default",
+        "Disabled",
+        "Secondary",
+        "Button",
+        "Active",
+        "Media",
+        "Activity"
+      ],
+      "textProperty": false
+    }
+  ],
+  "variables": [
+    {
+      "name": "Stroke/Border",
+      "key": "1762f9c7ab74d73ec9301eeac72513acb6c1cf1c",
+      "collection": "Size",
+      "inheritedOnly": true,
+      "remote": true,
+      "libraryKey": null,
+      "sourceLibraryStatus": "unidentified"
+    },
+    {
+      "name": "Space/400",
+      "key": "65dc087a798c5a1e25610c6057b6d57ba57a2f5f",
+      "collection": "Size",
+      "inheritedOnly": true,
+      "remote": true,
+      "libraryKey": null,
+      "sourceLibraryStatus": "unidentified"
+    }
+  ],
+  "styles": [],
+  "patterns": [
+    {
+      "id": "pattern-footer-2btn",
+      "sourceNodeIds": [
+        "I28001:30690;1366:1395"
+      ],
+      "occurrences": 25,
+      "measured": {
+        "layoutMode": "HORIZONTAL",
+        "width": 300,
+        "padding": [
+          12,
+          16,
+          24,
+          16
+        ],
+        "itemSpacing": 8,
+        "align": [
+          "CENTER",
+          "CENTER"
+        ],
+        "buttons": [
+          {
+            "variant": "type=Default",
+            "position": "left",
+            "sizingH": "FILL",
+            "grow": 1,
+            "innerPadding": [
+              12,
+              56,
+              12,
+              56
+            ]
+          },
+          {
+            "variant": "type=Active",
+            "position": "right",
+            "sizingH": "FILL",
+            "grow": 1,
+            "innerPadding": [
+              12,
+              56,
+              12,
+              56
+            ]
+          }
+        ]
+      },
+      "constraints": [
+        {
+          "id": "pc-001",
+          "status": "observed_not_confirmed",
+          "requestedBy": "dec-008",
+          "statement": "Label length for the P1 two-button row: user asked to record \"about 2 Chinese characters (inner width 18)\".",
+          "measured": "2-char labels (text width 28) give 130/130 in the existing example (older Active without icons). In M1 (current Active with icons), 2-char labels (28) and 4-char labels (56) both give 131/129. Nominal inner width 130 - 112 = 18 is already exceeded by 2 characters, so the 18 figure does not explain the limit.",
+          "conclusion": "No confirmed character limit. Label length did not change the result in M1; the icons in the current Active variant are the likely factor.",
+          "evidenceRefs": [
+            "rd-0004",
+            "rd-0005",
+            "rd-0007"
+          ],
+          "hypothesis": "The two icons in the current Active variant change the FILL split; not proven by experiment."
+        }
+      ],
+      "evidenceRefs": [
+        "probe-09",
+        "rd-0004",
+        "rd-0007"
+      ]
+    }
+  ],
+  "baseline": [
+    "bl-001 Button has no TEXT property; labels set via inner text override (overriddenFields: characters, styledTextSegments)",
+    "bl-002 Button colours are not bound to variables (only Stroke/Border, Space/400 bound)",
+    "bl-003 Label font is Inter Bold, which has no CJK glyphs; Figma renders CJK with fallback font (same as existing screens); hasMissingFont=false, no tofu in screenshot",
+    "bl-004 Library version drift: existing screens use an older version of Acme Button type=Active (no icons, fill #11A1E9); current published version has two Return icons and fill #2263EB; test file has not accepted library updates (dec-009: record only)",
+    "bl-005 Default Button border #E5E5E5 on white is 1.26:1; text button, boundary not required by WCAG 1.4.11; component-level, not changed"
+  ],
+  "evidenceRefs": [
+    "probe-02",
+    "probe-04a",
+    "probe-06a",
+    "probe-06b",
+    "probe-09",
+    "rd-0004",
+    "rd-0007"
+  ]
+}

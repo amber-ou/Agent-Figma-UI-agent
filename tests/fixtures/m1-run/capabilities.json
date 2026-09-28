@@ -1,0 +1,181 @@
+{
+  "schemaVersion": "1.2",
+  "runId": "ui-20260928-m1",
+  "runtime": {
+    "claudeCodeVersion": "2.1.283",
+    "os": "win32",
+    "node": "v22.17.0",
+    "figmaPlugin": {
+      "name": "figma@synced",
+      "version": "2.2.118",
+      "skills": [
+        "figma-use",
+        "figma-generate-design",
+        "figma-generate-library"
+      ]
+    }
+  },
+  "server": {
+    "name": "figma",
+    "url": "https://mcp.figma.com/mcp",
+    "transport": "http",
+    "toolPrefix": "mcp__figma__",
+    "health": "connected"
+  },
+  "account": {
+    "status": "ok",
+    "plans": [
+      {
+        "planRef": "team::fixture-pro",
+        "tier": "pro",
+        "seat": "Full",
+        "role": "admin"
+      },
+      {
+        "planRef": "organization::fixture-org",
+        "tier": "org",
+        "seat": "Full",
+        "role": "guest"
+      }
+    ],
+    "targetPlanRef": "organization::fixture-org",
+    "reasons": [],
+    "recoverySteps": [],
+    "checkedAt": "2026-09-28T07:40:00.000Z"
+  },
+  "tools": [
+    {
+      "name": "mcp__figma__use_figma",
+      "status": "verified",
+      "evidence": [
+        "m1-summary §5"
+      ]
+    },
+    {
+      "name": "mcp__figma__get_metadata",
+      "status": "verified",
+      "evidence": [
+        "m1-summary §5"
+      ]
+    },
+    {
+      "name": "mcp__figma__get_screenshot",
+      "status": "verified",
+      "evidence": [
+        "m1-summary §5"
+      ]
+    },
+    {
+      "name": "mcp__figma__get_libraries",
+      "status": "verified",
+      "evidence": [
+        "m1-summary §5"
+      ]
+    },
+    {
+      "name": "mcp__figma__search_design_system",
+      "status": "verified",
+      "evidence": [
+        "m1-summary §5"
+      ]
+    },
+    {
+      "name": "mcp__figma__get_variable_defs",
+      "status": "available_unverified"
+    },
+    {
+      "name": "mcp__figma__whoami",
+      "status": "verified",
+      "evidence": [
+        "m1-summary §5"
+      ]
+    },
+    {
+      "name": "mcp__figma__create_new_file",
+      "status": "available_unverified"
+    },
+    {
+      "name": "mcp__figma__upload_assets",
+      "status": "available_unverified"
+    }
+  ],
+  "features": {
+    "nativeWrite": {
+      "status": "verified",
+      "evidence": [
+        "op-0001",
+        "op-0003"
+      ]
+    },
+    "sharedPluginData": {
+      "status": "verified",
+      "evidence": [
+        "op-0001",
+        "rd-0001",
+        "rd-0002"
+      ]
+    },
+    "resolveForConsumer": {
+      "status": "verified",
+      "evidence": [
+        "probe-05",
+        "rd-0003"
+      ]
+    },
+    "importComponentByKey": {
+      "status": "verified",
+      "evidence": [
+        "op-0003"
+      ]
+    },
+    "importVariableByKey": {
+      "status": "available_unverified",
+      "notes": "not exercised: no new variable bindings (dec-004)"
+    },
+    "fontLoad": {
+      "status": "verified",
+      "evidence": [
+        "probe-01",
+        "op-0003"
+      ]
+    },
+    "screenshot": {
+      "status": "verified",
+      "evidence": [
+        "ev-002",
+        "ev-006"
+      ]
+    },
+    "hooksPrePost": {
+      "status": "verified",
+      "evidence": [
+        "hooktest-01",
+        "op-0001"
+      ]
+    },
+    "hooksPostToolUseFailure": {
+      "status": "unknown",
+      "notes": "no real failure observed"
+    }
+  },
+  "limits": {
+    "useFigmaReturnChars": {
+      "status": "unknown",
+      "maxObservedOk": null,
+      "firstFailure": null,
+      "evidence": []
+    },
+    "getMetadataWholePage": {
+      "observedChars": 986933,
+      "result": "exceeded Claude Code tool output limit; saved to file"
+    },
+    "searchDesignSystemQueriesPerCall": 1
+  },
+  "unverified": [
+    "importVariableByKey",
+    "hooksPostToolUseFailure",
+    "useFigmaReturnChars",
+    "variables source library (gap-001)"
+  ],
+  "checkedAt": "2026-09-28T07:40:00.000Z"
+}

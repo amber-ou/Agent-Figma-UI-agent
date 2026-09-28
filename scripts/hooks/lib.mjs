@@ -44,10 +44,16 @@ export function readJsonl(file) {
   return { records, truncatedTail };
 }
 
-// Latest record per operationId wins (event-sourced journal).
+// Latest record per operationId wins (event-sourced journal); timestamps are merged, not replaced.
 export function operationStates(records) {
   const byId = new Map();
-  for (const r of records) if (r.operationId) byId.set(r.operationId, { ...(byId.get(r.operationId) || {}), ...r });
+  for (const r of records) {
+    if (!r.operationId) continue;
+    const prev = byId.get(r.operationId) || {};
+    const merged = { ...prev, ...r };
+    if (prev.timestamps || r.timestamps) merged.timestamps = { ...(prev.timestamps || {}), ...(r.timestamps || {}) };
+    byId.set(r.operationId, merged);
+  }
   return byId;
 }
 

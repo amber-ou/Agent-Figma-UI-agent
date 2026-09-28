@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "1.2",
+  "runId": "ui-20260928-m1",
+  "phase": "handoff",
+  "status": "complete_with_exceptions",
+  "entities": [
+    {
+      "logicalKey": "m1.page",
+      "nodeId": "34014:8",
+      "type": "PAGE",
+      "fileKey": "FixtureOutputFile00001",
+      "active": true,
+      "lastOperationId": "op-0001"
+    },
+    {
+      "logicalKey": "m1.section",
+      "nodeId": "34014:9",
+      "type": "SECTION",
+      "fileKey": "FixtureOutputFile00001",
+      "active": true,
+      "lastOperationId": "op-0002"
+    },
+    {
+      "logicalKey": "m1.button-row",
+      "nodeId": "34016:68",
+      "type": "FRAME",
+      "fileKey": "FixtureOutputFile00001",
+      "active": true,
+      "childNodeIds": [
+        "34016:69",
+        "34016:73"
+      ],
+      "agentFingerprint": "fp1:d9899c64",
+      "lastOperationId": "op-0007"
+    }
+  ],
+  "importedRemoteNodeIds": [
+    "34016:41"
+  ],
+  "lastVerifiedOperationId": "op-0007",
+  "pendingOperations": [],
+  "pendingQuestions": [],
+  "gaps": [
+    "gap-001"
+  ],
+  "lock": {
+    "released": true,
+    "releasedAt": "2026-09-28T11:29:54.279Z",
+    "by": "ui-20260928-m1"
+  },
+  "updatedAt": "2026-09-28T11:38:49.425Z",
+  "completionEvaluatedAt": "2026-09-28T11:38:49.529Z"
+}

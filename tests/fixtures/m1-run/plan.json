@@ -1,0 +1,263 @@
+{
+  "schemaVersion": "1.2",
+  "runId": "ui-20260928-m1",
+  "taskType": "extend",
+  "status": "confirmed",
+  "screens": [
+    {
+      "screenKey": "m1.button-row",
+      "task": "M1 feasibility sample",
+      "sections": [
+        "button-row"
+      ],
+      "patternRefs": [
+        "pattern-footer-2btn"
+      ]
+    }
+  ],
+  "requiredCells": [
+    {
+      "key": "m1.button-row.default",
+      "screenKey": "m1.button-row",
+      "viewport": "fixed-300",
+      "state": "default",
+      "mode": null,
+      "applicable": true,
+      "reason": "only cell in M1",
+      "evidence": [
+        "structure",
+        "screenshot"
+      ],
+      "deliverable": "frame"
+    }
+  ],
+  "componentMap": [
+    {
+      "id": "cmap-Button",
+      "logicalName": "Button",
+      "source": {
+        "kind": "published_library",
+        "libraryKey": "lk-3180e49209920dd0e59ba17a586a957ac5374bb9b5675504443015977ef51f38",
+        "sourceFileKey": "FixtureLibraryFile0001",
+        "sourceNodeId": "1:1545",
+        "componentSetKey": "bb0d6c755865533790c89459c421fc692b6cce10",
+        "componentKey": null
+      },
+      "supportedVariants": {
+        "type": [
+          "Default",
+          "Disabled",
+          "Secondary",
+          "Button",
+          "Active",
+          "Media",
+          "Activity"
+        ]
+      },
+      "textPropertyKeys": [],
+      "decision": "reuse",
+      "reason": "user-specified; label via inner text override (no TEXT property: inherited_baseline)",
+      "versionCheck": {
+        "status": "differs",
+        "differences": [
+          "type=Active: current version has two Return icons and fill #2263EB; existing screens use an older version without icons and fill #11A1E9"
+        ],
+        "baselineRef": "bl-004",
+        "listedToUserRef": "dec-009"
+      }
+    }
+  ],
+  "variableMap": [],
+  "patternRefs": [
+    "pattern-footer-2btn"
+  ],
+  "designDecisions": [
+    {
+      "id": "dec-001",
+      "question": "container layout",
+      "options": [
+        "P1 Footer 25x",
+        "P2 Footer 6x",
+        "P3 Save Button Section 17x"
+      ],
+      "recommendation": "P1",
+      "answer": "P1",
+      "source": "user",
+      "evidenceRefs": [
+        "probe-09"
+      ],
+      "decidedAt": "2026-09-28T11:10:44.610Z"
+    },
+    {
+      "id": "dec-002",
+      "question": "button labels",
+      "options": [
+        "主要按鈕/次要按鈕",
+        "取消/確認",
+        "custom"
+      ],
+      "recommendation": null,
+      "answer": "Default=主要按鈕, Secondary=次要按鈕; verify no missing CJK glyphs in Inter Bold",
+      "source": "user",
+      "evidenceRefs": [],
+      "decidedAt": "2026-09-28T11:10:44.610Z"
+    },
+    {
+      "id": "dec-005",
+      "question": "F-001 unequal widths",
+      "options": [
+        "fixed 130",
+        "accept",
+        "other"
+      ],
+      "recommendation": "fixed 130",
+      "answer": "(a) direction; replicate how the existing P1 example achieves 130/130 (found: FILL grow=1 on both, both variants inner padding 56/56; no fixed width)",
+      "source": "user",
+      "evidenceRefs": [
+        "rd-0004"
+      ],
+      "decidedAt": "2026-09-28T11:16:27.032Z"
+    },
+    {
+      "id": "dec-006",
+      "question": "Secondary icon",
+      "options": [
+        "keep",
+        "hide",
+        "other variant"
+      ],
+      "recommendation": null,
+      "answer": "not applicable (Secondary no longer used per dec-007)",
+      "source": "user",
+      "evidenceRefs": [],
+      "decidedAt": "2026-09-28T11:16:27.032Z"
+    },
+    {
+      "id": "dec-007",
+      "question": "label vs visual weight",
+      "options": [
+        "keep",
+        "swap labels",
+        "Default+Active like existing screens"
+      ],
+      "recommendation": null,
+      "answer": "(c) Default + Active; Active=主要按鈕, Default=次要按鈕; order Default left / Active right per pattern-footer-2btn",
+      "source": "user",
+      "evidenceRefs": [
+        "rd-0004"
+      ],
+      "decidedAt": "2026-09-28T11:16:27.032Z"
+    },
+    {
+      "id": "dec-008",
+      "question": "F-001 widths 131/129",
+      "options": [
+        "2-char labels 取消/確認",
+        "accept 131/129",
+        "other"
+      ],
+      "recommendation": null,
+      "answer": "(a) Default=取消, Active=確認; record P1 label-length constraint in inventory and m1-summary",
+      "source": "user",
+      "evidenceRefs": [
+        "ev-003"
+      ],
+      "decidedAt": "2026-09-28T11:26:11.472Z"
+    },
+    {
+      "id": "dec-009",
+      "question": "F-004 Active icons (library version drift)",
+      "options": [
+        "keep current version with icons",
+        "hide via override",
+        "accept library update in test file"
+      ],
+      "recommendation": null,
+      "answer": "(a) keep current published version incl. icons; older version on existing screens is inherited_baseline, record only; no library update, no override",
+      "source": "user",
+      "evidenceRefs": [
+        "ev-003"
+      ],
+      "decidedAt": "2026-09-28T11:26:11.472Z"
+    },
+    {
+      "id": "dec-010",
+      "question": "dec-005 (130/130 like the example) conflicts with dec-009 (keep current Active with icons); widths are 131/129",
+      "options": [
+        "accept 131/129 as exception",
+        "fixed width 130 on both instances",
+        "test cause by temporarily hiding icons"
+      ],
+      "recommendation": null,
+      "answer": "(a) accept 131/129 as an exception",
+      "source": "user",
+      "evidenceRefs": [
+        "ev-005",
+        "ev-006"
+      ],
+      "decidedAt": "2026-09-28T11:38:49.425Z"
+    }
+  ],
+  "scope": {
+    "fileKey": "FixtureOutputFile00001",
+    "pageName": "figma-ui sandbox",
+    "existingNodesUntouched": true
+  },
+  "baseline": {
+    "pagesBefore": [
+      "1:81",
+      "1:82",
+      "14442:37607"
+    ],
+    "observations": [
+      {
+        "id": "bl-001",
+        "kind": "inherited_baseline",
+        "subject": "Button has no TEXT property; labels set via inner text override (overriddenFields: characters, styledTextSegments)"
+      },
+      {
+        "id": "bl-002",
+        "kind": "inherited_baseline",
+        "subject": "Button colours are not bound to variables (only Stroke/Border, Space/400 bound)"
+      },
+      {
+        "id": "bl-003",
+        "kind": "inherited_baseline",
+        "subject": "Label font is Inter Bold, which has no CJK glyphs; Figma renders CJK with fallback font (same as existing screens); hasMissingFont=false, no tofu in screenshot"
+      },
+      {
+        "id": "bl-004",
+        "kind": "inherited_baseline",
+        "subject": "Library version drift: existing screens use an older version of Acme Button type=Active (no icons, fill #11A1E9); current published version has two Return icons and fill #2263EB; test file has not accepted library updates (dec-009: record only)"
+      },
+      {
+        "id": "bl-005",
+        "kind": "inherited_baseline",
+        "subject": "Default Button border #E5E5E5 on white is 1.26:1; text button, boundary not required by WCAG 1.4.11; component-level, not changed"
+      }
+    ]
+  },
+  "decisions": [
+    {
+      "id": "dec-000",
+      "decision": "write allowed in test file, new page \"figma-ui sandbox\", one op at a time",
+      "scope": "FixtureOutputFile00001",
+      "decidedAt": "2026-09-28T11:10:44.610Z",
+      "source": "user"
+    },
+    {
+      "id": "dec-003",
+      "decision": "keep M1 nodes after run; cleanup decided later",
+      "scope": "M1 nodes",
+      "decidedAt": "2026-09-28T11:10:44.610Z",
+      "source": "user"
+    },
+    {
+      "id": "dec-004",
+      "decision": "Only Acme components; no new variable bindings; no background fill; gap-001 recorded",
+      "scope": "M1",
+      "decidedAt": "2026-09-28T11:10:44.610Z",
+      "source": "user"
+    }
+  ]
+}

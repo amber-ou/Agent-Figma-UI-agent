@@ -157,3 +157,27 @@ test('truncated journal tail blocks writes but still passes reads', () => {
   assert.match(pre(call('op-1', 'write')).reason, /truncated last line/);
   assert.equal(pre(call('rd-1', 'read')).decision, 'pass');
 });
+
+// ---- v1.3 / M2 ----
+test('T44: every pass path (no active run, read, planned write) emits no permission decision; only deny emits one', () => {
+  const quiet = input => run(PRE, { tool_name: TOOL, tool_use_id: 'tu', ...input });
+  assert.equal(quiet(call('x', 'write')), '', 'no active run');
+  ready();
+  assert.equal(quiet(call('rd-1', 'read')), '', 'read');
+  planned('op-1');
+  assert.equal(quiet(call('op-1', 'write')), '', 'planned write');
+  const denied = JSON.parse(quiet(call('op-2', 'write'))).hookSpecificOutput;
+  assert.equal(denied.permissionDecision, 'deny');
+});
+
+test('a truncated write response ("// truncated to 20kb") is recorded as unknown_outcome, a truncated read stays applied', () => {
+  ready();
+  planned('op-1');
+  pre(call('op-1', 'write'));
+  run(POST, { hook_event_name: 'PostToolUse', tool_name: TOOL, tool_use_id: 'tu', tool_response: [{ type: 'text', text: '{"createdNodeIds":["1:2","1:3"... // truncated to 20kb' }], ...call('op-1', 'write') });
+  assert.equal(latest('op-1').status, 'unknown_outcome');
+  assert.equal(latest('op-1').effectSummary.responseTruncated, true);
+  pre(call('rd-9', 'read'));
+  run(POST, { hook_event_name: 'PostToolUse', tool_name: TOOL, tool_use_id: 'tu', tool_response: 'xxxx// truncated to 20kb', ...call('rd-9', 'read') });
+  assert.equal(latest('rd-9').status, 'applied');
+});

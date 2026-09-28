@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://figma-ui.local/schemas/audit.schema.json",
+  "title": "audit.json — single source of findings; no run status (spec §12, §20)",
+  "type": "object",
+  "required": ["schemaVersion", "runId", "taskType", "gates", "coverage", "findings", "evidence", "acceptedExceptions", "completionEvaluation"],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "runId": { "$ref": "common.schema.json#/$defs/runId" },
+    "taskType": { "$ref": "common.schema.json#/$defs/taskType" },
+    "gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "status"],
+        "properties": {
+          "id": { "enum": ["G1", "G2", "G3", "G4", "G5", "G6", "G7"] },
+          "status": { "$ref": "common.schema.json#/$defs/gateStatus" },
+          "evidenceRefs": { "type": "array", "items": { "type": "string" } },
+          "planRef": { "type": "string" },
+          "note": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["applicable", "verified"],
+      "properties": { "applicable": { "type": "integer", "minimum": 0 }, "verified": { "type": "integer", "minimum": 0 } },
+      "additionalProperties": false
+    },
+    "metrics": { "type": "object" },
+    "score": { "description": "Diagnostic only (§12.3); never part of completionEvaluation.", "type": "object" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "subject", "origin", "status", "observed", "evidenceRefs"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/localId" },
+          "severity": { "$ref": "common.schema.json#/$defs/severity" },
+          "subject": { "enum": ["design", "execution"] },
+          "origin": { "$ref": "common.schema.json#/$defs/findingOrigin" },
+          "affectsDelivery": { "type": "boolean" },
+          "category": { "type": "string" },
+          "nodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "screenKey": { "type": "string" },
+          "observed": { "type": "string" },
+          "expected": { "type": "string" },
+          "recommendation": { "type": "string" },
+          "probableCause": { "type": "string" },
+          "causeStatus": { "enum": ["hypothesis", "confirmed"] },
+          "resolution": { "type": "string" },
+          "status": { "$ref": "common.schema.json#/$defs/findingStatus" },
+          "decisionRef": { "$ref": "common.schema.json#/$defs/localId" },
+          "acceptedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+          "evidenceRefs": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": false,
+        "if": { "properties": { "status": { "const": "accepted" } } },
+        "then": { "required": ["decisionRef"] }
+      }
+    },
+    "baselineObservations": { "type": "array", "items": { "type": "string" } },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "screenKey", "reviewSummary", "operationIds", "validity"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/localId" },
+          "kind": { "enum": ["structure", "screenshot", "contrast", "check"] },
+          "nodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "screenKey": { "type": "string" },
+          "viewport": { "type": ["string", "null"] },
+          "mode": { "type": ["string", "null"] },
+          "toolRef": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "required": ["tool", "capturedAt"],
+                "properties": {
+                  "tool": { "type": "string", "pattern": "^mcp__" },
+                  "operation": { "type": "string" },
+                  "capturedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "artifactRef": { "type": ["string", "null"] },
+          "reviewSummary": { "type": "string", "minLength": 1 },
+          "operationIds": { "type": "array", "items": { "type": "string" } },
+          "validity": { "enum": ["current", "superseded"] }
+        },
+        "additionalProperties": false,
+        "anyOf": [
+          { "required": ["toolRef"], "properties": { "toolRef": { "type": "object" } } },
+          { "required": ["artifactRef"], "properties": { "artifactRef": { "type": "string" } } }
+        ]
+      }
+    },
+    "implementationVerificationRequired": { "type": "array", "items": { "type": "string" } },
+    "acceptedExceptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "decisionRef", "hard", "scope"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/localId" },
+          "findingId": { "$ref": "common.schema.json#/$defs/localId" },
+          "decisionRef": { "$ref": "common.schema.json#/$defs/localId" },
+          "hard": { "const": false },
+          "scope": { "type": "string" },
+          "reason": { "type": "string" },
+          "acceptedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "completionEvaluation": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["ruleVersion", "eligible", "result", "reasons", "evaluatedAt"],
+          "properties": {
+            "ruleVersion": { "type": "string" },
+            "eligible": { "type": "boolean" },
+            "result": { "enum": ["complete", "complete_with_exceptions", "awaiting_user", "blocked", "partial"] },
+            "coverage": { "type": "object" },
+            "reasons": { "type": "array", "items": { "type": "string" } },
+            "evaluatedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "additionalProperties": false
+}
