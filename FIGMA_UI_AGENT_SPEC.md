@@ -807,7 +807,7 @@ Fingerprint 應只涵蓋本操作依賴的穩定屬性，排除時間戳或無�
 ### 11.5 未知結果與 rollback
 
 - timeout／連線中斷：畫布可能已變；先對帳再決定，不盲目重送。
-- 若實際工具回應含有明確表示「未執行、可安全重試」的欄位，依其意義處理；缺乏此類欄位則視為未知，先讀取。（v1.1 曾寫出欄位名 `safeToRetryWithoutCanvasRead`，研究時未找到出處，v1.2 改為依實際 schema。）
+- `use_figma` 錯誤回應若含 `safeToRetryWithoutCanvasRead`：值為 `true` 時可修正錯誤後重試；值為 `false` 時先唯讀讀取畫布、確認已變更的內容，再決定下一步。欄位缺失或值無法判讀時視為未知，先讀取，不重送。來源：官方 Figma plugin 的 figma-use skill Critical Rule 14（本機 plugin 2.2.118，2026-09-28 查證；見研究紀錄第 10 節）。此欄位的實際出現與語意仍須依真實錯誤回應驗證，並把觀察到的值記入 operation 與 capabilities；未觀察到前不得當作已驗證能力。其他工具的回應若有等效欄位，同樣依實際 schema 處理。（v1.1 曾寫出此欄位名但未附出處，v1.2 一度移除，後依上述來源恢復。）
 - 修改既有節點前保留必要原值；只針對可逆屬性建立補償操作。
 - 新建內容可由精確 owned IDs 回收；刪除前再驗證範圍與 ownership。
 - 高風險改版先在已授權區域建立 draft clone；驗收後再按照使用者選擇整合。

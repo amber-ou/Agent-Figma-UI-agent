@@ -97,7 +97,7 @@ Claude Code 提供 project agents 和 skills；agent 可使用 frontmatter 配�
 | API helpers | 本地 runtime 提供 query/set/createAutoLayout 等便利功能 | helper feature detection；不把 helper 當所有標準 Plugin API 都有 |
 | 配額 | 方案、seat 與工具分類影響限額；頁面亦保留變更權利 | 不複製固定配額常數，當下偵測與遵循回應 |
 | Skills 路徑 | 此環境為 Codex plugin cache | CC 查自己的 plugin／skill 入口，不能依賴本機絕對路徑 |
-| 重試欄位（v1.2） | v1.1 主規格寫出 `safeToRetryWithoutCanvasRead`，未找到出處 | 移除欄位名，改為依實際工具回應 schema 判斷 |
+| 重試欄位（v1.2） | v1.1 主規格寫出 `safeToRetryWithoutCanvasRead`，未找到出處 | v1.2 移除欄位名；2026-09-28 M0 在官方 figma-use skill Rule 14 找到出處後寫回主規格第 11.5 節，仍須依實際回應驗證（見第 10 節） |
 | 安裝名稱與工具前綴（v1.2） | `figma@claude-plugins-official` 未在 CC 實測；plugin 與手動設定的工具名稱前綴可能不同 | 安裝前以 CLI 查證；hooks matcher 用 regex，實際名稱記入 capabilities |
 | 截圖保存（v1.2） | 截圖工具通常把圖片交給模型檢視，CC 未必能存成本機檔 | 預設證據改為工具參照＋審查摘要，本機 PNG 選配 |
 
@@ -191,3 +191,30 @@ Claude Code 提供 project agents 和 skills；agent 可使用 frontmatter 配�
 6. 另指示：「怎麼做出好設計」的決策（例如要不要漸層）一律詢問 → 主規格第 7.4 節。
 
 這是對文件方向的同意與測試檔的寫入許可；每次真實寫入的具體範圍仍依主規格在 intake 確認。
+
+## 10. M0 實測差異紀錄（2026-09-28）
+
+環境：使用者本機 Claude Code 2.1.283；Figma plugin `figma@synced` 2.2.118（含 figma-use 等 skills）；remote MCP server 名稱 `figma`，工具名稱為 `mcp__figma__<tool>`；帳號為 Full seat（Pro team 與 Organization guest）。以下皆為 **E（本環境觀察）**，只有唯讀操作，尚未寫入。
+
+| 議題 | 實測結果 | 對 spec／實作的影響 |
+|---|---|---|
+| `get_metadata` 頁面清單不完整 | 不帶 nodeId 呼叫時，測試檔只列 `COVER`，library 檔也只列 `COVER`；以 `use_figma` 讀 `figma.root.children` 實際為 3 頁（COVER、`---`、`v1.1.2`）與 4 頁（COVER、Components、v1.3.0 Components、Rich menu） | 頁面盤點不得依賴 `get_metadata` 的頁面清單；改以 `use_figma` 唯讀讀 `figma.root.children` |
+| 整頁讀取超過回傳上限 | `get_metadata(14442:37607)`（頁面 `v1.1.2`，168 個頂層節點、約 5,600 個 instance）回傳約 88 萬字元，超過 CC 的工具輸出上限，被存成本機暫存檔 | Discover 須先縮小到 frame／section 範圍；CAP-05「回傳上限」記為已觀察到超限，確切上限值仍未量測 |
+| 起始節點類型 | `14442:37607` 是頁面（CANVAS），不是 frame | intake 解析 URL node-id 時需辨識節點類型 |
+| 檔案與 library 的角色 | 測試檔沒有已啟用的 library（`libraries_added_to_file` 為空）；Aiwow Library 在「可加入」清單內（organization） | 已啟用與否屬第 6.1 節第 3、4 類的區分；使用者將自行啟用 |
+| 既有 instance 來源 | 測試檔頁面 `v1.1.2` 前 1,500 個 instance 對應 40 個主元件，其中 39 個為 remote；抽查的 16 個 key 有 12 個與 Aiwow Library「Components」頁（`0:1`）的元件相符，其餘（Status Bar、Top bar/Web page、Page Content、Menu/Light）來自其他 library | 「Aiwow Library」只是元件來源之一；component map 需記錄實際來源 |
+| Variables 不在 Aiwow Library | Aiwow Library 檔本身只有 1 個 local variable；測試檔與 Aiwow 元件使用的 variables 全為 remote，來自其他 library，collections 名為 `Size`、`Global`、`Colors`（Light／Dark）、`System Colors`（6 modes，名稱與 iOS 系統色一致）、`Variable collection` | 使用者核准的 DS 來源需包含 variables 的實際來源 library；只核准 Aiwow Library 不足以涵蓋 variables |
+| `search_design_system` 批次上限 | 送 3 個 query 被 server 限制為 1 個（回傳 warning「Batch was clamped from 3 to 1」）；在 library 未啟用的測試檔搜尋 `Space/400` 回傳空陣列 | 每次只送 1 個 query；空結果不能解讀為「不存在」（第 6.1 節） |
+| `teamLibrary` 可見範圍 | 在測試檔 `getAvailableLibraryVariableCollectionsAsync()` 回傳空陣列（library 尚未啟用） | 啟用後需重測 |
+| `resolveForConsumer` | 對 remote variable 與既有 consumer 呼叫成功（例如 `Space/400` → 16、`Radius/200` → 8、`Error/colorError`（alias）→ 解析出實際色值） | CAP-05 此項可標為 verified（唯讀）；新建節點仍需重測 |
+| sharedPluginData | `setSharedPluginData`／`getSharedPluginData` 在 runtime 為 function；唯讀 `getSharedPluginData` 成功（回傳空字串）。`use_figma` 工具說明列 `setPluginData` 為不支援，但未提及 shared 版本 | 讀取已驗證；寫入尚未驗證，需在授權寫入區 probe |
+| import-by-key | `importComponentByKeyAsync`、`importComponentSetByKeyAsync`、`variables.importVariableByKeyAsync` 在 runtime 為 function | 實際匯入屬寫入，未驗證 |
+| 字型 | `listAvailableFontsAsync()` 回傳 8,927 筆；既有畫面使用 SF Pro、Roboto、Inter、Outfit；測試檔有 local text styles（Heading／Subtitle／Body／Button） | 字型可列舉已驗證；載入與寫入未驗證 |
+| `safeToRetryWithoutCanvasRead` | v1.2 主規格因找不到出處而移除此欄位名；但本機 figma-use skill（plugin 2.2.118）的 Critical Rule 14 明確要求依 `use_figma` 錯誤回應中的此欄位決定是否可重試 | 出處已找到（官方 plugin skill）。使用者 2026-09-28 決定寫回主規格第 11.5 節，註明來源並須依實際錯誤回應驗證 |
+| 其他 runtime helpers | `figma.createAutoLayout`、`figma.createSection`、`figma.createPage` 為 function；`editorType=figma` | 屬 feature detection 結果，寫入行為未驗證 |
+| Library 啟用重測 | 使用者表示已加入 Aiwow Library 與 variables library 後，`get_libraries` 的 `libraries_added_to_file` 仍為空，runtime `teamLibrary.getAvailableLibraryVariableCollectionsAsync()` 也仍為空；remote collection `Colors` 在測試檔只可見 2 個已引用的 variables（`Error/colorError`、`Colors/red/6`） | 啟用狀態以兩種讀法一致為準；未啟用前無法列出 `Colors` 全部 variables，不能據此判定「沒有 surface 語意 variable」 |
+| Library 啟用第二次重測 | `get_libraries` 顯示 Aiwow Library 已加入（source 由 `organization` 變為 `team`）；runtime `teamLibrary` 只看到 `Aiwow Library / Collection 1`（1 個 variable：`Boolean`）。以 `search_design_system` 將範圍限定在 4 個 organization library（Aiwow、程曦卡、UUPON、一起生活卡）搜尋 `Space/400`，結果為空 | `Size`／`Global`／`Colors`／`System Colors` 的來源 library 仍未識別，也未啟用；可能在清單以外的 team／未發佈檔案，屬未驗證 |
+
+### 10.1 Baseline 觀察
+
+- **`inherited_baseline`：Aiwow Library `Button`（component set `1:1545`，key `f90477a86f723dc5362f382e1d9686ffc08a93cb`）沒有 TEXT component property**，只有 VARIANT 屬性 `type`（Default／Disabled／Secondary／Button／Active／Media／Activity）。延伸設計要改按鈕文字時，只能 override instance 內層文字節點。依使用者 2026-09-28 指示記為 baseline 觀察，不修改該元件；本次改文字的 override 需記入 operation 與 audit 的結構證據。
