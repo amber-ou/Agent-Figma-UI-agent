@@ -9,4 +9,14 @@
 | [CC_BUILD_PROMPT.md](CC_BUILD_PROMPT.md) | 交給 Claude Code 的建置指令（含 M2 指令） |
 | [docs/m1-summary.md](docs/m1-summary.md) | M1 實測總結 |
 
-測試：`node --test "tests/**/*.test.mjs"`
+## 安裝
+
+需要 Node.js 22 以上。clone 後先執行一次：
+
+```sh
+npm install
+```
+
+依賴版本固定在 `package.json`（`ajv` 8.20.0、`ajv-formats` 3.0.1），並以 `package-lock.json` 鎖定；`.npmrc` 設 `save-exact=true`，之後新增的依賴也會固定版本。
+
+測試：`node --test "tests/**/*.test.mjs"`（或 `npm test`）
