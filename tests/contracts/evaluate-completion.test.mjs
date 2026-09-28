@@ -1,4 +1,5 @@
 // Fixture tests for the minimal §12.1 completion rule (T32, T34). executionLayer=offline_fixture.
+// Run: node --test "tests/**/*.test.mjs"
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluateCompletion } from '../../scripts/evaluate-completion.mjs';

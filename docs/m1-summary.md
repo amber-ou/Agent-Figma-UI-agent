@@ -10,7 +10,7 @@ M1 是可行性證明，不代表 M4 完整驗收，也不代表 agent 已可端
 |---|---|---|
 | implementationStatus | `m1_minimal` | 已實作：最小 hooks 強制層、最小 §12.1 完成判定（`scripts/evaluate-completion.mjs`）、M1 本機紀錄（brief／plan／inventory／operations journal／audit／ledger）。尚未實作：`/figma-ui` skill、JSON schemas、schema validator、journal／lock 工具腳本、M2–M4 其餘項目 |
 | integrationStatus | `m1_path_verified` | 已在授權測試檔以真實工具完成：讀取 library 元件 → 匯入 → 建立 instance 與小畫面 → 讀回主元件關係、binding、consumer 生效值與 mode → 截圖審查 → 依 fingerprint 局部修改兩次。hooks 對真實工具名稱觸發 |
-| run 狀態（ledger.status） | `awaiting_user` | 由 `evaluate-completion.mjs` 計算（見第 8 節）。G1–G6 pass、coverage 1/1；G7 fail：待答 dec-010 |
+| run 狀態（ledger.status） | `complete_with_exceptions` | 由 `evaluate-completion.mjs` 計算（見第 8 節）。G1–G7 pass、coverage 1/1；例外 ex-001（F-001 寬度 131／129，dec-010） |
 | 本機鎖 | 已釋放 | `.figma-ui/locks/B0FKsPFvTG11Tt1P7ZXxxn.json` 與 `.figma-ui/active-run.json` 已移除（owner token 比對相符後才刪除）；ledger 記錄 `lock.released=true` |
 
 ## 2. 環境與授權
@@ -73,7 +73,7 @@ dispatched／applied 由 hooks 自動寫入；planned 與 verified 由本機寫�
 
 | ID | 嚴重度 | 來源 | 狀態 | 內容 |
 |---|---|---|---|---|
-| F-001 | minor | introduced | open | 兩顆按鈕寬 131／129，既有範例為 130／130。改為 2 字標籤（dec-008）後仍相同，**標籤長度已排除**。與範例唯一剩下的版面差異是目前發佈版 Active 的兩個 16px Return icon 與 8px 間距（見 bl-004），推測為主因，未以實驗證明 |
+| F-001 | minor | introduced | accepted（dec-010，例外 ex-001） | 兩顆按鈕寬 131／129，既有範例為 130／130。改為 2 字標籤（dec-008）後仍相同，**標籤長度已排除**。與範例唯一剩下的版面差異是目前發佈版 Active 的兩個 16px Return icon 與 8px 間距（見 bl-004），推測為主因，未以實驗證明 |
 | F-002 | minor | inherited_baseline | resolved | Secondary 的 icon；改用 Active 後不適用（dec-006） |
 | F-003 | minor | introduced | resolved | 標籤與視覺重量不符；改為 Default＋Active（dec-007） |
 | F-004 | minor | inherited_baseline | resolved | 依 dec-009 改記為 baseline 觀察 bl-004 |
@@ -97,15 +97,20 @@ Pattern 限制（inventory `pattern-footer-2btn.constraints[pc-001]`，狀態 `o
 ```json
 {
   "ruleVersion": "12.1@1.2-m1min",
-  "eligible": false,
-  "result": "awaiting_user",
+  "eligible": true,
+  "result": "complete_with_exceptions",
   "coverage": { "applicable": 1, "verified": 1 },
-  "reasons": [
-    "G7 fail: pending question dec-010: dec-005 (130/130 like the example) conflicts with dec-009 (keep icons)",
-    "pending questions: dec-010"
-  ]
+  "reasons": []
 }
 ```
+
+第一次計算（dec-010 回答前）結果為 `awaiting_user`，原因為 G7 fail（dec-010 待答）。dec-010 回答後重新計算，得到上方結果。
+
+已接受例外（`audit.acceptedExceptions`）：
+
+| ID | Finding | decisionRef | 硬性門檻 | 內容 |
+|---|---|---|---|---|
+| ex-001 | F-001 | dec-010 | 否 | `34016:68` 兩顆按鈕寬 131／129（既有範例 130／130）；推測由 dec-009 保留的目前版 Active icon 造成 |
 
 | Gate | 結果 | 依據 |
 |---|---|---|
@@ -115,14 +120,14 @@ Pattern 限制（inventory `pattern-footer-2btn.constraints[pc-001]`，狀態 `o
 | G4 視覺 | pass | 無裁切、重疊、缺字；F-001 為 minor |
 | G5 設計可及性 | pass | 文字對比與點擊區（設計層）；實作層未驗證 |
 | G6 可追溯 | pass | node IDs、ledger、audit、最後截圖一致 |
-| G7 阻礙 | fail | dec-010 待答 |
+| G7 阻礙 | pass | 無待答問題或設計決策（dec-010 已回答）；無 dispatched／unknown_outcome 操作 |
 
 `evaluate-completion.mjs` 是 M1 的最小實作（5 項 fixture 測試），尚未包含 JSON Schema 驗證與第 20 節全部跨檔案檢查；M2 會補齊。
 
 ## 9. 未驗證與缺口
 
 - gap-001：`Size`／`Global`／`Colors`／`System Colors` 的來源 library 未識別、未啟用。顏色 token 綁定、mode 切換驗證待補；tokenBinding 分母為 0，記為 N/A。
-- F-001 的原因（icon）未以實驗證明。
+- F-001 的原因（icon）未以實驗證明；已依 dec-010 接受為例外 ex-001。
 - PostToolUseFailure 的真實觸發、variable import-by-key、確切回傳上限。
 - 協作情境（T35–T37：使用者同時改動）未在真實畫布測試。
 - 鍵盤、螢幕閱讀器等實作層可及性。
