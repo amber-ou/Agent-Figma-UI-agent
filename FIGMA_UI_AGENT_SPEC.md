@@ -1,6 +1,6 @@
 # Figma UI Design Agent — Claude Code 建置規格
 
-版本：1.1 · 研究基準日：2026-09-27 · 修訂／補充查核日：2026-09-28 · 語言：繁體中文
+版本：1.2 · 研究基準日：2026-09-27 · 修訂／補充查核日：2026-09-28（v1.1、v1.2） · 語言：繁體中文
 
 文件性質：可交付實作的產品／技術規格；不是已完成的 agent，也不是已通過實機測試的證明。
 
@@ -26,6 +26,10 @@
 | 語言 | 繁體中文，支援英文混排 | 字型、長字串、日期與數字需測試 |
 | 設計系統缺口 | 先報告並詢問，再決定 wrap／新增／調整需求 | 預設不自行建立另一套 tokens 或元件庫 |
 | 互動原則 | 發生阻礙、設計來源衝突或需改變範圍時先問使用者 | 不用靜默降級掩蓋失敗 |
+| 設計決策，已確認（v1.2） | DS、既有 pattern 或使用者指示未決定的設計選擇（例如是否使用漸層）**一律詢問**，agent 不自行決定 | 第 7.4 節；plan 的 designDecisions 不得有 agent 自訂來源 |
+| 執行環境，已確認（v1.2） | 使用者本機的 Claude Code | 本機安裝 Figma plugin／remote MCP 與 OAuth；hooks 在本機執行 |
+| 人機協作，已確認（v1.2） | 使用者可能在 agent 工作期間同時編輯同一 Figma 檔 | 第 11.2 節；以衝突偵測＋不覆寫處理，不宣稱能鎖住人 |
+| M1 測試檔，已確認（v1.2） | 使用者提供可寫測試檔與唯讀 library | 第 17.1 節 |
 | 文件格式 | Markdown | 方便 CC 直接讀取、版本控制與拆分實作 |
 
 Web 僅作測試 fixture，不是每次工作的預設產品平台。真正啟動設計工作前，必須完成當次需求確認。首次請求若已寫明欄位，將已知內容預填成簡短確認，不要要求使用者重填；尚未回答的產品／平台／DS 不得自行預設。
@@ -41,7 +45,10 @@ Web 僅作測試 fixture，不是每次工作的預設產品平台。真正啟�
 | 想確認的內容 | 章節 |
 |---|---|
 | 每次呼叫如何問需求 | 第 7 節 |
-| 如何讀 library、元件、variables 並延伸 | 第 6、8、10 節；第 6 節為核心詳規 |
+| 哪些設計選擇必須問使用者 | 第 7.4 節 |
+| 如何讀 library、元件、variables 並延伸 | 第 6、8、10 節；第 6 節為核心詳規，第 6.6 節為版面 pattern |
+| 使用者同時編輯時怎麼辦 | 第 11.2 節 |
+| 哪些規則由 hooks 程式化強制 | 第 4.5 節 |
 | Claude Code 要建立哪些檔案 | 第 4、17、20 節 |
 | 工具／權限不足怎麼辦 | 第 5、11 節 |
 | 設計品質如何衡量 | 第 9、12 節 |
@@ -71,7 +78,8 @@ Web 僅作測試 fixture，不是每次工作的預設產品平台。真正啟�
 - 從產品任務推導資訊優先順序與使用流程，避免只有視覺裝飾。
 - 保留既有元件、變數、字型與命名慣例；提供可追溯的例外。
 - 一次完成指定 screens、viewports、states，包含失敗與空資料狀態。
-- 局部改版能保留範圍外內容及使用者手動修改。
+- 局部改版能保留範圍外內容及使用者手動修改；使用者與 agent 同時編輯時，偵測衝突且不覆寫使用者的改動。
+- 所有未被 DS／既有 pattern／使用者指示決定的設計選擇都由使用者決定。
 - 中斷後可恢復；未知結果不能盲目重送，不能產生重複頁面或元件。
 - 交付可重現的品質證據、Figma 連結與開發備註。
 
@@ -132,22 +140,27 @@ Web 僅作測試 fixture，不是每次工作的預設產品平台。真正啟�
 ```text
 CLAUDE.md                              # 短入口、來源優先序、工作範圍
 .claude/
+  settings.json                        # 專案 hooks 設定（第 4.5 節）；合併既有設定，不覆寫
   skills/figma-ui/
     SKILL.md                           # 主流程與階段出口
     references/
-      discovery.md
+      discovery.md                     # 含第 6.6 節 pattern 盤點方法
+      design-decisions.md              # 第 7.4 節：何時必須問、問題格式
       design-quality.md
-      figma-runtime.md
+      collaboration.md                 # 第 11.2 節：人機協作與衝突處理
+      runtime-probes.md                # 只記錄本專案 probe 結果與差異；API 細節以官方 Figma skills 為準
       recovery.md
       handoff.md
-    templates/
-      brief.example.json
-      plan.example.json
-      audit.example.json
+    snippets/                          # 貼入 use_figma 的標準 JS 片段
+      op-header.js                     # 每次呼叫必帶的標頭註解格式
+      fingerprint.js                   # 在 Figma 端計算 fingerprint
+      mark-owned.js                    # sharedPluginData 所有權標記
+      precondition-guard.js            # 同一腳本內先驗證再寫入
   agents/figma-ui-designer.md           # 可選專用入口，P0 不依賴 subagent
 schemas/
   brief.schema.json
   plan.schema.json
+  inventory.schema.json
   capabilities.schema.json
   ledger.schema.json
   operation.schema.json
@@ -158,26 +171,33 @@ scripts/
   operation-journal.mjs
   quality-metrics.mjs
   verify-installation.mjs
+  hooks/
+    pre-figma-call.mjs                 # PreToolUse：授權、鎖、未知結果阻擋、記 dispatched
+    post-figma-call.mjs                # PostToolUse／PostToolUseFailure：記結果
 tests/
-  fixtures/
+  fixtures/                            # 完整範例檔的唯一來源；skill 直接引用，不另存 templates
   contracts/
   recovery/
+  hooks/
   acceptance/
 docs/
   setup.md
   runbook.md
   acceptance-results.md
+.figma-ui/                             # 本機執行狀態；加入 .gitignore
+  active-run.json                      # 目前啟用的 runId；無此檔時 hooks 放行（不影響非 agent 使用）
+  locks/<fileKey>.json                 # 本機 writer 鎖（第 11.1 節）
 design-runs/                            # 執行輸出；依團隊政策忽略敏感資料
   <run-id>/
     brief.json
     capabilities.json
     inventory.json
-    design-plan.json
-    ledger.json
+    plan.json
+    ledger.json                         # run.status 的唯一來源
     operations.jsonl
     decisions.md
     # findings 的唯一資料來源是 audit.json，不另維護 issues.json
-    evidence/
+    evidence/                           # 選配：本機截圖；預設證據為工具參照（第 12.5 節）
     audit.json
     handoff.md
 ```
@@ -201,6 +221,8 @@ claude mcp list
 在 CC 內透過 `/mcp` 完成 OAuth。登入由使用者操作；不要求貼上 token。禁止將秘密寫入 repo、prompt、ledger 或報告。
 
 實作者必須檢查目前版本的 CLI help、plugin 安裝狀態與實際 tool schema。既有 remote server 可重用，不得為了名稱一致刪除使用者設定。若 remote／desktop 同時存在，使用明確 server identity，避免誤用同名工具。
+
+**v1.2：**執行環境已確認為使用者本機的 Claude Code。plugin 套件名稱（上方 `figma@claude-plugins-official`）為研究時未在 CC 實測的寫法，安裝前以 `claude plugin` 的實際搜尋／help 確認。MCP 工具的完整名稱依安裝方式不同（例如手動設定為 `mcp__figma__use_figma`，plugin 安裝可能帶 plugin 前綴），`verify-installation.mjs` 必須列出實際名稱並寫入 capabilities；hooks matcher 不得寫死單一前綴。
 
 `.mcp.json` 僅於採手動配置且無現有等效連線時建立。示意：
 
@@ -249,9 +271,26 @@ user-invocable: true
 
 本文件的 adapter／writer 是邏輯模組：P0 可由 skill 指導 Claude Code 使用已連接的 MCP 工具，搭配本機腳本處理 schemas、journal、locks 與報告。**不要求本機 JavaScript 直接存取 CC 的內部工具物件，也不假設存在未公開的 MCP 呼叫 SDK。** 測試 fixtures 模擬工具結果的正規化，不假冒真實連線。
 
-若需要更強的強制保護，可在確認 CC 版本支援後增加 tool hooks／受控工具路由，並另測拒絕案例。自然語言 prompt、本機 lock 和事後 validator 各有邊界：prompt 不能提供安全隔離，本機 lock 不能限制其他 Figma 使用者，事後驗證不能阻止已發生的外部修改。交付必須說明實際實作了哪些保護。
+v1.2 起，寫入前的授權、鎖與未知結果阻擋改由第 4.5 節的 Claude Code hooks 程式化強制，不再只靠模型自行呼叫本機腳本。自然語言 prompt、本機 lock、hooks 和事後 validator 各有邊界：prompt 不能提供安全隔離，本機 lock 與 hooks 不能限制其他 Figma 使用者，事後驗證不能阻止已發生的外部修改。交付必須說明實際實作了哪些保護。
 
 第一版應用工具最小權限、精確範圍、預先記錄、衝突檢查與可恢復操作降低風險；不得為了追求「自動化」開啟 blanket bypass permissions。
+
+### 4.5 Hooks 強制層（P0，v1.2 新增）
+
+**D：**Claude Code 的 PreToolUse／PostToolUse matcher 支援 MCP 工具名稱（`mcp__<server>__<tool>`）與 regex；PreToolUse 以 exit code 2 或 `permissionDecision: "deny"` 阻擋呼叫；hook 由 stdin 取得 `tool_name`、`tool_input`、`tool_use_id`、`session_id`、`cwd`；工具失敗時觸發獨立的 PostToolUseFailure 事件。[Claude Code hooks](https://code.claude.com/docs/en/hooks)
+
+**P：**以 hooks 取代「模型在每次 `use_figma` 前後自行呼叫 journal 腳本」：
+
+| Hook | Matcher（示意，依實際工具名調整） | 行為 |
+|---|---|---|
+| PreToolUse | `mcp__.*figma.*__(use_figma\|create_new_file\|upload_assets)` | 1. 無 `.figma-ui/active-run.json` → 放行（不干擾非 agent 使用）。2. 解析 code 開頭的 op 標頭（`snippets/op-header.js`）；缺標頭 → 阻擋並說明格式。3. `mode=read` → 記錄後放行。4. `mode=write`：檢查 brief.output 已確認、fileKey 與授權 output 相符、本機鎖由本 run 持有、同檔沒有 dispatched／unknown_outcome 操作；任一不符 → 阻擋。5. 通過後寫入 `dispatched`（含 code hash）再放行。 |
+| PostToolUse | 同上 | 將對應 operation 記為 `applied`，保存回傳的 IDs／摘要；未驗證前不標 verified。 |
+| PostToolUseFailure | 同上 | 能證明未執行（例如 schema 驗證錯誤）→ `failed_known`；逾時、截斷或無法判定 → `unknown_outcome`。 |
+
+- 只有 dispatched、沒有任何後續事件（CC 當機、程序中止）的操作，下一次 PreToolUse 一律視為 `unknown_outcome` 並阻擋同檔寫入，直到對帳完成。這是安全預設。
+- `use_figma` 同時用於讀與寫，hook 無法從程式碼可靠判斷是否有 mutation。op 標頭的 `mode` 是自我聲明：標成 read 卻寫入的情況無法完全攔截，交付須列為已知邊界；validator 事後比對 read 操作的前後 fingerprint 作為補充偵測。
+- hooks 失敗（腳本例外）時預設阻擋 write、放行 read，並回報原因；不得靜默放行 write。
+- hooks 設定寫入專案 `.claude/settings.json`，與使用者既有設定合併，不覆寫其他 hooks。
 
 ## 5. 能力探測與工具路由
 
@@ -264,6 +303,8 @@ user-invocable: true
 `CAP-03` 身分／方案檢查只記錄必要的 seat 和 plan reference，避免把 email 等個資複製進公開報告。新檔案若有多個可選 team／plan，使用者決定歸屬。
 
 `CAP-04` 寫入 smoke test 只能在指定測試頁面或使用者授權的任務範圍內。不能為測試權限而污染任意檔案。
+
+`CAP-05`（v1.2）以下 runtime 能力是本規格其他章節的前提，必須在 M1 以最小 probe 驗證並記入 capabilities，未驗證前不得當作可用：`setSharedPluginData`／`getSharedPluginData`（第 11.2、11.4 節所有權標記）、`resolveForConsumer`（第 6.3 節）、library 元件與 variable 的 import-by-key API、字型列舉與載入、截圖取得方式、單次 `use_figma` 回傳大小上限，以及 hooks 對實際 Figma 工具名稱是否觸發。
 
 ### 5.2 邏輯能力表
 
@@ -413,6 +454,17 @@ Figma 的配額與可用性會因方案、seat、工具類別變動，因此不�
 
 若最後 unresolved 資源影響必需 UI，run 為 partial／blocked；只有非必要且已接受的例外才能 `complete_with_exceptions`。
 
+### 6.6 版面 pattern 盤點（P0，v1.2 新增）
+
+元件與 variables 只決定「用什麼零件」，不決定「怎麼組」。延伸畫面的品質主要來自沿用產品既有的組裝方式，因此 Discover 階段必須另外盤點版面 pattern：
+
+1. 選 2–3 個與本次需求最相近的既有畫面（同產品、同平台、同類任務），由使用者確認或在 intake 指定；找不到時詢問，不自行挑選風格差異大的畫面。
+2. 從中讀出並記錄可量測的 pattern：畫面寬度與 grid／欄數、外距與 section 間距（對應 spacing variables）、頁首／導航結構、標題層級與 text styles、卡片／列表／表單／dialog 的慣用組合、主次 action 位置、空狀態與錯誤呈現方式、背景與裝飾手法（例如是否已有漸層、陰影、插圖）。
+3. 每個 pattern 記錄：ID、來源 nodeIds、量測值、使用的元件／variables、出現次數、截圖或結構證據。來源畫面之間互相矛盾時，列出差異並詢問，不自行擇一。
+4. Plan 階段每個 section 的版面必須引用 pattern ID 或已確認的設計決策（第 7.4 節）；兩者皆無即為待問問題。
+
+pattern 盤點寫入 inventory.json 的 `patterns`，範圍以本次需求為限，不必盤點整個檔案。
+
 ## 7. 需求輸入、澄清與決策規則
 
 ### 7.1 Brief 必要資訊
@@ -429,13 +481,13 @@ Figma 的配額與可用性會因方案、seat、工具類別變動，因此不�
 
 `REQ-02` 可由既有材料推得的內容先整理為候選事實，附來源；不得反覆詢問已回答的資訊。
 
-`REQ-03` 品牌、字型、主色、風格與資料密度若有既定 DS，沿用；若沒有且會實質影響設計方向，提供至多 2–3 個具體選項及差異。
+`REQ-03` 品牌、字型、主色、風格與資料密度若有既定 DS 或既有 pattern，沿用並在 plan 確認時列出；若沒有，依第 7.4 節詢問，提供 2–3 個具體選項及差異，不自行決定。
 
 下列為 **intake 階段的完整 brief 範例**；未取得來源／輸出資訊而保留空值是合法草稿，不能通過寫入前檢查。
 
 ```json
 {
-  "schemaVersion": "1.1",
+  "schemaVersion": "1.2",
   "runId": "ui-20260927-001",
   "workflow": "native_design",
   "taskType": "extend",
@@ -497,13 +549,29 @@ Figma 的配額與可用性會因方案、seat、工具類別變動，因此不�
 
 `ASK-03` 沒有回覆不代表批准。可繼續來源查核、唯讀探索、局部文件整理；不能越過待決寫入。
 
-`ASK-04` 不對每個 padding 或元件擺放要求批准。已由需求、DS 或先前決策確定的操作直接執行。
+`ASK-04` 已由需求、DS、既有 pattern 或先前決策確定的操作直接執行，不逐一要求批准。但凡需要 agent 自行做出的設計選擇，一律依第 7.4 節詢問；「不確定是否屬於設計選擇」時視為屬於。
 
-`ASK-05` 可確定不改變結果的內部修正（例如修正 JSON 格式、讀取 typings）可自行處理。若使用者要求所有異常都先問，切換 `ask_on_any_error` 並先報告工具錯誤；兩種政策不可混用。
+`ASK-05` 可確定不改變結果的內部修正（例如修正 JSON 格式、讀取 typings）可自行處理。若使用者要求所有異常都先問，切換 `ask_on_any_error` 並先報告工具錯誤；兩種政策不可混用。`approvalPolicy` 的 enum 為 `ask_on_problem | ask_on_any_error`，預設 `ask_on_problem`；此政策只管工具／執行異常，設計決策不論政策為何都依第 7.4 節詢問。
 
 ### 7.3 衝突來源
 
 優先採用：本次明確指示 → 已接受的 brief／決策 → 指定 DS 與既有產品 → 指定參考 → agent 提案。若程式庫與 Figma 不一致，不能宣稱其中一方自然優先；列出差異與來源，由使用者決定 authoritative source。
+
+### 7.4 設計決策一律詢問（P0，v1.2 新增）
+
+使用者已確認：agent 在「怎麼做出好設計」上不自行做決定，一律轉成問題。
+
+`DEC-01` **定義。**設計決策是任何會影響畫面外觀、資訊層級或使用體驗，且未被下列來源明確決定的選擇：本次使用者指示、已確認的 brief／先前決策、指定 DS（元件、variables、styles）、已盤點並在 plan 中確認的既有 pattern（第 6.6 節）。
+
+`DEC-02` **必問範例（非完整清單）：**是否使用漸層、陰影、插圖、背景裝飾；強調色或狀態色的使用位置；DS 未涵蓋的間距、圓角、字級；多個候選元件的選擇；版面結構與資訊排序的取捨（例如表格或卡片、分頁或 tab）；長文字採換行或截斷；空狀態、錯誤狀態的呈現方式與文案語氣；圖示選擇；響應式時要隱藏或收合哪些內容；修正視覺缺陷時有多種合理修法。
+
+`DEC-03` **不必逐項問：**直接由 DS／pattern／使用者指示推得的操作（例如沿用既有 section 間距 variable、使用 DS 的 Primary Button）。這些項目在 plan 確認時以摘要一次列出，讓使用者看得到 agent 將依循哪些既有規則。
+
+`DEC-04` **問題格式：**情境（哪個畫面／元件）→ 為何 DS／pattern 無法決定 → 2–3 個具體選項，每個說明視覺差異與取捨 → 可附建議，但必須明確標示為建議。適合時可附既有畫面的節點連結作為參考。同一階段的問題集中一次提出，優先在 Plan 階段問完，減少 Build 中途打斷。
+
+`DEC-05` **未回答不代表同意。**待答設計決策所影響的 section 不得進入 Build；不相依的部分可繼續。Build／Validate 中途出現新的設計決策時，暫停相依寫入並詢問，不先做再請使用者確認。
+
+`DEC-06` **資料化與強制。**每個決策寫入 `plan.designDecisions`：`id`、`question`、`options`、`recommendation`（可空）、`answer`、`source`（`user | ds | existing_pattern | brief`）、`evidenceRefs`、`decidedAt`。`source` 不允許 agent 自訂值；`designDecisions` 與 `plan.decisions`（範圍、例外、授權等決策）分開保存，但共用 ID 命名空間，decisionRef 可指向兩者。每個 write operation 必須以 `basisRefs` 引用其依據（pattern ID、designDecision ID、componentMap／variableMap 項目）。validator 拒絕 `answer` 為空卻被引用的決策，也拒絕沒有依據的 write operation。這只能檢查「有沒有引用依據」，無法證明腳本內容完全符合依據；後者由 Validate 階段的結構與視覺檢查補足。
 
 ## 8. 工作流程與階段出口
 
@@ -530,8 +598,8 @@ BUILD/VALIDATE → RECONCILE → 局部修正 → VALIDATE
 |---|---|---|
 | Intake | 整理 brief、關鍵問題、範圍 | brief 有來源，blocking questions 為空 |
 | Preflight | 工具、檔案、seat、skills、資產與字型能力 | capabilities，已知限制 |
-| Discover | 讀既有 screens、instances、variables、library、Code Connect | inventory、來源優先序、缺口清單 |
-| Plan | flow、screen/state 矩陣、版面規則、元件映射、寫入範圍 | design-plan，重大取捨已確認 |
+| Discover | 讀既有 screens、instances、variables、library、版面 pattern、Code Connect | inventory（含 patterns）、來源優先序、缺口清單 |
+| Plan | flow、screen/state 矩陣、版面規則、元件映射、寫入範圍、設計決策 | plan；所有 designDecisions 已由使用者回答或有 DS／pattern 來源 |
 | Build | 先重用；只有已允許的 gaps 才補 tokens／元件，再 composition；audit 跳過 | 操作 journal、IDs、結構摘要 |
 | Validate | 結構、視覺、狀態、響應式、可及性設計檢查 | audit＋screenshots＋修正紀錄 |
 | Handoff | 成果索引、互動規則、開發備註、限制 | handoff，完成條件逐項對應 |
@@ -543,22 +611,23 @@ BUILD/VALIDATE → RECONCILE → 局部修正 → VALIDATE
 3. 查看同產品現有畫面，讀 instance 的主元件、屬性與 variable bindings。
 4. 讀可用 library，依回傳 continuation／offset 分頁，不假設第一頁完整。
 5. 搜尋尚未解析的 components、variables、styles；用單一意圖的短查詢。
-6. 產出 `component-map`：reuse／wrap_proposed／new_proposed／blocked，各項需有理由；未經當次允許，不執行 proposed 項。
+6. 依第 6.6 節盤點相近畫面的版面 pattern。
+7. 產出 `component-map`：reuse／wrap_proposed／new_proposed／blocked，各項需有理由；未經當次允許，不執行 proposed 項。
 
 只讀 local variables 得到空陣列，不足以排除 remote library variables。唯讀權限的 library 元件仍可能允許匯入使用；「不能修改主元件」不等於「不能重用 instance」。
 
 ### 8.2 設計計畫
 
-每個 screen 定義：使用者任務、主要 action、資訊排序、sections、viewport、states、元件來源、內容長度限制、互動目的地。
+每個 screen 定義：使用者任務、主要 action、資訊排序、sections、viewport、states、元件來源、引用的 pattern ID、內容長度限制、互動目的地。
 
-若是已有風格的局部修改，直接沿用；若是從零開始且方向不明，先提出具體方向比較，避免先做完整頁再問喜好。必要時做小範圍概念稿，但不強迫每個任務產出三套設計。
+若是已有風格的局部修改，沿用既有 pattern 並在 plan 確認時列出；若方向不明或 pattern 不足，依第 7.4 節提出具體選項詢問，避免先做完整頁再問喜好。若使用者要求看概念稿再決定，只在授權區域做小範圍概念稿，概念稿本身不代表方向已選定。
 
 ### 8.3 組裝與迭代
 
 - 完整任務可分成可恢復的 batches；跨 page 拆開。
 - 主 layout 由外到內：screen → sections → components → text/assets。
 - 每批回傳新增與修改 IDs、類型、必要的 bounds／binding／count 證據。
-- 每個組合完成後做視覺審查；發現缺陷做局部修正，再拍受影響 composition。
+- 每個組合完成後做視覺審查；發現缺陷做局部修正，再拍受影響 composition。修正方式只有一種合理解（例如修正錯誤的 variable 綁定）可直接做；有多種合理修法時依第 7.4 節詢問。
 - 未變更、已有有效證據的部分不重複掃描與截圖。
 - 只以第 12.1 節的唯一完成判定作停止條件；評分不另設完成門檻。連續 3 次視覺修正仍未改善同一問題時回報，請使用者決定調整方向；此數字是專案預設，可配置。
 
@@ -579,7 +648,7 @@ BUILD/VALIDATE → RECONCILE → 局部修正 → VALIDATE
 - 先定資訊層級、內容密度、grid、對齊與留白，再加裝飾。
 - 字級、行高、間距、圓角與陰影採有限且一致的 scale；沿用 DS。
 - 主次 action、可點擊性、錯誤與成功訊號清晰；不能只有色彩差別。
-- 不以預設紫色漸層、滿頁卡片或大量陰影替代產品判斷。
+- 不以預設紫色漸層、滿頁卡片或大量陰影替代產品判斷。漸層、陰影、插圖等裝飾手法除非既有 pattern 已使用，否則依第 7.4 節詢問。
 - 文字不重疊、不意外截斷、不出現中英混排缺字。刻意省略需有規則與完整內容取得方式。
 - 圖片的主體、比例、裁切焦點、loading／fallback 需一致；placeholder 不得在交付時冒充真實資產。
 - 圖示採同一套 library 的重量與比例；常見圖示優先重用，避免以 emoji 假裝 UI icon。
@@ -649,6 +718,8 @@ BUILD/VALIDATE → RECONCILE → 局部修正 → VALIDATE
 
 實作必須：先讀當下 skill／typings → feature detect → helper 可用則使用 → 否則只採已查證標準 API fallback。對 layout、字型、變數 setter 做型別與值檢查。無法確認的 API 不應憑名稱猜測。
 
+**v1.2：**runtime API 的使用方式（字型、Auto Layout、helpers、page loading）以使用者本機已安裝的官方 Figma plugin skills（例如 `figma-use`、`figma-generate-design`）為準，`figma-ui` skill 在需要時指示載入它們，並把版本記入 capabilities。本專案不另寫一份 runtime API 教學，避免 plugin 升級後內容分歧；`references/runtime-probes.md` 只記錄本專案實測的結果、差異與決策。
+
 資料色彩範圍與 enum 必須驗證；fills／strokes 採新陣列賦值；所有 promise 等待完成。頁面內容要依 runtime 的 async page-loading 規則處理，每次操作顯式指定目標 page。這些是降低跨版本失敗的工程要求，而非假定 MCP 具備資料庫式 transaction。
 
 ## 11. 寫入安全、狀態與恢復
@@ -659,19 +730,36 @@ BUILD/VALIDATE → RECONCILE → 局部修正 → VALIDATE
 
 本研究的兩份本機技能對跨頁並行有不同要求；本專案選擇可追溯與恢復優先的 serial policy，不宣稱是 Figma 的全域限制。未來要並行，必須以隔離證據與壓力測試另行設計。
 
-本機 file lock 只能避免此專案的多個程序互撞，不能鎖住 Figma 其他使用者；不可宣稱能阻止所有協作者修改。
+本機 file lock 只能避免此專案的多個程序互撞，不能鎖住 Figma 其他使用者；不可宣稱能阻止所有協作者修改。使用者本人在 Figma 的同時編輯由第 11.2 節處理。
 
-所有參與此專案的 writer 共用同一 lock registry，以 canonical fileKey 為鍵，不以 run directory 為鍵。鎖至少記錄 owner token、host ID、PID、程序啟動時間、runId、operationId、取得時間與 heartbeat。取得鎖必須原子化；釋放只允許相同 owner token。不同 registry／主機不在此鎖的保證範圍。
+**P0 鎖（v1.2 簡化）：**使用情境是單一使用者、本機、通常一個 CC session。鎖檔為 `.figma-ui/locks/<canonical fileKey>.json`，以 fileKey 為鍵，不以 run directory 為鍵；內容為 owner token、runId、PID、hostname、取得時間。以獨佔建立（O_EXCL 或等效）原子取得；釋放只允許相同 owner token。PreToolUse hook 檢查鎖由目前 run 持有才放行 write。
 
-heartbeat 逾時不是可直接搶鎖的證據。確認本機程序已退出（含 PID 重用檢查）後，接手者先讀 journal 並 reconciliation。若外部工具呼叫可能仍執行，維持 `recovery_required` 封鎖，不因程序死亡或短時間畫布沒有變動就重送；需取得已終止／已完成的證據，無法確認時先問。`dispatched`／`unknown_outcome` 期間阻擋同檔後續寫入；只有恢復程序可取得 recovery ownership 做唯讀對帳。
+鎖的 PID 已不存在時，不自動搶鎖：先讀 journal；若有 dispatched／unknown_outcome，進入對帳（第 11.4 節）；確認沒有未知寫入後，詢問使用者是否接手。`dispatched`／`unknown_outcome` 期間阻擋同檔後續寫入。
 
-### 11.2 操作 journal
+**延後至 P1：**heartbeat、PID 重用檢查、程序啟動時間比對、跨主機 registry。只有實際出現多個本機 agent 程序同時寫同檔的需求時才實作。
 
-每次 mutation 先持久化操作意圖與 preconditions，再寫 dispatched，才呼叫工具；回應後記錄結果。呼叫前再次檢查目標 fingerprint，縮短衝突窗口，但不宣稱有原子 compare-and-swap。下列是 **operation 欄位片段**，不宣稱符合完整 schema；尖括號只作說明。
+### 11.2 與使用者同時編輯（P0，v1.2 新增）
+
+使用者已確認可能在 agent 工作期間同時編輯同一 Figma 檔。Figma 沒有可供 agent 取得的編輯鎖，因此本節目標是**偵測衝突、絕不覆寫使用者改動、讓使用者看得到 agent 在哪裡工作**，而不是阻止使用者編輯。
+
+1. **工作區隔離。**設計任務預設在 output 頁面空白處為每個 run 建立一個 Section（名稱例如 `figma-ui / <runId>`），新畫面都放在其中。agent 只寫入自己建立的節點，以及 `modify` 任務中使用者明確指定的範圍。
+2. **所有權標記。**agent 建立的每個根節點，在建立它的同一個 `use_figma` 腳本內立刻以 `setSharedPluginData` 寫入 `runId`、`operationId`、`logicalKey`、`agentFingerprint`（寫入當下的 fingerprint）。子節點以所屬根節點判定所有權。此能力須先依 CAP-05 驗證；不支援時退回名稱＋結構比對並將恢復能力標為降級。
+3. **同一腳本內先驗證再寫入。**每個修改既有節點的 write 腳本，開頭先在 Figma 端重新計算目標節點 fingerprint（`snippets/fingerprint.js`），與 ledger 中最後一次 agent 驗證的值比對；不一致就不做任何修改，回傳 `conflict` 與差異摘要（`snippets/precondition-guard.js`）。這把衝突窗口縮到單一腳本執行期間，但仍不是原子交易。
+4. **偵測到使用者改動時：**
+   - 使用者改了 agent 建立的節點：視為使用者的決定，不覆寫、不還原。回報差異並詢問：採納（更新 plan 與 fingerprint 基準）或由使用者說明要如何處理。
+   - 使用者在 agent 的 Section 內新增節點：保留，不移動、不刪除，回報並詢問是否納入本次範圍。
+   - 使用者刪除 agent 建立的節點：不自動重建，詢問。
+   - 使用者改動影響已驗證的 requiredCell：該格 evidence 失效，重驗前不得宣稱完成。
+5. **暫停與交棒。**使用者說「暫停」時，agent 完成或對帳目前的 operation 後停止寫入；恢復時先讀回 Section 範圍並對帳，再繼續。
+6. **可見狀態（P1）。**寫入期間在 Section 名稱加上狀態（例如 `figma-ui / <runId>（agent 編輯中）`），結束後移除，讓使用者在畫布上看得到 agent 正在寫哪裡。會增加寫入次數，因此列 P1。
+
+### 11.3 操作 journal
+
+每次 mutation 先持久化操作意圖與 preconditions（planned，由 skill 經 `operation-journal.mjs` 寫入），dispatched 與結果由第 4.5 節的 hooks 自動記錄。每個 `use_figma` 呼叫的 code 開頭帶 op 標頭（`// figma-ui run=<runId> op=<operationId> mode=read|write`），hook 以此對應 operation。目標 fingerprint 在同一腳本內重新檢查（第 11.2 節第 3 點），縮短衝突窗口，但不宣稱有原子 compare-and-swap。下列是 **operation 欄位片段**，不宣稱符合完整 schema；尖括號只作說明。
 
 ```json
 {
-  "schemaVersion": "1.1",
+  "schemaVersion": "1.2",
   "operationId": "op-0007",
   "runId": "ui-20260927-001",
   "logicalKey": "members.desktop.default",
@@ -679,7 +767,9 @@ heartbeat 逾時不是可直接搶鎖的證據。確認本機程序已退出（�
   "fileKey": "<verified-file-key>",
   "pageId": "<verified-page-id>",
   "scopeRootIds": ["<verified-root-id>"],
+  "mode": "write",
   "status": "planned",
+  "basisRefs": ["pattern-list-01", "dec-003", "cmap-InviteAction"],
   "preconditions": {
     "targetExists": true,
     "expectedFingerprint": "<normalized-properties-hash>"
@@ -698,7 +788,7 @@ heartbeat 逾時不是可直接搶鎖的證據。確認本機程序已退出（�
 
 failed_known 僅表示已證明此 attempt 沒有副作用，可修正後建立新的 attempt；unknown_outcome 必須 reconciliation 後才可轉 applied／failed_known。已知部分成功以 applied＋`effectSummary.partial=true` 記錄，缺口用新 operation 補償或修正，不重播原 create。cancelled 只用於未送出的 planned 操作；中斷本機不等於取消了遠端 mutation。verified 舊紀錄保持不可變，後續修改用新 operation 並使舊 evidence 失效。
 
-### 11.3 Idempotency 與對帳
+### 11.4 Idempotency 與對帳
 
 1. 從 ledger 查 logicalKey 對應 node ID。
 2. 驗證 node 存在、類型、parent、scope 與預期 fingerprint。
@@ -706,22 +796,24 @@ failed_known 僅表示已證明此 attempt 沒有副作用，可修正後建立�
 4. 若候選不唯一或包含他人修改，停止並問；不可 name-prefix 大範圍刪除。
 5. 重跑完成操作應 update／no-op；不能複製一份。
 
-Fingerprint 應只涵蓋本操作依賴的穩定屬性，排除時間戳或無关欄位；用於樂觀衝突偵測，並不提供原子性。
+**v1.2：**若 CAP-05 已驗證 sharedPluginData，步驟 3 先在已知父層範圍內搜尋帶有相同 `runId`／`operationId`／`logicalKey` 標記的節點，再退回名稱＋類型＋結構搜尋。標記可由使用者複製節點時一併複製，因此多個節點帶相同標記時仍視為多義，停止並問。
 
-對 **create 尚未回傳 ID** 的情況，preconditions 還必須保存：精確父節點、既有 child IDs、預計新增數量／類型／結構、run/operation 識別與使用者授權的 output scope。新建子樹可先使用含 operation 識別的暫時根名稱；名稱只是候選線索，不是 ownership 證明，驗證後才換成人類可讀名稱。
+Fingerprint 應只涵蓋本操作依賴的穩定屬性，排除時間戳或無關欄位；用於樂觀衝突偵測，並不提供原子性。Fingerprint 必須在 Figma 端（`use_figma` 腳本內）以 `snippets/fingerprint.js` 的固定演算法計算後回傳；本機腳本讀不到畫布，不能自行計算。演算法變更時提升版本號並記入 fingerprint 值，不同版本的值不能互相比較。
+
+對 **create 尚未回傳 ID** 的情況，preconditions 還必須保存：精確父節點、既有 child IDs、預計新增數量／類型／結構、run/operation 識別與使用者授權的 output scope。新建子樹的根節點在同一腳本內立刻寫入 sharedPluginData 所有權標記（第 11.2 節第 2 點）；不支援時才用含 operation 識別的暫時根名稱。名稱只是候選線索，不是 ownership 證明，驗證後才換成人類可讀名稱。
 
 恢復時比較父層前後差異，再核對類型、結構、內容與操作意圖。只有候選唯一且所有證據一致才接續；有協作者新增、多個候選、部分節點建立或識別尚未寫入就中斷時，標記 unknown_outcome，保留現況並詢問，不刪、不重建。Figma 沒有可假定的原子識別寫入，因此不能保證所有未知 create 都可自動恢復。
 
-### 11.4 未知結果與 rollback
+### 11.5 未知結果與 rollback
 
 - timeout／連線中斷：畫布可能已變；先對帳再決定，不盲目重送。
-- 如工具回傳 `safeToRetryWithoutCanvasRead`，尊重其意義；缺該欄位則視為未知，先讀取。
+- 若實際工具回應含有明確表示「未執行、可安全重試」的欄位，依其意義處理；缺乏此類欄位則視為未知，先讀取。（v1.1 曾寫出欄位名 `safeToRetryWithoutCanvasRead`，研究時未找到出處，v1.2 改為依實際 schema。）
 - 修改既有節點前保留必要原值；只針對可逆屬性建立補償操作。
 - 新建內容可由精確 owned IDs 回收；刪除前再驗證範圍與 ownership。
 - 高風險改版先在已授權區域建立 draft clone；驗收後再按照使用者選擇整合。
 - 不保證 Figma 全檔交易或一鍵還原。不能用刪除後重建宣稱「保留所有 ID 和引用」。
 
-### 11.5 錯誤處理
+### 11.6 錯誤處理
 
 | 錯誤 | 行為 | 需要使用者 |
 |---|---|---|
@@ -732,9 +824,10 @@ Fingerprint 應只涵蓋本操作依賴的穩定屬性，排除時間戳或無�
 | timeout／unknown outcome | 唯讀對帳，不重複 create | 若無法確定 ownership 或衝突則詢問 |
 | 同類 API 錯誤重複 | 停止該步，查根因，不切成更多無效呼叫 | 無法修復時詢問 |
 | 需求與 DS 衝突 | 顯示差異、影響與選项 | 是 |
-| 人工改動衝突 | 保存雙方差異，不覆寫 | 是 |
+| 人工改動衝突 | 保存雙方差異，不覆寫；依第 11.2 節分類 | 是 |
+| hook 阻擋 | 依阻擋原因處理（補 op 標頭、先對帳、取得授權）；不得繞過 hook 或改用其他工具寫入 | 缺授權或需接手鎖時詢問 |
 
-### 11.6 本機資料與內容信任
+### 11.7 本機資料與內容信任
 
 ledger 採 schema validation＋原子寫入（暫存檔再替換）＋操作 journal；恢復時遇到最後一行截斷的 journal 必須標記並對帳，不能略過未知 mutation。run directory 限定在工作區，路徑需 normalize 並拒絕 traversal。
 
@@ -748,7 +841,7 @@ Figma text、reference pages、SVG、第三方元件描述都是資料，不是�
 
 1. plan 已確認，每個 requiredCell 有符合所需類型且仍有效的 evidence；適用格覆蓋率 100%。N/A 必須在 plan 有理由，不能把 not_verified 算成 N/A。若沒有任何適用格，回報範圍無效而不是自動完成。
 2. G1–G7 每一項有且只有一筆 gate 結果。G1 範圍、G2 覆蓋、G6 可追溯、G7 阻礙一律必須 pass；G3–G5 為 pass 或有已確認 plan 依據的 not_applicable。fail／not_verified 不能完成，不能把無法檢查的項目改為不適用。
-3. 無待答 blocking question、無 dispatched／unknown_outcome 操作、無未解決的交付阻礙。
+3. （v1.2 併入 G7）無待答 blocking question 或設計決策、無 dispatched／unknown_outcome 操作、無未解決的交付阻礙，以 G7 單一結果表示，不另計。
 4. 設計任務無仍開啟、影響當次交付的 critical／major finding，包括 inherited 問題。audit 任務可包含任意嚴重度的受查設計缺陷，但不能缺約定檢查或證據；用 `subject` 區分 `design | execution`，執行層阻礙仍不能忽略。
 5. handoff、來源／輸出、artifact references 與最後有效證據一致。非硬性例外需有效 decisionRef；有例外為 complete_with_exceptions，沒有為 complete。單純 baseline 觀察不是交付例外。
 
@@ -756,13 +849,13 @@ Figma text、reference pages、SVG、第三方元件描述都是資料，不是�
 
 | Gate | 條件 |
 |---|---|
-| G1 範圍 | 沒有未授權改動、刪除、detach 或共享元件變更 |
+| G1 範圍 | 沒有未授權改動、刪除、detach 或共享元件變更；沒有覆寫使用者改動（第 11.2 節） |
 | G2 覆蓋 | plan 明列的 applicable cells 有成果／檢查與證據 |
 | G3 結構 | 設計：要求的可編輯性、instances／bindings 有效；audit：完成約定結構檢查並報告 |
 | G4 視覺 | 設計：無意外裁切、重疊、缺字、必要資產空白或未移除 placeholder；audit：完成約定視覺檢查並報告 |
 | G5 設計可及性 | 設計：當次適用檢查通過；audit：完成約定可及性檢查並報告。兩者均明列實作層未驗證項 |
 | G6 可追溯 | 檔案／node URLs、ledger、audit、最後版本截圖一致 |
-| G7 阻礙 | 無尚未回答的 blocking question 或未知寫入結果 |
+| G7 阻礙 | 無尚未回答的 blocking question 或設計決策、無 dispatched／unknown_outcome 操作、無未解決的交付阻礙 |
 
 ### 12.2 可計算指標
 
@@ -793,9 +886,9 @@ Figma text、reference pages、SVG、第三方元件描述都是資料，不是�
 
 ```json
 {
-  "schemaVersion": "1.1",
+  "schemaVersion": "1.2",
   "runId": "ui-20260927-001",
-  "status": "partial",
+  "taskType": "extend",
   "gates": [{"id": "G4", "status": "fail", "evidenceRefs": ["ev-012"]}],
   "findings": [{
     "id": "F-001",
@@ -817,14 +910,25 @@ Figma text、reference pages、SVG、第三方元件描述都是資料，不是�
     "kind": "screenshot",
     "nodeId": "<verified-node-id>",
     "screenKey": "members.mobile.default",
-    "artifactRef": "evidence/mobile-default.png",
+    "toolRef": {"tool": "<actual-screenshot-tool-name>", "capturedAt": "2026-09-27T00:10:00Z"},
+    "artifactRef": null,
+    "reviewSummary": "mobile 寬度下長 email 與角色選單重疊",
     "operationIds": ["op-0007"],
     "validity": "current"
   }],
   "implementationVerificationRequired": ["keyboard-navigation", "screen-reader"],
-  "acceptedExceptions": []
+  "acceptedExceptions": [],
+  "completionEvaluation": {
+    "ruleVersion": "12.1@1.2",
+    "eligible": false,
+    "result": "partial",
+    "reasons": ["G4 fail: F-001 open"],
+    "evaluatedAt": "2026-09-27T00:11:00Z"
+  }
 }
 ```
+
+v1.2：run 的對外狀態只保存在 ledger.status；audit.json 不另設 status，只保存由 validator 計算的 `completionEvaluation`，ledger 由它更新，避免兩處狀態不一致。
 
 檢查狀態只用 `pass | fail | not_applicable | not_verified`；not_verified 不能視為 pass。嚴重度定義：critical＝越界／資料損失／主流程不可用；major＝必要品質或狀態失敗；minor＝不阻斷任務的局部改善。
 
@@ -832,7 +936,16 @@ finding.status 為 `open | resolved | accepted`，origin 為 `introduced | regre
 
 ### 12.5 截圖證據
 
-每份 evidence 記錄：ID、nodeId、screenKey、viewport／mode、capture time、對應 operation IDs、本機檔或可用 tool reference、審查摘要。若圖像無法持久化，交付註明保存限制，不放失效的暫時 URL 冒充長期附件。
+**截圖的用途（v1.2 補充）：**
+
+1. **自我視覺檢查（主要用途）。**agent 每完成一個畫面或局部修正，就擷取截圖並實際看圖，檢查結構資料看不出的問題：文字被切、元素重疊、缺字、placeholder 沒換掉、對齊與層級不對。發現問題就登錄 finding 並修正或詢問。
+2. **完成判定的證據。**每個 requiredCell（畫面×尺寸×狀態×模式）需要一筆「最後一次修改之後」的視覺檢查紀錄，否則 G2／G4 不能 pass。
+3. **修改前後比對。**`modify` 任務先截修改前的基線，完成後再截一次，確認範圍外沒有變化。
+4. **恢復與協作對帳。**中斷恢復或偵測到使用者改動時，用來確認畫布現況。
+
+**保存方式：**預設證據是工具參照（toolRef：工具名稱、擷取時間）＋ nodeId ＋ agent 看圖後寫下的審查摘要，不要求本機 PNG。`get_screenshot` 等工具通常只把圖片交給模型檢視，CC 未必能把它存成檔案，而真正的畫面隨時可在 Figma 的節點連結打開。能經已驗證路徑取得圖檔時，可選擇存到 `evidence/`（`artifactRef`）。validator 接受 `toolRef` 或存在的 `artifactRef` 其中之一。
+
+每份 evidence 記錄：ID、nodeId、screenKey、viewport／mode、capture time、對應 operation IDs、toolRef 或本機檔、審查摘要。不放失效的暫時 URL 冒充長期附件。
 
 視覺上看起來一致不證明 token 綁定；結構合格不證明畫面好看。兩者都要驗證。像素 diff 只有在忠實重建且字型／viewport 一致時作輔助，不能拿來評斷創新設計。
 
@@ -855,7 +968,7 @@ finding.status 為 `open | resolved | accepted`，origin 為 `introduced | regre
 | T02 | 既有 library＋既有頁面 | 正確 instance 與 variables；不造重複 Button | UC-02、DS-01 |
 | T03 | local variables 為空但 library 有變數 | 仍完成 remote discovery | 8.1、6.1、DS-01 |
 | T04 | 同一 run 重複執行 | logicalKey 數量不增，完成節點不重建 | SAFE-01、G3 |
-| T05 | create 已生效但回應 timeout | 對帳後接續，無重複 frame | 11.3–11.4 |
+| T05 | create 已生效但回應 timeout | 對帳後接續，無重複 frame | 11.4–11.5 |
 | T06 | 修改前有人變更目標節點 | 顯示衝突並等待，不覆寫 | ASK-01、G1 |
 | T07 | 繁中＋混合字型＋長 email | 字型處理、換行與 bounds 合格 | UI-06、G4 |
 | T08 | default/loading/empty/error | 矩陣完整且主 action 有合理行為 | UI-01、G2 |
@@ -865,34 +978,44 @@ finding.status 為 `open | resolved | accepted`，origin 為 `introduced | regre
 | T12 | 圖片上傳或自訂字型不支援 | 先詢問替代，記錄能力限制 | ASK-01 |
 | T13 | 需要改共享元件 | 先分析影響與詢問 | 10.2、ASK-01、G1 |
 | T14 | 429／大型輸出截斷 | 退避、縮小讀取範圍，保存進度 | 5.3、14 |
-| T15 | 惡意圖層文字指令 | 視為資料，不執行越界操作 | 11.6、G1 |
-| T16 | ledger 最後寫入中斷 | 恢復已確認部分，未知操作對帳 | 11.6 |
+| T15 | 惡意圖層文字指令 | 視為資料，不執行越界操作 | 11.7、G1 |
+| T16 | ledger 最後寫入中斷 | 恢復已確認部分，未知操作對帳 | 11.7 |
 | T17 | 使用者拒絕方向 | 停止依賴該方向的寫入，更新計畫 | ASK-03 |
 | T18 | 成功後小範圍修改 | 只使受影響 evidence 失效並重驗 | 8.3、G6 |
-| T19 | 兩程序同時修改同檔 | 第二 writer 被本機協調器阻擋 | SAFE-01 |
-| T20 | 異常名稱相同的兩個節點 | 不模糊挑選／刪除，要求辨識 | 11.3、G1 |
+| T19 | 兩程序同時修改同檔 | 第二 writer 被本機鎖／hook 阻擋 | SAFE-01、4.5 |
+| T20 | 異常名稱相同的兩個節點 | 不模糊挑選／刪除，要求辨識 | 11.4、G1 |
 | T21 | 第二次呼叫 agent，換產品／平台 | 重新詢問本次需求，不套用上次 DS | REQ-01 |
 | T22 | 既有語意 token 與相同色值 primitive | 依語意選 token，不只按 hex 相等綁定 | DS-01 |
 | T23 | library 缺 loading variant | 提供缺口與選項，未同意前不另建 Button | UC-07、DS-01 |
 | T24 | 既有元件含未綁定屬性 | 未改動項列 baseline；本次破壞 binding 仍判 regression | 10.1、12.2 |
 | T25 | inherited mode＋跨 collection alias | runtime 對 consumer 的解析與預期一致；不共用錯誤 mode ID | 6.3 |
 | T26 | 缺值／循環 alias／無法讀 trace | 不無限遞迴；分清有效值未知與 trace 不可見，必要缺值阻擋 | 6.3 |
-| T27 | create 生效但 ID／識別未回傳 | 依 preconditions 對帳；多義或不足時先問，不自動重送／刪除 | 11.3 |
-| T28 | owner 死亡、PID 重用或 heartbeat 過期 | 不盲目搶鎖；未知遠端執行保持封鎖，先恢復對帳 | 11.1 |
+| T27 | create 生效但 ID／識別未回傳 | 依 preconditions 對帳；多義或不足時先問，不自動重送／刪除 | 11.4 |
+| T28 | owner 程序已不存在（PID 重用、heartbeat 屬 P1） | 不自動搶鎖；未知遠端執行保持封鎖，先對帳再詢問接手 | 11.1 |
 | T29 | audit 找出 critical 設計缺陷 | 不寫入畫布；檢查與證據完整可完成報告，但不宣稱設計通過 | 8.0、12.1 |
 | T30 | 只要求 light／單尺寸的局部修改 | 不新增 dark 或無關 viewport；驗證受影響範圍 | 8.0、9.5 |
 | T31 | 參考 A、library B、輸出 C | 分開檢查權限；只寫授權 C 範圍，來源保持唯讀 | 7.1 |
 | T32 | audit 少 gate、懸空 evidenceRef 或過期截圖 | validator 拒絕完成；範例片段不能作完整檔案 | 12.1、20 |
 | T33 | new／continue／resume | 新任務 intake；續改不重問；恢復先對帳，有衝突才再確認 | 7.1 |
 | T34 | 高分但 gate fail／低分且有具體缺陷 | 高分不能完成；低分缺陷轉 findings，不調分掩蓋 | 12.1、12.3 |
+| T35 | 兩次操作之間，使用者改了 agent 建立的節點 | 同腳本 precondition guard 回傳 conflict，未修改；回報差異並詢問 | 11.2、G1 |
+| T36 | 使用者在 agent 的 Section 內新增節點 | 保留不動，回報並詢問是否納入範圍 | 11.2 |
+| T37 | 使用者刪除 agent 建立的節點 | 不自動重建，詢問 | 11.2、11.4 |
+| T38 | 需要 DS／pattern 未決定的裝飾（例如漸層）或多種合理修法 | 產生 designDecision 問題；回答前相依 section 不寫入 | 7.4、DEC-05 |
+| T39 | write 呼叫缺 op 標頭、fileKey 非授權 output、同檔有 unknown_outcome | PreToolUse hook 阻擋並說明原因；無 active run 時放行 | 4.5 |
+| T40 | 工具逾時觸發 PostToolUseFailure／CC 在 dispatched 後中止 | 記為 unknown_outcome；下一次 write 被阻擋直到對帳 | 4.5、11.3 |
+| T41 | write operation 無 basisRefs 或引用未回答的決策 | validator 拒絕 | DEC-06 |
+| T42 | 相近既有畫面的 pattern 互相矛盾 | 列出差異並詢問，不自行擇一 | 6.6 |
+
+**v1.2 優先級：**P0 必測為 T02–T08、T10、T11、T13、T15、T16、T21–T27、T29、T31–T33、T35、T38–T41。其餘（T01、T09、T12、T14、T17–T20、T28、T30、T34、T36、T37、T42）為 P1，仍保留在 fixture 層逐步補齊；不得因為列 P1 就在交付報告中省略其狀態。
 
 ### 13.3 基準任務
 
-建議真實驗收採 3 組任務，每組至少執行 2 次以涵蓋重跑：
+建議真實驗收採 3 組任務。v1.2：P0 每組執行 1 次；同一 run 內的重跑（T04）仍屬 P0；跨 run 的第二次完整執行列 P1：
 
 - A：成員管理頁＋邀請 dialog，desktop/mobile，loading/empty/error/success。
 - B：既有設計系統的設定頁局部改版，混合語言、長內容、不能改共享主元件。
-- C：中斷恢復案例，包含已成功但未收到回應的 mutation 與一處人工改動。
+- C：中斷恢復與協作案例，包含已成功但未收到回應的 mutation，以及使用者在 agent 工作期間改動 agent 建立的節點（T35）。
 
 若沒有 library 測試檔，T02／T03 必須標記未驗證；不能用自己臨時造的空資料表示正式 library 相容。
 
@@ -947,9 +1070,9 @@ finding.status 為 `open | resolved | accepted`，origin 為 `introduced | regre
 | 階段 | 交付 | 通過條件 |
 |---|---|---|
 | M0 最小連線準備 | 檢查 CC／remote MCP、取得本次來源及測試輸出範圍、最小 brief 與操作紀錄 | 真實讀取來源成功；缺條件時精確回報，不假設權限 |
-| M1 真實垂直流程 | 讀一個真實 library 元件及語意變數 → 在授權區建立 instance 與小畫面 → 讀回 binding／mode → 取得截圖 | 主元件關係、有效值、畫面證據均正確；有精確 IDs 與保留／清理決策 |
+| M1 真實垂直流程 | 讀一個真實 library 元件及語意變數 → 在授權區建立 instance 與小畫面 → 讀回 binding／mode → 取得截圖；同時跑 CAP-05 probes 與最小 hooks | 主元件關係、有效值、畫面證據均正確；CAP-05 各項有 verified／unavailable 結論；有精確 IDs 與保留／清理決策 |
 | M2 工作流程與契約 | 將 M1 已證實的路徑整理成 skill、解析器、schemas、plan、baseline、唯一完成判定 | new／continue／resume、來源輸出分離、任務分流與離線契約測試通過 |
-| M3 寫入與恢復強化 | writer 協調、journal、鎖恢復、unknown outcome、audit／evidence 管理 | 重跑、衝突、無回傳 ID、中斷與內容壓力測試；明列每項測試層級 |
+| M3 寫入與恢復強化 | hooks 強制層、journal、本機鎖、unknown outcome、人機協作衝突處理、audit／evidence 管理 | 重跑、衝突、使用者同時編輯、無回傳 ID、中斷與內容壓力測試；明列每項測試層級 |
 | M4 完整驗收與交付 | 三組基準任務、handoff、runbook、acceptance report | P0 必測項有結果；必要真實整合與視覺證據齊全才稱端到端驗收 |
 | M5 選配 | capture、Code Connect、code implementation | 另行驗收，不阻塞已完成 P0 |
 
@@ -957,13 +1080,25 @@ CC 完成建置時必須提供：已建立檔案、安裝／使用方式、已�
 
 M1 先驗證最小真實路徑，不等六份 schema 和所有 scripts 完成才接觸 Figma；但仍必須在寫入前保存目標範圍、父層基線、操作意圖與識別，遇到未知結果就停止，不以試驗為由跳過必要保護。選擇已含所需元件／變數的測試來源，不為了 smoke test 擅自造新 DS。
 
-M1 缺權限或素材時，可繼續 M2/M3 的離線部分，但不得把未驗證 runtime 假設固化成通用 adapter。報告分成 `implementationStatus` 與 `integrationStatus`；本機建置完成但整合 blocked 不等於 agent 已可端到端使用。M1 只是可行性證明，也不能代替 M4 完整驗收。
+M1 缺權限或素材時，可繼續 M2/M3 的離線部分，但不得把未驗證 runtime 假設固化成通用 adapter。
+
+### 17.1 M1 測試目標（v1.2，使用者提供）
+
+| 角色 | 檔案 | fileKey | 起始節點 | 權限 |
+|---|---|---|---|---|
+| output（也可作 source） | [Aiwow 電子名片 LINE OA (Copy)](https://www.figma.com/design/B0FKsPFvTG11Tt1P7ZXxxn/Aiwow-%E9%9B%BB%E5%AD%90%E5%90%8D%E7%89%87-LINE-OA--Copy-?node-id=14442-37607) | `B0FKsPFvTG11Tt1P7ZXxxn` | `14442:37607`（URL 的 `14442-37607`） | 使用者表示允許寫入 |
+| library source | [Aiwow Library](https://www.figma.com/design/IBq10PHhCxczFX6hBzQvaC/Aiwow-Library?node-id=0-1) | `IBq10PHhCxczFX6hBzQvaC` | `0:1` | 唯讀，不可編輯 |
+
+- 以上 fileKey／nodeId 由 URL 解析，仍須在 M0 以真實讀取確認存在與權限，不得未經讀取就寫入。
+- 使用者的「允許寫入」是對此測試檔的整體許可；M1 仍在 intake 確認具體頁面與區域。預設在 `14442:37607` 所在頁面的空白處新建一個 run Section，不改動任何既有節點。
+- Library 唯讀只代表不能改主元件與 variables 定義；能否在測試檔匯入並使用其元件／variables，取決於 library 是否已發佈並在測試檔啟用，屬未驗證，M0 須確認。不能匯入時先問，不在測試檔自建替代元件。
+- M1 結束後依使用者決定保留或清理，清理只刪除帶本 run 所有權標記且 ID 精確相符的節點。報告分成 `implementationStatus` 與 `integrationStatus`；本機建置完成但整合 blocked 不等於 agent 已可端到端使用。M1 只是可行性證明，也不能代替 M4 完整驗收。
 
 ## 18. 建議核心行為提示詞
 
 以下為 CC 撰寫 skill／agent 時的語意基線；應搭配程式化驗證，不把自然語言當作權限隔離器：
 
-> 你是以既有設計系統延伸 UI 的 agent，在 Claude Code 中操作 Figma。手動啟動新任務時，先確認產品／平台、參考及 DS 來源、輸出位置和修改邊界；continue 沿用已確認範圍，resume 先對帳。先讀既有元件、變數、樣式與使用情境，再用真實工具 schema 建立原生設計；不臆造工具、IDs、字型或資產。預設 strict reuse，新增 DS 資產或改變方案前先問。區分 inherited baseline 與本次新增／regression，不擅自重構來源 library。變數有效值優先由已驗證 runtime 對 consumer 解析。設計寫入採單 writer 與 journal，未知結果先對帳；唯讀 audit 不寫入畫布。按當次 requiredCells 提供結構與視覺證據，局部修正只重驗受影響範圍。完成以第 12.1 節判定，不用自評分數代替證據；交付連結、資源沿用、檢查報告、必要互動說明、限制與恢復點。
+> 你是以既有設計系統延伸 UI 的 agent，在 Claude Code 中操作 Figma。手動啟動新任務時，先確認產品／平台、參考及 DS 來源、輸出位置和修改邊界；continue 沿用已確認範圍，resume 先對帳。先讀既有元件、變數、樣式、版面 pattern 與使用情境，再用真實工具 schema 建立原生設計；不臆造工具、IDs、字型或資產。預設 strict reuse，新增 DS 資產或改變方案前先問。DS、既有 pattern 或使用者指示沒有決定的設計選擇（例如是否使用漸層），一律以選項形式詢問使用者，不自行決定。使用者可能同時編輯同一檔案：寫入前在同一腳本內驗證目標未被改動，偵測到改動就停止並詢問，絕不覆寫。區分 inherited baseline 與本次新增／regression，不擅自重構來源 library。變數有效值優先由已驗證 runtime 對 consumer 解析。設計寫入採單 writer 與 journal，未知結果先對帳；唯讀 audit 不寫入畫布。按當次 requiredCells 提供結構與視覺證據，局部修正只重驗受影響範圍。完成以第 12.1 節判定，不用自評分數代替證據；交付連結、資源沿用、檢查報告、必要互動說明、限制與恢復點。
 
 ## 19. 版本與維護
 
@@ -973,20 +1108,21 @@ M1 缺權限或素材時，可繼續 M2/M3 的離線部分，但不得把未驗�
 
 ## 20. 資料契約與驗證器補充
 
-CC 必須產出真正的 JSON Schema（建議 Draft 2020-12）和 validator，不能只有此文件中的範例。結構化 artifacts 使用 schemaVersion `1.1`；Markdown 摘要註明 spec 版本與 run ID。拒絕錯誤 enum、重複 IDs 與缺少 required 欄位；語法 schema 檢查與跨檔案語意檢查分開實作。示意值與真實值分開，實際 run 的必要識別欄位拒絕尖括號占位符，不能誤擋合法 UI 文案中的尖括號。
+CC 必須產出真正的 JSON Schema（建議 Draft 2020-12）和 validator，不能只有此文件中的範例。結構化 artifacts 使用 schemaVersion `1.2`；Markdown 摘要註明 spec 版本與 run ID。拒絕錯誤 enum、重複 IDs 與缺少 required 欄位；語法 schema 檢查與跨檔案語意檢查分開實作。示意值與真實值分開，實際 run 的必要識別欄位拒絕尖括號占位符，不能誤擋合法 UI 文案中的尖括號。
 
 brief 依 `stage=intake | confirmed` 驗證；intake 可有 null／問題，confirmed 的必要決策須已完成。明標「欄位片段」的 JSON 只做語法檢查，完整 fixture 必須通過相應 schema；範例缺欄位不代表 required 變 optional。M1 可先用最小完整紀錄，M2 再遷移為完整契約，不把片段當真實操作檔。
 
 | 契約 | Required 欄位 | 跨欄位驗證 |
 |---|---|---|
 | brief | schemaVersion、runId、workflow、taskType、stage、goal、sources、output、designSystem、requiredModes、reviewScope、decisionRefs、openQuestions | audit output=null；設計寫入前 output 已解析且獲准；strict reuse 新增需 decisionRef |
-| plan | schemaVersion、runId、taskType、status、screens、requiredCells、componentMap、variableMap、scope、baseline、decisions | status=draft／confirmed；confirmed 有有效範圍決策；每 cell 有唯一 key／applicability／證據要求；audit 可有空 screens |
+| plan | schemaVersion、runId、taskType、status、screens、requiredCells、componentMap、variableMap、patternRefs、designDecisions、scope、baseline、decisions | status=draft／confirmed；confirmed 有有效範圍決策且所有被引用的 designDecisions 已回答；designDecisions.source 只允許 `user \| ds \| existing_pattern \| brief`；每 cell 有唯一 key／applicability／證據要求；audit 可有空 screens |
+| inventory | schemaVersion、runId、sources、discoveryCoverage、components、variables、styles、patterns、baseline、evidenceRefs | pattern 需有來源 nodeIds 與證據；patternRefs 必須解析到 inventory.patterns |
 | capabilities | runtime、server、tools、features、checkedAt | verified 必須有 evidence；unknown 不得作寫入前提 |
-| ledger | runId、phase、status、entities、lastVerifiedOperationId、pendingOperations、pendingQuestions | entity IDs 對應 file／scope；不得同 logicalKey 多個 active entity |
-| operation | operationId、runId、logicalKey、kind、status、preconditions、timestamps | dispatched 未有已知結果不得重新 create |
-| audit | schemaVersion、runId、taskType、status、gates、coverage、findings、evidence、acceptedExceptions、completionEvaluation | complete／complete_with_exceptions 均須通過第 12.1 節；audit 任務的受查設計缺陷不等於執行阻礙 |
+| ledger | runId、phase、status、entities、lastVerifiedOperationId、pendingOperations、pendingQuestions | run.status 的唯一來源；entity IDs 對應 file／scope；entity 保存最後一次 agent 驗證的 fingerprint；不得同 logicalKey 多個 active entity |
+| operation | operationId、runId、logicalKey、kind、mode、status、basisRefs、preconditions、timestamps | dispatched 未有已知結果不得重新 create；mode=write 必須有非空 basisRefs 且可解析 |
+| audit | schemaVersion、runId、taskType、gates、coverage、findings、evidence、acceptedExceptions、completionEvaluation | 不含 run status；completionEvaluation 由 validator 計算，complete／complete_with_exceptions 均須通過第 12.1 節；每筆 evidence 有 toolRef 或存在的 artifactRef；audit 任務的受查設計缺陷不等於執行阻礙 |
 
-上述每個結構化契約都必須有 schemaVersion 與 runId；表格未重列者同樣適用。capabilities／ledger／operation 的 schema 亦須納入前述列舉、lock／recovery 與時間欄位。inventory.json 採 plan schema 的 inventory definition 或獨立 schema，至少含 sources、discoveryCoverage、components、variables、styles、baseline 與 evidenceRefs，不作無 schema 的任意資料袋。
+上述每個結構化契約都必須有 schemaVersion 與 runId；表格未重列者同樣適用。capabilities／ledger／operation 的 schema 亦須納入前述列舉、lock／recovery 與時間欄位。inventory.json 使用獨立的 `inventory.schema.json`（v1.2 定案），欄位見上表，不作無 schema 的任意資料袋。
 
 規劃／ledger／audit 共享 screenKey 及 checkId 定義。validator 查核：每個 evidenceRef 可解析到 audit.evidence，artifact 存在或有明確可用 tool reference，operation／decision ID 存在，截圖未因相關 mutation 過期，G1–G7 不缺不重複，N/A 有 plan 理由。`completionEvaluation` 記錄 ruleVersion、eligible、reasons 與評估時間，由 validator 計算，不信任模型自行填的 complete。evidence 可使用本機相對路徑，交付連結需解析到適用環境位置。
 
@@ -1009,11 +1145,34 @@ INVARIANT-07: 同一模式值相等不代表 variable 語意可替代。
 INVARIANT-08: audit 任務沒有 Figma mutation；設計缺陷與審查工作完成度分開。
 INVARIANT-09: 來源預設唯讀；只有明確 output scope 可寫，跨檔 ID 必須重新解析。
 INVARIANT-10: 品質分數不參與 completionEvaluation；高分不能抵銷 fail／not_verified。
+INVARIANT-11: 沒有使用者回答、DS 或已確認 pattern 依據的設計決策，不得進入 write operation。
+INVARIANT-12: 目標節點目前的 fingerprint 與最後一次 agent 驗證值不同時，不得寫入該節點，直到使用者決定。
+INVARIANT-13: 有 active run 時，所有 Figma write 呼叫都必須經過 hook 記錄；hook 無法判定時阻擋 write。
 ```
 
 這些應至少以 contract／fixture tests 驗證。prompt 可以描述規則，但程式化 validator 才能攔下可判定的違規狀態。
 
-### 20.3 v1.1 變更紀錄與遷移
+### 20.3 v1.2 變更紀錄
+
+使用者於 2026-09-28 確認：本機 Claude Code 執行、可能與 agent 同時編輯、提供 M1 測試檔與唯讀 library、設計決策一律詢問，並同意全部 v1.2 審查建議。v1.2 變更：
+
+- 新增第 7.4 節「設計決策一律詢問」與 `plan.designDecisions`、operation `basisRefs`、INVARIANT-11。
+- 新增第 6.6 節版面 pattern 盤點與 `inventory.schema.json`（獨立 schema）。
+- 新增第 4.5 節 hooks 強制層：寫入授權、鎖、未知結果阻擋與 journal 由 PreToolUse／PostToolUse／PostToolUseFailure 自動處理。
+- 新增第 11.2 節人機協作：run Section 隔離、sharedPluginData 所有權標記、同一腳本內 precondition guard、使用者改動不覆寫；原 11.2–11.6 順延為 11.3–11.7。
+- 本機鎖簡化；heartbeat、PID 重用檢查、跨主機 registry 延後至 P1。
+- runtime API 細節改以官方 Figma plugin skills 為準；`figma-runtime.md` 改為 `runtime-probes.md`。
+- Fingerprint 明訂在 Figma 端計算。
+- 截圖證據預設為工具參照＋審查摘要，本機 PNG 為選配；補充截圖用途說明。
+- run status 只存 ledger；audit 只存 completionEvaluation；12.1 第 3 條併入 G7。
+- `approvalPolicy` enum 明訂；移除未查證的 `safeToRetryWithoutCanvasRead` 欄位名。
+- 移除 skill `templates/`，範例統一由 `tests/fixtures/` 提供；`design-plan.json` 改名 `plan.json`。
+- 測試新增 T35–T42，並分 P0／P1；基準任務 P0 各執行 1 次。
+- 新增第 17.1 節 M1 測試目標與 CAP-05 必測 probes。
+
+目前尚無 1.1 artifacts；若日後出現，依下方 1.0 的同樣原則唯讀備份、驗證後遷移（補 designDecisions、basisRefs、mode、patterns，移除 audit.status），不得只改版本字串。
+
+### 20.4 v1.1 變更紀錄與遷移
 
 使用者於 2026-09-28 同意全部審查建議。v1.1：統一完成判定並移除分數門檻；基線／新增／回歸分開；runtime consumer 解析優先；補無回傳 ID 與 stale lock 恢復；任務分流；手動 new／continue／resume；來源／輸出分離；提前核心 DS 規格；先做真實垂直流程；同步研究與建置指令。
 

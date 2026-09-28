@@ -1,8 +1,8 @@
 # Figma MCP UI 設計研究紀錄
 
-版本：1.1 · 原研究日期：2026-09-27 · 補充查核／修訂：2026-09-28。
+版本：1.2 · 原研究日期：2026-09-27 · 補充查核／修訂：2026-09-28（v1.1、v1.2）。
 
-目的：為「Claude Code 讀取指定檔案的 library／variables 並延伸 UI」提供來源與限制。規範以 FIGMA_UI_AGENT_SPEC.md v1.1 為唯一來源；本文件不另定義完成條件。
+目的：為「Claude Code 讀取指定檔案的 library／variables 並延伸 UI」提供來源與限制。規範以 FIGMA_UI_AGENT_SPEC.md v1.2 為唯一來源；本文件不另定義完成條件。
 
 ## 1. 研究方式與可信度
 
@@ -16,6 +16,8 @@
 - **U：尚未驗證**，需要在 CC 與指定 Figma 檔案實測。
 
 本次沒有連線讀取使用者的 Figma 檔案、沒有查詢其帳戶／seat，也沒有在真實畫布試寫。沒有安裝或配置 Claude Code。故所有實機權限、library 存取與寫入品質皆屬 U；本研究不能替代 integration tests。
+
+**v1.2 補查限制：**2026-09-28 的 v1.2 修訂在雲端環境進行。Claude Code hooks 文件可連線查證（S14）；`developers.figma.com` 被該環境的網路政策阻擋，因此 v1.2 新增、依賴 Figma Plugin API 的項目（sharedPluginData、同一腳本內 precondition guard）標為 U，須在 M1 以 CAP-05 probe 驗證。
 
 ## 2. 對使用者需求最重要的結論
 
@@ -59,6 +61,32 @@ Claude Code 提供 project agents 和 skills；agent 可使用 frontmatter 配�
 
 **P：**本 agent 採主會話手動入口。new／continue／resume 是本專案的 skill 引數語意，用以區分新任務需求確認與現有 run 恢復，不是宣稱 CC 有同名內建子命令。
 
+### 2.7 Hooks 可作為寫入保護的強制層
+
+**D，2026-09-28 查證：**Claude Code 的 PreToolUse／PostToolUse matcher 支援 MCP 工具名稱 `mcp__<server>__<tool>` 與 regex（例如 `mcp__.*__write.*`）；PreToolUse 以 exit code 2 或 `permissionDecision: "deny"` 阻擋；hook 由 stdin 取得 `tool_name`、`tool_input`、`tool_use_id`、`session_id`、`cwd` 等欄位；工具成功觸發 PostToolUse，失敗觸發獨立的 PostToolUseFailure；command hook 預設 timeout 600 秒。[Claude Code hooks](https://code.claude.com/docs/en/hooks)
+
+**P：**v1.1 讓模型在每次 `use_figma` 前後自行呼叫 journal 腳本，會增加呼叫次數且可能遺漏。v1.2 改由 hooks 自動記錄與阻擋（主規格第 4.5 節）。`use_figma` 同時承擔讀與寫，hook 無法從程式碼判定是否 mutation，所以採 op 標頭自我聲明，這是已知邊界。
+
+**U：**hooks 對 plugin 安裝的 Figma 工具實際名稱是否如預期觸發、`tool_input` 內是否能取得 fileKey，須在使用者本機 M1 驗證。
+
+### 2.8 節點所有權標記
+
+**U（依 Figma Plugin API 既有知識，本次無法連線查證）：**Plugin API 提供 `setSharedPluginData(namespace, key, value)`／`getSharedPluginData`，資料保存在檔案內的節點上，可由其他 plugin 讀取。若 `use_figma` runtime 支援，可用來標記 agent 建立的節點（runId、operationId、logicalKey、fingerprint），比 v1.1 的「暫時名稱＋結構比對」可靠。
+
+**P：**主規格第 11.2、11.4 節以此為優先方案，不支援時退回名稱＋結構比對並標為降級。標記會隨使用者複製節點一起複製，所以多個節點帶相同標記時仍視為多義。
+
+### 2.9 與使用者同時編輯
+
+使用者於 2026-09-28 確認可能在 agent 工作期間同時編輯同一 Figma 檔。
+
+**P：**目前沒有查到可供 agent 取得的 Figma 編輯鎖，本機鎖也限制不了 Figma 內的使用者。因此 v1.2 採：run Section 隔離工作區、所有權標記、在同一個 `use_figma` 腳本內先比對 fingerprint 再寫入（把衝突窗口縮到單次腳本執行）、偵測到使用者改動一律不覆寫並詢問。這不是原子交易，不能保證零衝突。
+
+**U：**單一 `use_figma` 腳本執行期間，其他協作者的改動如何與之合併（多人即時協作的語意），研究未查證；M1／T35 以實測記錄行為。
+
+### 2.10 設計決策交給使用者
+
+**P，使用者 2026-09-28 指示：**DS、既有 pattern 或使用者指示未決定的設計選擇（例如是否使用漸層）一律詢問。主規格第 7.4 節將它資料化為 `plan.designDecisions`，並要求 write operation 以 `basisRefs` 引用依據，讓 validator 可以檢查「有沒有依據」。另新增第 6.6 節版面 pattern 盤點，讓大部分版面選擇能從既有畫面取得依據，減少需要問的題數。
+
 ## 3. 已發現的不一致與處理方式
 
 | 議題 | 查到的差異 | Spec 採取的處理 |
@@ -69,6 +97,9 @@ Claude Code 提供 project agents 和 skills；agent 可使用 frontmatter 配�
 | API helpers | 本地 runtime 提供 query/set/createAutoLayout 等便利功能 | helper feature detection；不把 helper 當所有標準 Plugin API 都有 |
 | 配額 | 方案、seat 與工具分類影響限額；頁面亦保留變更權利 | 不複製固定配額常數，當下偵測與遵循回應 |
 | Skills 路徑 | 此環境為 Codex plugin cache | CC 查自己的 plugin／skill 入口，不能依賴本機絕對路徑 |
+| 重試欄位（v1.2） | v1.1 主規格寫出 `safeToRetryWithoutCanvasRead`，未找到出處 | 移除欄位名，改為依實際工具回應 schema 判斷 |
+| 安裝名稱與工具前綴（v1.2） | `figma@claude-plugins-official` 未在 CC 實測；plugin 與手動設定的工具名稱前綴可能不同 | 安裝前以 CLI 查證；hooks matcher 用 regex，實際名稱記入 capabilities |
+| 截圖保存（v1.2） | 截圖工具通常把圖片交給模型檢視，CC 未必能存成本機檔 | 預設證據改為工具參照＋審查摘要，本機 PNG 選配 |
 
 圖片差異的依據：[Write-to-canvas limitations](https://developers.figma.com/docs/figma-mcp-server/write-to-canvas/)、[Asset tools](https://developers.figma.com/docs/figma-mcp-server/tools-and-prompts/)。配額依據：[Rate limits & access](https://developers.figma.com/docs/figma-mcp-server/rate-limits-access/)。
 
@@ -108,7 +139,7 @@ Claude Code 提供 project agents 和 skills；agent 可使用 frontmatter 配�
 
 ## 6. 來源索引
 
-下表「用途」說明本次用到的部分，不代表完整轉錄來源。原查閱日為 2026-09-27；S02、S10 於 2026-09-28 補查，S13 為同日新增。
+下表「用途」說明本次用到的部分，不代表完整轉錄來源。原查閱日為 2026-09-27；S02、S10 於 2026-09-28 補查，S13 為同日新增；S14 於 2026-09-28 v1.2 修訂時新增。
 
 | ID | 一手來源 | 用途 |
 |---|---|---|
@@ -125,6 +156,7 @@ Claude Code 提供 project agents 和 skills；agent 可使用 frontmatter 配�
 | S11 | [Claude Code MCP](https://code.claude.com/docs/en/mcp) | MCP 配置與連線管理 |
 | S12 | [WCAG 2.2 Quick Reference](https://www.w3.org/WAI/WCAG22/quickref/) | 對比、target size、可及性檢查邊界 |
 | S13 | [Figma Variable API](https://developers.figma.com/docs/plugins/api/Variable/) | resolveForConsumer、valuesByMode、變數解析邊界 |
+| S14 | [Claude Code hooks](https://code.claude.com/docs/en/hooks) | MCP matcher、阻擋方式、stdin 欄位、PostToolUseFailure、timeout（v1.2 新增） |
 
 ## 7. 必須留到實作驗證的事項
 
@@ -134,6 +166,10 @@ Claude Code 提供 project agents 和 skills；agent 可使用 frontmatter 配�
 4. 元件 properties、variables／aliases／modes 是否完整可讀。
 5. 本次產品字型、圖片與 SVG 資產的相容性。
 6. 真實 UI 的視覺品質、響應式、狀態完整性與恢復正確性。
+7. （v1.2）`use_figma` 是否支援 `setSharedPluginData`／`getSharedPluginData`，以及單次回傳大小上限。
+8. （v1.2）hooks 是否對使用者本機實際的 Figma 工具名稱觸發，`tool_input` 能否解析出 fileKey。
+9. （v1.2）Aiwow Library 是否已發佈並在測試檔啟用，元件與 variables 能否以 key 匯入。
+10. （v1.2）使用者在 `use_figma` 腳本執行期間編輯時的實際行為（T35）。
 
 以上項目不能在本次研究階段勾選通過。`CC_BUILD_PROMPT.md` 要求實作者在離線測試與真實整合之間清楚區分結果。
 
@@ -142,3 +178,16 @@ Claude Code 提供 project agents 和 skills；agent 可使用 frontmatter 配�
 使用者於 2026-09-28 同意全部優化建議：基線與新變更分離、統一完成條件、runtime variables 解析優先、補中斷／鎖恢復、任務分流、明確啟動語意、來源輸出分離、資料契約收斂，以及先驗證真實垂直流程。這是對文件方向的同意，不構成任何特定 Figma 檔案的寫入授權。
 
 這次仍僅修訂文件，未建立 agent 或執行真實 Figma integration。主規格的 M1 用來優先消除可行性疑問，M4 才是完整 P0 驗收。
+
+## 9. v1.2 審查決策紀錄
+
+使用者於 2026-09-28 回答：
+
+1. 執行環境為本機 Claude Code。
+2. 可能與 agent 同時編輯，請評估如何達成 → 主規格第 11.2 節。
+3. 提供可寫測試檔 `B0FKsPFvTG11Tt1P7ZXxxn`（起始節點 `14442:37607`）與唯讀 library `IBq10PHhCxczFX6hBzQvaC` → 主規格第 17.1 節。
+4. 詢問截圖用途 → 主規格第 12.5 節補充說明，預設不要求本機 PNG。
+5. 同意將審查建議直接修訂為 v1.2。
+6. 另指示：「怎麼做出好設計」的決策（例如要不要漸層）一律詢問 → 主規格第 7.4 節。
+
+這是對文件方向的同意與測試檔的寫入許可；每次真實寫入的具體範圍仍依主規格在 intake 確認。
