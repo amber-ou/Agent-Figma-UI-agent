@@ -1,8 +1,8 @@
 # 交給 Claude Code 的建置指令
 
-版本：1.3 · 修訂日期：2026-09-28 · 配套規格：FIGMA_UI_AGENT_SPEC.md v1.3
+版本：1.4 · 修訂日期：2026-09-28 · 配套規格：FIGMA_UI_AGENT_SPEC.md v1.4
 
-> **狀態：**M0–M1 已完成（見 `docs/m1-summary.md`）。下方第一段是初次建置指令，保留作紀錄；**接下來請使用文末的「M2 建置指令」。**
+> **狀態：**M0–M2 與第一次真實任務已完成（見 `docs/m1-summary.md`、`docs/m2-summary.md`、`docs/m3-first-run-summary.md`）。前面的初次與 M2 指令保留作紀錄；**接下來請使用文末的「M3 建置指令」。**
 
 把本檔與 `FIGMA_UI_AGENT_SPEC.md`、`FIGMA_MCP_RESEARCH.md` 放在同一專案。直接將下方指令貼給 Claude Code；CC 應讀取檔案後開始實作，而不是只回覆建議。
 
@@ -130,3 +130,37 @@ M1 完成後，把下方兩條分隔線之間的內容貼給本機 Claude Code�
 
 ---
 
+## M3 建置指令（v1.4）
+
+把下方兩條分隔線之間的內容貼給本機 Claude Code。
+
+---
+
+請依 `FIGMA_UI_AGENT_SPEC.md` v1.4 進行 M3。先讀第 20.3 節（v1.4 變更紀錄）與 `docs/m3-first-run-summary.md`。以 M2 已實作的 skill、schemas、scripts 與 60 個測試為基礎擴充，不要重寫。
+
+第一部分：實作 v1.4 規則（離線，附測試）
+
+1. **schema 與 validator**：`plan.designDecisions[]` 新增選填的 `status`（pending／answered／skipped）與 `delegation`（decisionRef、scope=run）；`ledger` 新增選填的 `userAcceptance`（kind=test_run、decisionRef、note、acceptedAt）。validator 規則：skipped 的決策不得被 write operation 引用；userAcceptance 不得改變 status 或 completionEvaluation（INVARIANT-17）；delegation 的 run 與目前 run 不同時拒絕（INVARIANT-18）。schemaVersion 維持 1.2。
+2. **skill**：更新 `SKILL.md` 與 references：
+   - DEC-07 授權採用建議的流程；沒有建議的題目標 skipped、run 結束時列出。
+   - Plan 階段可及性預檢（第 9.5 節）。
+   - 字型比對（第 10.3 節）：未安裝的字型不得替換，要列出。
+   - REQ-04 品牌與產品名稱。
+   - 從既有 instance 取得主元件（第 6.2 節）。
+   - styles 計入 tokenBinding（第 10.1、12.2 節）。
+   - handoff 同時列出完成判定與 userAcceptance。
+3. **tokenBinding 計算**：`quality-metrics.mjs`（或併入現有腳本），分開統計 variable binding 與 style 套用，raw 值計入分母。
+4. **測試**：T47–T51，以及上面每條 validator 規則的反例。指令為 `node --test "tests/**/*.test.mjs"`。
+5. **文件**：`docs/setup.md` 補上 Windows PowerShell 的注意事項：`npm` 被執行原則擋下時改用 `npm.cmd install`，或執行 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`。
+
+第二部分：M3 真實整合（在 sandbox 頁，寫入前照舊列計畫給我確認）
+
+6. **協作情境 T35–T37**：先建立一個小節點；請我在 Figma 手動修改、新增或刪除；確認 agent 偵測到、不覆寫、不重建，並回報差異。
+7. **PostToolUseFailure**：用一個必定失敗、且不會改動畫布的唯讀腳本觸發，記錄實際的 stdin 欄位與 `safeToRetryWithoutCanvasRead` 是否出現。
+8. **中文回傳上限**：唯讀量測 20KB 上限對中文是以字元還是位元組計算。
+
+限制：hooks 放行不得輸出 `allow`；read 用獨立 operationId；run 結束必須釋放鎖；未驗證的推論標為假設；所有變更推到新分支 `feat/m3`，不要直接推 main。
+
+完成時交付：檔案清單、implementationStatus／integrationStatus、測試指令與結果、T35–T37 與 PostToolUseFailure 的實測結果、未完成項目，並把總結寫進 `docs/m3-summary.md`。
+
+---

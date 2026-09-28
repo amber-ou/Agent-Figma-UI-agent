@@ -1,6 +1,6 @@
 # Agent-Figma-UI-agent
 
-在 Claude Code 中透過官方 Figma MCP 讀取既有 library／components／variables，直接在 Figma 繪製與延伸原生 UI 的 agent。目前規格為 v1.3；M0–M1（真實 Figma 垂直流程、hooks 強制層）與 M2（`/figma-ui` skill、JSON Schemas、validator、本機工具）已完成，下一步為 M3（寫入與恢復強化、協作情境實測）。
+在 Claude Code 中透過官方 Figma MCP 讀取既有 library／components／variables，直接在 Figma 繪製與延伸原生 UI 的 agent。目前規格為 v1.4；M0–M2 已完成，第一次真實任務（名片分享成功）已跑完整個流程並接受為測試成功。下一步為 M3（實作 v1.4 規則、協作情境與失敗事件實測），指令見 `CC_BUILD_PROMPT.md` 文末。
 
 啟動：在 Claude Code 輸入 `/figma-ui <需求>`；續改 `/figma-ui continue <run-id> <調整>`；恢復 `/figma-ui resume <run-id>`。詳見 [docs/setup.md](docs/setup.md)。
 
@@ -10,6 +10,7 @@
 | [FIGMA_MCP_RESEARCH.md](FIGMA_MCP_RESEARCH.md) | 研究紀錄：來源、能力差異、未驗證事項 |
 | [CC_BUILD_PROMPT.md](CC_BUILD_PROMPT.md) | 交給 Claude Code 的建置指令（含 M2 指令） |
 | [docs/m1-summary.md](docs/m1-summary.md) | M1 實測總結 |
+| [docs/m3-first-run-summary.md](docs/m3-first-run-summary.md) | 第一次真實任務總結 |
 | [docs/m2-summary.md](docs/m2-summary.md) | M2 交付、測試對應與限制 |
 | [docs/setup.md](docs/setup.md) | 安裝、帳號恢復與使用方式 |
 

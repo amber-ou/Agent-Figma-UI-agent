@@ -25,6 +25,8 @@ npm install
 node scripts/verify-installation.mjs
 ```
 
+Windows PowerShell 若出現「已停用指令碼執行，無法載入 npm.ps1」，改用 `npm.cmd install`，或先執行 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`。
+
 `verify-installation.mjs` 檢查 Claude Code、Figma MCP 連線、plugin 版本、專案 hooks、skill 與依賴；`problems` 為空才算完成。
 
 在 Claude Code 內執行 `/mcp` 完成 Figma OAuth（由使用者操作，不貼 token）。
