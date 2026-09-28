@@ -213,6 +213,7 @@ Claude Code 提供 project agents 和 skills；agent 可使用 frontmatter 配�
 | `safeToRetryWithoutCanvasRead` | v1.2 主規格因找不到出處而移除此欄位名；但本機 figma-use skill（plugin 2.2.118）的 Critical Rule 14 明確要求依 `use_figma` 錯誤回應中的此欄位決定是否可重試 | 出處已找到（官方 plugin skill）。使用者 2026-09-28 決定寫回主規格第 11.5 節，註明來源並須依實際錯誤回應驗證 |
 | 其他 runtime helpers | `figma.createAutoLayout`、`figma.createSection`、`figma.createPage` 為 function；`editorType=figma` | 屬 feature detection 結果，寫入行為未驗證 |
 | Library 啟用重測 | 使用者表示已加入 Aiwow Library 與 variables library 後，`get_libraries` 的 `libraries_added_to_file` 仍為空，runtime `teamLibrary.getAvailableLibraryVariableCollectionsAsync()` 也仍為空；remote collection `Colors` 在測試檔只可見 2 個已引用的 variables（`Error/colorError`、`Colors/red/6`） | 啟用狀態以兩種讀法一致為準；未啟用前無法列出 `Colors` 全部 variables，不能據此判定「沒有 surface 語意 variable」 |
+| Library 啟用第二次重測 | `get_libraries` 顯示 Aiwow Library 已加入（source 由 `organization` 變為 `team`）；runtime `teamLibrary` 只看到 `Aiwow Library / Collection 1`（1 個 variable：`Boolean`）。以 `search_design_system` 將範圍限定在 4 個 organization library（Aiwow、程曦卡、UUPON、一起生活卡）搜尋 `Space/400`，結果為空 | `Size`／`Global`／`Colors`／`System Colors` 的來源 library 仍未識別，也未啟用；可能在清單以外的 team／未發佈檔案，屬未驗證 |
 
 ### 10.1 Baseline 觀察
 
