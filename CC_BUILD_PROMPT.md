@@ -1,6 +1,8 @@
 # 交給 Claude Code 的建置指令
 
-版本：1.2 · 修訂日期：2026-09-28 · 配套規格：FIGMA_UI_AGENT_SPEC.md v1.2
+版本：1.3 · 修訂日期：2026-09-28 · 配套規格：FIGMA_UI_AGENT_SPEC.md v1.3
+
+> **狀態：**M0–M1 已完成（見 `docs/m1-summary.md`）。下方第一段是初次建置指令，保留作紀錄；**接下來請使用文末的「M2 建置指令」。**
 
 把本檔與 `FIGMA_UI_AGENT_SPEC.md`、`FIGMA_MCP_RESEARCH.md` 放在同一專案。直接將下方指令貼給 Claude Code；CC 應讀取檔案後開始實作，而不是只回覆建議。
 
@@ -92,3 +94,39 @@ DS 沒有頁首背景的規範，參考的兩個既有畫面也不一致（A 用
 ```
 
 續改與恢復的 skill 引數範例：`/figma-ui continue <run-id> 調整列表間距`、`/figma-ui resume <run-id>`。這些不是另行安裝的 Claude Code 內建命令。
+
+---
+
+## M2 建置指令（v1.3）
+
+M1 完成後，把下方兩條分隔線之間的內容貼給本機 Claude Code。
+
+---
+
+請依 `FIGMA_UI_AGENT_SPEC.md` v1.3 進行 M2「工作流程與契約」。M1 已完成（`docs/m1-summary.md`），請以 M1 已實作的 `scripts/hooks/*`、`scripts/evaluate-completion.mjs` 與既有 13 個測試為基礎擴充，不要重寫。
+
+這次要交付：
+
+1. **`/figma-ui` workflow skill**（主規格第 4.1、4.3、7、8 節）：`.claude/skills/figma-ui/SKILL.md`，手動呼叫（`disable-model-invocation: true`）、在主會話執行。支援 `new`／`continue <run-id>`／`resume <run-id>` 三種入口。SKILL.md 保持精簡，細節放 `references/`（discovery、design-decisions、design-quality、collaboration、runtime-probes、recovery、handoff）。runtime API 用法指向已安裝的官方 Figma skills，不另寫教學。
+2. **Preflight**：每個新 run 先做第 4.2.1 節帳號與 seat 診斷，並列出實際工具名稱與 plugin 版本，寫入 capabilities。
+3. **Intake**：分別確認元件 library 與 variables library（第 6.1 節）；URL node-id 先辨識節點類型；寫入位置預設為獨立頁面或小範圍 Section。
+4. **Discover**：頁面清單改用 `figma.root.children`、不整頁 `get_metadata`、`search_design_system` 一次一個 query（第 8.1 節）；pattern 盤點依第 6.6 節，限制狀態分 `observed_not_confirmed | confirmed`；比對元件版本差異（第 6.2 節）。
+5. **Plan 與設計決策**：`plan.designDecisions` 與 write operation 的 `basisRefs`（第 7.4 節）；DS／pattern 沒有決定的設計選擇一律以選項形式問我。
+6. **snippets**：`op-header.js`、`fingerprint.js`、`mark-owned.js`、`precondition-guard.js`，把 M1 實際用過的寫法整理成可重用片段。
+7. **JSON Schemas**（第 20 節）：brief、plan、inventory、capabilities、ledger、operation、audit，schemaVersion 維持 `1.2`（與 M1 紀錄一致）；validator 分語法與跨檔檢查；`evaluate-completion.mjs` 接上 schema 驗證。把 M1 的 run 紀錄（去識別化後）轉成完整 fixtures。
+8. **本機工具腳本**：`state-store.mjs`（原子寫入）、`operation-journal.mjs`（planned／verified 記錄）、鎖的取得與釋放（run 結束必須釋放並移除 `active-run.json`）。
+9. **測試**：新增 T43–T46 與第 13.2 節中 M2 範圍的 P0 fixture；指令一律為 `node --test "tests/**/*.test.mjs"`。
+10. **量測回傳上限**：以唯讀方式在 sandbox 頁量測 `use_figma` 回傳上限，寫入 capabilities。
+
+限制與注意：
+
+- 真實 Figma 寫入只能在測試檔的「figma-ui sandbox」頁（`34014:8`），每個 run 開新 Section；寫入前照舊列計畫給我確認。
+- hooks 放行不得輸出 `allow`；read 使用獨立 operationId。
+- 變數來源 library（gap-001）尚未識別；需要顏色 token 的驗證先標 not_verified，不要用 raw value 冒充。我查到 library 名稱後會告訴你。
+- 未經實驗證實的原因推論要標示為假設。
+- 所有變更 commit 到新分支 `feat/m2-skill` 並推上去，不要直接推 main。
+
+完成時交付：建立與修改的檔案清單、`/figma-ui` 的啟動方式、implementationStatus／integrationStatus、實際執行的測試指令與結果、未完成項目，以及下一次我呼叫 `/figma-ui` 時會看到的開場詢問範例。
+
+---
+

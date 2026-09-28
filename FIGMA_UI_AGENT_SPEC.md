@@ -1,6 +1,6 @@
 # Figma UI Design Agent — Claude Code 建置規格
 
-版本：1.2 · 研究基準日：2026-09-27 · 修訂／補充查核日：2026-09-28（v1.1、v1.2） · 語言：繁體中文
+版本：1.3 · 研究基準日：2026-09-27 · 修訂／補充查核日：2026-09-28（v1.1、v1.2、v1.3） · 語言：繁體中文
 
 文件性質：可交付實作的產品／技術規格；不是已完成的 agent，也不是已通過實機測試的證明。
 
@@ -30,6 +30,7 @@
 | 執行環境，已確認（v1.2） | 使用者本機的 Claude Code | 本機安裝 Figma plugin／remote MCP 與 OAuth；hooks 在本機執行 |
 | 人機協作，已確認（v1.2） | 使用者可能在 agent 工作期間同時編輯同一 Figma 檔 | 第 11.2 節；以衝突偵測＋不覆寫處理，不宣稱能鎖住人 |
 | M1 測試檔，已確認（v1.2） | 使用者提供可寫測試檔與唯讀 library | 第 17.1 節 |
+| M1 結果（v1.3） | 真實垂直流程已跑通，run 為 `complete_with_exceptions`；變數來源 library 仍未識別 | `docs/m1-summary.md`；第 17 節 M2 以此為起點 |
 | 文件格式 | Markdown | 方便 CC 直接讀取、版本控制與拆分實作 |
 
 Web 僅作測試 fixture，不是每次工作的預設產品平台。真正啟動設計工作前，必須完成當次需求確認。首次請求若已寫明欄位，將已知內容預填成簡短確認，不要要求使用者重填；尚未回答的產品／平台／DS 不得自行預設。
@@ -224,6 +225,17 @@ claude mcp list
 
 **v1.2：**執行環境已確認為使用者本機的 Claude Code。plugin 套件名稱（上方 `figma@claude-plugins-official`）為研究時未在 CC 實測的寫法，安裝前以 `claude plugin` 的實際搜尋／help 確認。MCP 工具的完整名稱依安裝方式不同（例如手動設定為 `mcp__figma__use_figma`，plugin 安裝可能帶 plugin 前綴），`verify-installation.mjs` 必須列出實際名稱並寫入 capabilities；hooks matcher 不得寫死單一前綴。
 
+**v1.3 實測（E）：**使用者本機為 Windows、Claude Code 2.1.283、Figma plugin `figma@synced` 2.2.118；以 `claude mcp add --transport http figma https://mcp.figma.com/mcp` 手動設定後，工具名為 `mcp__figma__<tool>`，共 40 個工具。上方 `figma@claude-plugins-official` 的名稱未經證實，不得寫進安裝文件。
+
+#### 4.2.1 帳號與 seat 診斷（P0，v1.3 新增）
+
+M0 實測中第一次授權的帳號是 Starter／View seat，兩個檔案都讀不到，且 View seat 不能寫入。之後換帳號時又因瀏覽器仍登入舊帳號，連續兩次授權回到同一帳號。因此 Preflight 必須：
+
+1. 每個新 run 先呼叫 `whoami`，記錄帳號識別（不寫 email 進公開報告，見 CAP-03）、各 plan 與 seat 類型；寫入任務只接受目標檔所屬 plan 的 Full seat。View／Dev seat 或讀取回「沒有權限」時，停在 `blocked`，不重試讀取以免耗用配額。
+2. 帳號不符時提供固定的恢復步驟：`/mcp` → figma → **Clear authentication**；在**預設瀏覽器**（或無痕視窗）確認 figma.com 登入的是正確帳號；再 **Authenticate**，授權頁上確認帳號後才允許；仍取得舊帳號時重啟 Claude Code（`claude --continue`），必要時 `claude mcp remove figma` 後重新加入。
+3. 授權網址可從終端機複製，貼到只登入正確帳號的無痕視窗完成授權；callback 為本機 `localhost`，不受瀏覽器種類影響。
+4. 授權完成後再以 `whoami` 驗證，驗證前不得宣稱帳號已切換。
+
 `.mcp.json` 僅於採手動配置且無現有等效連線時建立。示意：
 
 ```json
@@ -283,13 +295,17 @@ v1.2 起，寫入前的授權、鎖與未知結果阻擋改由第 4.5 節的 Cla
 
 | Hook | Matcher（示意，依實際工具名調整） | 行為 |
 |---|---|---|
-| PreToolUse | `mcp__.*figma.*__(use_figma\|create_new_file\|upload_assets)` | 1. 無 `.figma-ui/active-run.json` → 放行（不干擾非 agent 使用）。2. 解析 code 開頭的 op 標頭（`snippets/op-header.js`）；缺標頭 → 阻擋並說明格式。3. `mode=read` → 記錄後放行。4. `mode=write`：檢查 brief.output 已確認、fileKey 與授權 output 相符、本機鎖由本 run 持有、同檔沒有 dispatched／unknown_outcome 操作；任一不符 → 阻擋。5. 通過後寫入 `dispatched`（含 code hash）再放行。 |
+| PreToolUse | `mcp__.*figma.*__(use_figma\|create_new_file\|upload_assets)` | 1. 無 `.figma-ui/active-run.json` → 放行（不干擾非 agent 使用）。2. 解析 code 開頭的 op 標頭（`snippets/op-header.js`）；缺標頭 → 阻擋並說明格式。3. `mode=read` → operationId 若屬既有 write operation 則阻擋，否則記錄後放行。4. `mode=write`：檢查 brief.output 已確認、fileKey 與授權 output 相符、本機鎖由本 run 持有、operation 為 `planned` 且 `mode=write`、fileKey 相符、`basisRefs` 非空，且同檔沒有 dispatched／unknown_outcome 操作；任一不符 → 阻擋。5. 通過後寫入 `dispatched`（含 `mode`、`fileKey`、code hash）再放行。active run 期間，非 `use_figma` 的 Figma 寫入工具一律阻擋，直到另有對應設計。 |
 | PostToolUse | 同上 | 將對應 operation 記為 `applied`，保存回傳的 IDs／摘要；未驗證前不標 verified。 |
 | PostToolUseFailure | 同上 | 能證明未執行（例如 schema 驗證錯誤）→ `failed_known`；逾時、截斷或無法判定 → `unknown_outcome`。 |
 
 - 只有 dispatched、沒有任何後續事件（CC 當機、程序中止）的操作，下一次 PreToolUse 一律視為 `unknown_outcome` 並阻擋同檔寫入，直到對帳完成。這是安全預設。
 - `use_figma` 同時用於讀與寫，hook 無法從程式碼可靠判斷是否有 mutation。op 標頭的 `mode` 是自我聲明：標成 read 卻寫入的情況無法完全攔截，交付須列為已知邊界；validator 事後比對 read 操作的前後 fingerprint 作為補充偵測。
 - hooks 失敗（腳本例外）時預設阻擋 write、放行 read，並回報原因；不得靜默放行 write。
+- **「放行」的實作（v1.3，MUST）：**hook 放行時直接 `exit 0`、不輸出任何 permission decision，讓 Claude Code 照常走權限流程；只有阻擋時才輸出 `deny`。不得輸出 `permissionDecision: "allow"`：它會跳過使用者的權限確認，等同替所有 Figma 呼叫開啟 bypass。M1 第一版曾這樣實作，已修正並有 fixture 測試。
+- **read 不得覆寫 write 狀態（v1.3）：**journal 以 operationId 合併狀態，因此 read 呼叫若沿用 write 的 operationId，會把 `unknown_outcome` 覆蓋成 read 的 applied，繞過對帳。read 一律使用獨立 operationId（例如 `rd-0001`），hook 對重用者阻擋。
+- **實測（E，v1.3）：**Windows 本機上，`.claude/settings.json` 以 `node "$CLAUDE_PROJECT_DIR/scripts/hooks/*.mjs"` 設定的 hooks 對 `mcp__figma__use_figma` 觸發，新增設定後未重啟即生效，`tool_input.fileKey` 可讀；PostToolUseFailure 尚未遇到真實失敗，其 stdin 欄位名稱未驗證。
+- **run 結束時必須釋放鎖並移除 `active-run.json`**（owner token 相符才刪除）。否則 hook 會持續阻擋同專案中所有未帶 op 標頭的 Figma 呼叫。
 - hooks 設定寫入專案 `.claude/settings.json`，與使用者既有設定合併，不覆寫其他 hooks。
 
 ## 5. 能力探測與工具路由
@@ -305,6 +321,8 @@ v1.2 起，寫入前的授權、鎖與未知結果阻擋改由第 4.5 節的 Cla
 `CAP-04` 寫入 smoke test 只能在指定測試頁面或使用者授權的任務範圍內。不能為測試權限而污染任意檔案。
 
 `CAP-05`（v1.2）以下 runtime 能力是本規格其他章節的前提，必須在 M1 以最小 probe 驗證並記入 capabilities，未驗證前不得當作可用：`setSharedPluginData`／`getSharedPluginData`（第 11.2、11.4 節所有權標記）、`resolveForConsumer`（第 6.3 節）、library 元件與 variable 的 import-by-key API、字型列舉與載入、截圖取得方式、單次 `use_figma` 回傳大小上限，以及 hooks 對實際 Figma 工具名稱是否觸發。
+
+**M1 結果（v1.3）：**verified：sharedPluginData 寫入與跨呼叫讀回、`resolveForConsumer`（既有與新節點）、`importComponentSetByKeyAsync`、字型列舉與載入、`get_screenshot`、hooks Pre／Post 觸發。not_verified：variable import-by-key、PostToolUseFailure 真實觸發、確切回傳上限（已知整頁 `get_metadata` 約 88 萬字元會超限）。詳見 `docs/m1-summary.md` 第 5 節。
 
 ### 5.2 邏輯能力表
 
@@ -352,6 +370,13 @@ Figma 的配額與可用性會因方案、seat、工具類別變動，因此不�
 
 盤點必須說明完整度：`complete_for_requested_scope | partial | unavailable`。只找到本次所需資源即可完成 scope，不必把整個組織 library 全數下載。
 
+**元件 library 與 variables library 分開核准（v1.3，P0）：**M0 實測中，Aiwow Library 提供元件，但元件與既有畫面綁定的 variables（`Size`、`Global`、`Colors`、`System Colors`）來自另一個 library，Aiwow Library 本身只有 1 個 local variable。因此：
+
+- Intake 必須分別確認「元件來源」與「variables 來源」；只核准元件 library 不等於核准了 variables。
+- Discover 從既有 bindings 找出 remote variables 後，必須回報其 collection 與（若可得）來源 library；API 查不到來源時，請使用者在 Figma 由 variable 標籤查出 library 名稱。
+- variables 來源未識別時記為 gap，tokenBinding 分母為 0 記 N/A，不得用 raw value 冒充綁定。只有使用者核准時，才可引用檔案中既有 consumer 已在使用的 remote variable。
+- 「已加入目標檔」以 `get_libraries` 的 `libraries_added_to_file` 與 runtime `teamLibrary` 兩種讀法一致為準；使用者表示已加入但兩者都未反映時，先請使用者確認是否按下 Add to file、是否加在正確檔案。
+
 ### 6.2 元件候選解析
 
 每個需求元件執行以下判定：
@@ -364,6 +389,8 @@ Figma 的配額與可用性會因方案、seat、工具類別變動，因此不�
 6. 記錄最終來源與選擇理由，建立 instance 後再次確認主元件關係與 properties。
 
 名稱相近或外觀相似不能單獨決定選擇；不能取第一筆搜尋結果就視為標準元件。
+
+**Library 版本差異（v1.3）：**以 key 匯入會取得 library 目前發佈的版本，但目標檔的既有畫面可能停在舊版（目標檔尚未接受 library 更新）。M1 中同一個 Button variant key，新 instance 多了兩個 icon、底色也不同，連帶影響寬度。Plan 階段若發現新舊版本外觀或尺寸不同，必須列給使用者，並記為 `inherited_baseline`。不得自行在目標檔接受 library 更新（會改動所有既有 instance），也不得以 override 隱藏元件目前版本的內容來模仿舊版，除非使用者決定。
 
 以下為元件候選 mapping **欄位片段**，不是完整 plan：
 
@@ -464,6 +491,13 @@ Figma 的配額與可用性會因方案、seat、工具類別變動，因此不�
 4. Plan 階段每個 section 的版面必須引用 pattern ID 或已確認的設計決策（第 7.4 節）；兩者皆無即為待問問題。
 
 pattern 盤點寫入 inventory.json 的 `patterns`，範圍以本次需求為限，不必盤點整個檔案。
+
+**Pattern 的重現與限制（v1.3）：**
+
+- 重現 pattern 時照抄其實際做法（例如兩顆按鈕都是 FILL 加相同內距），不以「看起來相同的數值」替代（例如改成固定寬度）。建好後量測結果並與範例比對。
+- 比對時同時比較元件版本：範例若使用舊版元件，數值不同可能來自版本差異，不是 agent 的設定錯誤。
+- pattern 的限制（例如文字字數上限）以 `constraints` 記錄，狀態為 `observed_not_confirmed | confirmed`。只有經過實驗驗證才可標為 confirmed，並附量測數字。
+- 對原因的推論在驗證前一律標示為假設。M1 曾推論寬度差異來自文字長度，改字後結果不變，推論被推翻；不得把未驗證的推論寫成規則或作為決策依據。
 
 ## 7. 需求輸入、澄清與決策規則
 
@@ -606,15 +640,21 @@ BUILD/VALIDATE → RECONCILE → 局部修正 → VALIDATE
 
 ### 8.1 發現順序
 
-1. 讀目標 URL／node，辨識 Design、FigJam 或其他檔案類型；P0 僅處理 Design。
+1. 讀目標 URL／node，辨識 Design、FigJam 或其他檔案類型；P0 僅處理 Design。URL 的 node-id 可能指向頁面（CANVAS）而非 frame，需先辨識節點類型。
 2. 若有程式碼，檢索需求相關 Code Connect 與 tokens；沒有則記錄 N/A。
 3. 查看同產品現有畫面，讀 instance 的主元件、屬性與 variable bindings。
 4. 讀可用 library，依回傳 continuation／offset 分頁，不假設第一頁完整。
-5. 搜尋尚未解析的 components、variables、styles；用單一意圖的短查詢。
+5. 搜尋尚未解析的 components、variables、styles；用單一意圖的短查詢。`search_design_system` 每次只送 1 個 query（實測 server 會把多筆裁成 1 筆）；library 未啟用時搜尋為空，不代表資源不存在。
 6. 依第 6.6 節盤點相近畫面的版面 pattern。
 7. 產出 `component-map`：reuse／wrap_proposed／new_proposed／blocked，各項需有理由；未經當次允許，不執行 proposed 項。
 
 只讀 local variables 得到空陣列，不足以排除 remote library variables。唯讀權限的 library 元件仍可能允許匯入使用；「不能修改主元件」不等於「不能重用 instance」。
+
+**讀取範圍（v1.3 實測）：**
+
+- 頁面清單以 `use_figma` 唯讀讀取 `figma.root.children`；`get_metadata` 不帶 nodeId 時實測只列出第一頁，不能用來盤點頁面。
+- 不對整頁呼叫 `get_metadata`：實測一個含約 5,600 個 instance 的頁面回傳約 88 萬字元，超過工具輸出上限。先用 `use_figma` 取得頂層節點摘要，再縮小到 frame／section。
+- 大量讀取的頁面不適合作為 agent 寫入位置；每次對帳都要重讀，耗時也耗配額。寫入預設放在獨立頁面或範圍小的 Section（M1 由使用者決定新增「figma-ui sandbox」頁）。
 
 ### 8.2 設計計畫
 
@@ -709,6 +749,9 @@ BUILD/VALIDATE → RECONCILE → 局部修正 → VALIDATE
 - 明確定義固定、hug、fill，避免循環尺寸依賴；append 到有效 parent 後再設 child sizing。
 - 修改文字前載入實際字型，混合字型需逐段處理。先探測可用 family/style，不能猜 SemiBold 的拼法。[Figma text API](https://developers.figma.com/docs/plugins/working-with-text/)
 - 文字換行、line-height、width、max-lines／ellipsis 依任務規則；檢查 CJK 換行與 glyph。
+- **CJK fallback（v1.3 實測）：**Inter 等拉丁字型沒有中文字形，Figma 會以 fallback 字型顯示。這是既有畫面也有的狀況，記為 baseline；每次仍要在截圖確認沒有缺字或方框，並檢查 `hasMissingFont`。
+- **元件沒有 TEXT property 時**，改文字只能 override instance 內層文字節點：先載入該節點實際使用的字型，只改 `characters`，不 detach；override 需記入 operation 與結構證據。
+- **FILL 平分寬度不保證相等（v1.3 實測）：**兩個 FILL 子元素的實際寬度會受內容最小寬度影響（M1 為 131／129）。要求等寬時，建好後量測；不相等就回報，由使用者決定接受、改做法或查原因。
 - node names 表達用途，例如 `Members/Header/InviteAction`；既有名字不必批次重命名。
 - 在空白區域放新 top-level frames，不覆蓋既有畫布。
 
@@ -743,7 +786,7 @@ BUILD/VALIDATE → RECONCILE → 局部修正 → VALIDATE
 使用者已確認可能在 agent 工作期間同時編輯同一 Figma 檔。Figma 沒有可供 agent 取得的編輯鎖，因此本節目標是**偵測衝突、絕不覆寫使用者改動、讓使用者看得到 agent 在哪裡工作**，而不是阻止使用者編輯。
 
 1. **工作區隔離。**設計任務預設在 output 頁面空白處為每個 run 建立一個 Section（名稱例如 `figma-ui / <runId>`），新畫面都放在其中。agent 只寫入自己建立的節點，以及 `modify` 任務中使用者明確指定的範圍。
-2. **所有權標記。**agent 建立的每個根節點，在建立它的同一個 `use_figma` 腳本內立刻以 `setSharedPluginData` 寫入 `runId`、`operationId`、`logicalKey`、`agentFingerprint`（寫入當下的 fingerprint）。子節點以所屬根節點判定所有權。此能力須先依 CAP-05 驗證；不支援時退回名稱＋結構比對並將恢復能力標為降級。
+2. **所有權標記。**agent 建立的每個根節點，在建立它的同一個 `use_figma` 腳本內立刻以 `setSharedPluginData` 寫入 `runId`、`operationId`、`logicalKey`、`agentFingerprint`（寫入當下的 fingerprint）。子節點以所屬根節點判定所有權。此能力已在 M1 驗證（plugin 2.2.118，寫入與跨呼叫讀回皆成功；`use_figma` 說明列為不支援的是非 shared 的 `setPluginData`）；plugin 升級後須重測，不支援時退回名稱＋結構比對並將恢復能力標為降級。
 3. **同一腳本內先驗證再寫入。**每個修改既有節點的 write 腳本，開頭先在 Figma 端重新計算目標節點 fingerprint（`snippets/fingerprint.js`），與 ledger 中最後一次 agent 驗證的值比對；不一致就不做任何修改，回傳 `conflict` 與差異摘要（`snippets/precondition-guard.js`）。這把衝突窗口縮到單一腳本執行期間，但仍不是原子交易。
 4. **偵測到使用者改動時：**
    - 使用者改了 agent 建立的節點：視為使用者的決定，不覆寫、不還原。回報差異並詢問：採納（更新 plan 與 fingerprint 基準）或由使用者說明要如何處理。
@@ -1006,8 +1049,12 @@ finding.status 為 `open | resolved | accepted`，origin 為 `introduced | regre
 | T40 | 工具逾時觸發 PostToolUseFailure／CC 在 dispatched 後中止 | 記為 unknown_outcome；下一次 write 被阻擋直到對帳 | 4.5、11.3 |
 | T41 | write operation 無 basisRefs 或引用未回答的決策 | validator 拒絕 | DEC-06 |
 | T42 | 相近既有畫面的 pattern 互相矛盾 | 列出差異並詢問，不自行擇一 | 6.6 |
+| T43 | `whoami` 為 View／Dev seat，或讀取回報沒有權限 | 停在 blocked 並給出第 4.2.1 節恢復步驟；不重試耗用配額 | 4.2.1、G7 |
+| T44 | hook 的放行路徑（無 active run、read、通過檢查的 write） | 不輸出任何 permission decision；只有阻擋時輸出 deny | 4.5、INVARIANT-14 |
+| T45 | 元件 library 已核准，但 variables 來自未識別的 library | 記為 gap、詢問使用者；不以 raw value 冒充綁定 | 6.1 |
+| T46 | 新匯入的元件版本與既有畫面使用的版本外觀不同 | 在 plan 中列出差異並記 baseline；不自行接受 library 更新或用 override 模仿舊版 | 6.2 |
 
-**v1.2 優先級：**P0 必測為 T02–T08、T10、T11、T13、T15、T16、T21–T27、T29、T31–T33、T35、T38–T41。其餘（T01、T09、T12、T14、T17–T20、T28、T30、T34、T36、T37、T42）為 P1，仍保留在 fixture 層逐步補齊；不得因為列 P1 就在交付報告中省略其狀態。
+**v1.2 優先級：**P0 必測為 T02–T08、T10、T11、T13、T15、T16、T21–T27、T29、T31–T33、T35、T38–T41；v1.3 新增 T43–T46 皆為 P0。其餘（T01、T09、T12、T14、T17–T20、T28、T30、T34、T36、T37、T42）為 P1，仍保留在 fixture 層逐步補齊；不得因為列 P1 就在交付報告中省略其狀態。
 
 ### 13.3 基準任務
 
@@ -1070,7 +1117,7 @@ finding.status 為 `open | resolved | accepted`，origin 為 `introduced | regre
 | 階段 | 交付 | 通過條件 |
 |---|---|---|
 | M0 最小連線準備 | 檢查 CC／remote MCP、取得本次來源及測試輸出範圍、最小 brief 與操作紀錄 | 真實讀取來源成功；缺條件時精確回報，不假設權限 |
-| M1 真實垂直流程 | 讀一個真實 library 元件及語意變數 → 在授權區建立 instance 與小畫面 → 讀回 binding／mode → 取得截圖；同時跑 CAP-05 probes 與最小 hooks | 主元件關係、有效值、畫面證據均正確；CAP-05 各項有 verified／unavailable 結論；有精確 IDs 與保留／清理決策 |
+| M1 真實垂直流程 | 讀一個真實 library 元件及語意變數 → 在授權區建立 instance 與小畫面 → 讀回 binding／mode → 取得截圖；同時跑 CAP-05 probes 與最小 hooks | 主元件關係、有效值、畫面證據均正確；CAP-05 各項有 verified／unavailable 結論；有精確 IDs 與保留／清理決策。**已完成（2026-09-28，`complete_with_exceptions`，見 `docs/m1-summary.md`）** |
 | M2 工作流程與契約 | 將 M1 已證實的路徑整理成 skill、解析器、schemas、plan、baseline、唯一完成判定 | new／continue／resume、來源輸出分離、任務分流與離線契約測試通過 |
 | M3 寫入與恢復強化 | hooks 強制層、journal、本機鎖、unknown outcome、人機協作衝突處理、audit／evidence 管理 | 重跑、衝突、使用者同時編輯、無回傳 ID、中斷與內容壓力測試；明列每項測試層級 |
 | M4 完整驗收與交付 | 三組基準任務、handoff、runbook、acceptance report | P0 必測項有結果；必要真實整合與視覺證據齊全才稱端到端驗收 |
@@ -1082,6 +1129,18 @@ M1 先驗證最小真實路徑，不等六份 schema 和所有 scripts 完成才
 
 M1 缺權限或素材時，可繼續 M2/M3 的離線部分，但不得把未驗證 runtime 假設固化成通用 adapter。
 
+**M1 之後的待辦（v1.3）：**
+
+| 項目 | 歸屬 | 說明 |
+|---|---|---|
+| gap-001 variables 來源 library | M2 前由使用者查明 | 查明並啟用後補驗顏色 token 綁定、mode 切換與 variable import-by-key |
+| 協作情境 T35–T37 | M3 | 在 sandbox 頁實測使用者同時改動 agent 節點 |
+| PostToolUseFailure 真實觸發 | M3 | 記錄實際 stdin 欄位與 `safeToRetryWithoutCanvasRead` 的出現情形 |
+| 確切回傳上限 | M2 | 量測後寫入 capabilities，Discover 依此拆批 |
+| F-001 寬度原因 | 選配 | 推測為目前版 Active 的 icon，未以實驗證實；已依 dec-010 接受為例外 |
+
+M2 以 M1 已實作的 `scripts/hooks/*`、`scripts/evaluate-completion.mjs` 與其測試為基礎擴充，不重寫；測試指令為 `node --test "tests/**/*.test.mjs"`（`node --test tests/` 在 Node 22 會失敗）。
+
 ### 17.1 M1 測試目標（v1.2，使用者提供）
 
 | 角色 | 檔案 | fileKey | 起始節點 | 權限 |
@@ -1092,7 +1151,8 @@ M1 缺權限或素材時，可繼續 M2/M3 的離線部分，但不得把未驗�
 - 以上 fileKey／nodeId 由 URL 解析，仍須在 M0 以真實讀取確認存在與權限，不得未經讀取就寫入。
 - 使用者的「允許寫入」是對此測試檔的整體許可；M1 仍在 intake 確認具體頁面與區域。預設在 `14442:37607` 所在頁面的空白處新建一個 run Section，不改動任何既有節點。
 - Library 唯讀只代表不能改主元件與 variables 定義；能否在測試檔匯入並使用其元件／variables，取決於 library 是否已發佈並在測試檔啟用，屬未驗證，M0 須確認。不能匯入時先問，不在測試檔自建替代元件。
-- M1 結束後依使用者決定保留或清理，清理只刪除帶本 run 所有權標記且 ID 精確相符的節點。報告分成 `implementationStatus` 與 `integrationStatus`；本機建置完成但整合 blocked 不等於 agent 已可端到端使用。M1 只是可行性證明，也不能代替 M4 完整驗收。
+- M1 結束後依使用者決定保留或清理，清理只刪除帶本 run 所有權標記且 ID 精確相符的節點。
+- **M1 實際結果（v1.3）：**`14442:37607` 實為頁面 `v1.1.2`，不是 frame；使用者決定改在新頁「figma-ui sandbox」（`34014:8`）寫入，M1 節點全部保留（dec-003）。Aiwow Library 已由使用者加入測試檔；variables 來源 library 未識別（gap-001）。需要 Full seat 帳號才能讀寫（見第 4.2.1 節）。報告分成 `implementationStatus` 與 `integrationStatus`；本機建置完成但整合 blocked 不等於 agent 已可端到端使用。M1 只是可行性證明，也不能代替 M4 完整驗收。
 
 ## 18. 建議核心行為提示詞
 
@@ -1148,11 +1208,31 @@ INVARIANT-10: 品質分數不參與 completionEvaluation；高分不能抵銷 fa
 INVARIANT-11: 沒有使用者回答、DS 或已確認 pattern 依據的設計決策，不得進入 write operation。
 INVARIANT-12: 目標節點目前的 fingerprint 與最後一次 agent 驗證值不同時，不得寫入該節點，直到使用者決定。
 INVARIANT-13: 有 active run 時，所有 Figma write 呼叫都必須經過 hook 記錄；hook 無法判定時阻擋 write。
+INVARIANT-14: hook 不輸出 permissionDecision "allow"；放行只以不輸出決定表示。
+INVARIANT-15: read operation 不得使用或覆寫 write operation 的 operationId。
+INVARIANT-16: 未經驗證的原因推論不得寫成 confirmed 規則或 pattern 限制。
 ```
 
 這些應至少以 contract／fixture tests 驗證。prompt 可以描述規則，但程式化 validator 才能攔下可判定的違規狀態。
 
-### 20.3 v1.2 變更紀錄
+### 20.3 v1.3 變更紀錄
+
+依 2026-09-28 使用者本機 M0–M1 實測（`docs/m1-summary.md`、研究紀錄第 10 節）修訂：
+
+- 新增第 4.2.1 節帳號與 seat 診斷；更正 plugin 名稱為實測值。
+- 第 4.5 節：放行不得輸出 `allow`；read 不得重用 write operationId；dispatched 記錄 mode／fileKey；run 結束須釋放鎖；補 Windows 實測結果。新增 INVARIANT-14～16。
+- CAP-05 填入 M1 結果；第 11.2 節所有權標記改為已驗證。
+- 第 6.1 節：元件 library 與 variables library 分開核准；啟用狀態以兩種讀法一致為準。
+- 第 6.2 節：library 版本差異的處理。
+- 第 6.6 節：pattern 重現照抄實際做法、限制需實驗確認、未驗證推論須標示假設。
+- 第 8.1 節：頁面清單與讀取範圍的實測限制、`search_design_system` 一次一個 query。
+- 第 10.3 節：CJK fallback、無 TEXT property 的文字覆寫、FILL 不保證等寬。
+- 第 13.2 節新增 T43–T46。
+- 第 17 節：M1 標記完成，列出 M1 後待辦與測試指令。
+- schemaVersion 維持 `1.2`：本版沒有改變資料契約結構，inventory pattern 的 `constraints` 為新增的選填欄位。
+- 第 11.5 節 `safeToRetryWithoutCanvasRead` 已於 PR #2 依官方 figma-use skill Rule 14 恢復，v1.3 沿用。
+
+### 20.4 v1.2 變更紀錄
 
 使用者於 2026-09-28 確認：本機 Claude Code 執行、可能與 agent 同時編輯、提供 M1 測試檔與唯讀 library、設計決策一律詢問，並同意全部 v1.2 審查建議。v1.2 變更：
 
@@ -1172,7 +1252,7 @@ INVARIANT-13: 有 active run 時，所有 Figma write 呼叫都必須經過 hook
 
 目前尚無 1.1 artifacts；若日後出現，依下方 1.0 的同樣原則唯讀備份、驗證後遷移（補 designDecisions、basisRefs、mode、patterns，移除 audit.status），不得只改版本字串。
 
-### 20.4 v1.1 變更紀錄與遷移
+### 20.5 v1.1 變更紀錄與遷移
 
 使用者於 2026-09-28 同意全部審查建議。v1.1：統一完成判定並移除分數門檻；基線／新增／回歸分開；runtime consumer 解析優先；補無回傳 ID 與 stale lock 恢復；任務分流；手動 new／continue／resume；來源／輸出分離；提前核心 DS 規格；先做真實垂直流程；同步研究與建置指令。
 

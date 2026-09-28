@@ -1,8 +1,8 @@
 # Figma MCP UI 設計研究紀錄
 
-版本：1.2 · 原研究日期：2026-09-27 · 補充查核／修訂：2026-09-28（v1.1、v1.2）。
+版本：1.3 · 原研究日期：2026-09-27 · 補充查核／修訂：2026-09-28（v1.1、v1.2、v1.3）。
 
-目的：為「Claude Code 讀取指定檔案的 library／variables 並延伸 UI」提供來源與限制。規範以 FIGMA_UI_AGENT_SPEC.md v1.2 為唯一來源；本文件不另定義完成條件。
+目的：為「Claude Code 讀取指定檔案的 library／variables 並延伸 UI」提供來源與限制。規範以 FIGMA_UI_AGENT_SPEC.md v1.3 為唯一來源；本文件不另定義完成條件。
 
 ## 1. 研究方式與可信度
 
@@ -171,6 +171,8 @@ Claude Code 提供 project agents 和 skills；agent 可使用 frontmatter 配�
 9. （v1.2）Aiwow Library 是否已發佈並在測試檔啟用，元件與 variables 能否以 key 匯入。
 10. （v1.2）使用者在 `use_figma` 腳本執行期間編輯時的實際行為（T35）。
 
+**v1.3 狀態（依 M0–M1 實測）：**第 1、2 項已由第 10 節與 `docs/m1-summary.md` 記錄；第 3 項已確認（需 Full seat 帳號，見主規格第 4.2.1 節）；第 7 項 sharedPluginData 已驗證，回傳上限只知道整頁讀取會超限；第 8 項已驗證（Pre／Post；PostToolUseFailure 未驗證）；第 9 項元件已驗證，variables 的來源 library 未識別；第 4 項 variables 部分、第 5、6、10 項仍未驗證。
+
 以上項目不能在本次研究階段勾選通過。`CC_BUILD_PROMPT.md` 要求實作者在離線測試與真實整合之間清楚區分結果。
 
 ## 8. v1.1 審查決策紀錄
@@ -218,3 +220,21 @@ Claude Code 提供 project agents 和 skills；agent 可使用 frontmatter 配�
 ### 10.1 Baseline 觀察
 
 - **`inherited_baseline`：Aiwow Library `Button`（component set `1:1545`，key `f90477a86f723dc5362f382e1d9686ffc08a93cb`）沒有 TEXT component property**，只有 VARIANT 屬性 `type`（Default／Disabled／Secondary／Button／Active／Media／Activity）。延伸設計要改按鈕文字時，只能 override instance 內層文字節點。依使用者 2026-09-28 指示記為 baseline 觀察，不修改該元件；本次改文字的 override 需記入 operation 與 audit 的結構證據。
+
+## 11. v1.3 決策紀錄（M1 結束，2026-09-28）
+
+M1 在使用者授權的測試檔跑通真實垂直流程，run `ui-20260928-m1` 的完成判定為 `complete_with_exceptions`（例外 ex-001：按鈕寬 131／129，dec-010）。完整紀錄見 `docs/m1-summary.md`。主規格 v1.3 依此修訂的重點：
+
+| 實測發現 | 主規格處理 |
+|---|---|
+| 第一次授權的帳號為 View seat；換帳號時因瀏覽器仍登入舊帳號而兩次失敗 | 第 4.2.1 節帳號與 seat 診斷 |
+| hook 放行時輸出 `allow` 會跳過權限確認 | 第 4.5 節改為放行不輸出決定；INVARIANT-14 |
+| read 重用 write operationId 可覆蓋 `unknown_outcome` | 第 4.5 節阻擋；INVARIANT-15 |
+| 元件 library 與 variables library 是不同的 library | 第 6.1 節分開核准 |
+| 新匯入的元件是目前發佈版，既有畫面停在舊版，外觀與尺寸不同 | 第 6.2 節版本差異處理 |
+| 寬度差異的原因推論（文字長度）經實驗推翻 | 第 6.6 節限制需實驗確認；INVARIANT-16 |
+| `get_metadata` 頁面清單不完整、整頁讀取超限 | 第 8.1 節讀取範圍 |
+| FILL 不保證等寬；Inter 無中文字形；元件無 TEXT property | 第 10.3 節 |
+
+以上屬 E（本環境觀察），以使用者本機 Claude Code 2.1.283、Figma plugin 2.2.118 為準；升級後需重測。
+
