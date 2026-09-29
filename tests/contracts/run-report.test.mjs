@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { recordPhase, recordQuestionRound, recordAnswered, runMetrics, renderHandoff } from '../../scripts/run-report.mjs';
+import { recordPhase, recordQuestionRound, recordAnswered, runMetrics, renderHandoff, formatTokenBinding } from '../../scripts/run-report.mjs';
 import { writeEvaluation, recordUserAcceptance, evaluateRun } from '../../scripts/evaluate-completion.mjs';
 import { validateRun } from '../../scripts/validate-artifacts.mjs';
 import { copyM1, tmpRoot } from '../helpers.mjs';
@@ -100,4 +100,19 @@ test('Stage B not ready: the UI agent keeps its full validation (no ready_for_qa
   assert.equal(evaluation.eligible, false);
   assert.notEqual(evaluation.result, 'ready_for_qa');
   assert.ok(evaluation.reasons.some(r => /G4 not_verified/.test(r)));
+});
+
+// M4: legacy runs store tokenBinding as a string; the handoff printed "undefined" for it.
+test('M4: tokenBinding renders legacy strings, full objects and partial objects without "undefined"', () => {
+  assert.equal(formatTokenBinding(undefined), null);
+  assert.equal(formatTokenBinding('fixture only: 2 fills + 2 text styles'), 'fixture only: 2 fills + 2 text styles');
+  assert.equal(formatTokenBinding({ ratio: '45/54', variableBindings: 0, styleApplications: { total: 45 }, raw: 9 }), '45/54（variables 0、styles 45、raw 9）');
+  const partial = formatTokenBinding({ denominator: 4, bound: 3 });
+  assert.equal(partial, '3/4（variables unknown、styles unknown、raw unknown）');
+  for (const s of [partial, formatTokenBinding({})]) assert.ok(!/undefined/.test(s), s);
+  // a real legacy run (M1 fixture keeps the string form) produces a handoff without "undefined"
+  const dir = copyM1();
+  evaluateRun(dir);
+  writeEvaluation(dir);
+  assert.ok(!/undefined/.test(renderHandoff(dir, { root: tmpRoot() })));
 });

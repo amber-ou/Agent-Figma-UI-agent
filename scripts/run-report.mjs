@@ -145,6 +145,18 @@ const nodeUrl = (fileKey, id) => `https://www.figma.com/design/${fileKey}/?node-
 const cell = c => [c.viewport, c.state, c.mode].filter(v => v != null).join(' · ') || '—';
 const fmtMs = v => (v == null ? 'unknown' : v < 60000 ? `${Math.round(v / 1000)} s` : `${Math.round(v / 60000)} min`);
 
+// audit.metrics.tokenBinding is the quality-metrics object since v1.4, but runs written before that
+// store a free-text string. Render both; never print "undefined" for a missing field (M4).
+export function formatTokenBinding(tb) {
+  if (tb == null) return null;
+  if (typeof tb === 'string') return tb;
+  if (typeof tb !== 'object') return String(tb);
+  const v = x => (x == null ? 'unknown' : x);
+  const ratio = tb.ratio ?? (tb.denominator != null && tb.bound != null ? `${tb.bound}/${tb.denominator}` : 'unknown');
+  const styles = typeof tb.styleApplications === 'object' ? tb.styleApplications?.total : tb.styleApplications;
+  return `${ratio}（variables ${v(tb.variableBindings)}、styles ${v(styles)}、raw ${v(tb.raw)}）`;
+}
+
 export function renderHandoff(dir, { root = projectRoot(), metrics } = {}) {
   const run = loadRun(dir);
   const { brief, plan, audit, ledger } = run;
@@ -193,8 +205,8 @@ export function renderHandoff(dir, { root = projectRoot(), metrics } = {}) {
   L.push('## 驗證結果', '');
   L.push(`- 覆蓋：${ev.coverage ? `${ev.coverage.verified}/${ev.coverage.applicable}` : 'unknown'}`);
   L.push(`- Gates：${(audit.gates || []).map(g => `${g.id} ${g.status}`).join('、')}`);
-  const tb = audit.metrics?.tokenBinding;
-  if (tb) L.push(`- tokenBinding：${tb.ratio}（variables ${tb.variableBindings}、styles ${tb.styleApplications?.total ?? 0}、raw ${tb.raw}）`);
+  const tb = formatTokenBinding(audit.metrics?.tokenBinding);
+  if (tb) L.push(`- tokenBinding：${tb}`);
   const findings = audit.findings || [];
   L.push(`- Findings：${findings.length} 筆（open ${findings.filter(f => f.status === 'open').length}、resolved ${findings.filter(f => f.status === 'resolved').length}、accepted ${findings.filter(f => f.status === 'accepted').length}）；例外 ${(audit.acceptedExceptions || []).map(x => `${x.id}（${x.decisionRef}）`).join('、') || '無'}`);
   L.push('- Design QA：尚未接入（階段 B）；本 run 的適用驗證全部由 UI agent 完成。', '');
