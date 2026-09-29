@@ -1,6 +1,6 @@
 {
   "name": "agent-figma-ui",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Claude Code agent that extends native Figma UI from existing libraries, components and variables (spec: FIGMA_UI_AGENT_SPEC.md)",
   "type": "module",
@@ -8,7 +8,8 @@
   "scripts": {
     "test": "node --test \"tests/**/*.test.mjs\"",
     "validate": "node scripts/validate-artifacts.mjs",
-    "evaluate": "node scripts/evaluate-completion.mjs"
+    "evaluate": "node scripts/evaluate-completion.mjs",
+    "metrics": "node scripts/quality-metrics.mjs"
   },
   "dependencies": {
     "ajv": "8.20.0",

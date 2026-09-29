@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import { readJsonl, operationStates } from './hooks/lib.mjs';
+import { precheckContrast } from './quality-metrics.mjs';
 
 const schemaDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
 export const CONTRACTS = ['brief', 'plan', 'inventory', 'capabilities', 'ledger', 'audit'];
@@ -25,6 +26,11 @@ function getAjv() {
 }
 
 const schemaId = name => `https://figma-ui.local/schemas/${name}.schema.json`;
+
+// DEC-08: status is optional for plans written before v1.4; derive it from the answer.
+export function decisionStatus(d) {
+  return d.status || (typeof d.answer === 'string' && d.answer ? 'answered' : 'pending');
+}
 
 // ---- syntax: one document against one schema ----
 export function validateSchema(name, doc) {
@@ -97,7 +103,7 @@ export function validateRunSemantics(run) {
   }
 
   const isDecision = id => designDecisions.has(id) || decisions.has(id);
-  const answered = id => decisions.has(id) || (designDecisions.has(id) && designDecisions.get(id).answer);
+  const answered = id => decisions.has(id) || (designDecisions.has(id) && decisionStatus(designDecisions.get(id)) === 'answered');
 
   // brief
   if (brief) {
@@ -147,6 +153,44 @@ export function validateRunSemantics(run) {
         else if (!variableLibs.has(v.libraryKey)) errors.push(`variableMap ${v.id}: library ${v.libraryKey} is not an approved variables library (§6.1)`);
       }
     }
+    // DEC-07 / INVARIANT-18: a delegation is valid only for this run and must point at the user's
+    // authorisation in this plan's decisions.
+    for (const d of plan.designDecisions || []) {
+      const dg = d.delegation;
+      if (!dg) continue;
+      if (dg.runId !== plan.runId) errors.push(`designDecision ${d.id}: delegation belongs to run ${dg.runId}, not ${plan.runId}; authorisation does not carry over to another run (INVARIANT-18)`);
+      if (!decisions.has(dg.decisionRef)) errors.push(`designDecision ${d.id}: delegation.decisionRef ${dg.decisionRef} is not a user decision in plan.decisions (DEC-07)`);
+    }
+    // §9.5 accessibility pre-check: recompute contrast; a failing style needs a design decision
+    // (alternatives) before the plan is confirmed.
+    const a11y = plan.accessibilityPrecheck || [];
+    dup(a11y.map(c => c.id), 'accessibilityPrecheck');
+    for (const c of a11y) {
+      if (c.foreground && c.background && c.kind !== 'target_size') {
+        const expected = precheckContrast(c);
+        if (c.status !== expected.status) errors.push(`accessibilityPrecheck ${c.id}: status ${c.status} but ${c.foreground} on ${c.background} is ${expected.ratio}:1 (needs ${expected.required}:1) → ${expected.status}`);
+      }
+      if (c.status === 'fail' && !designDecisions.has(c.decisionRef)) errors.push(`accessibilityPrecheck ${c.id}: failing item needs decisionRef to a designDecision listing alternatives (§9.5)`);
+      if (c.baselineRef) {
+        const obs = observations.get(c.baselineRef);
+        if (!obs) errors.push(`accessibilityPrecheck ${c.id}: baselineRef ${c.baselineRef} not found in plan.baseline.observations`);
+        else if (obs.kind !== 'inherited_baseline') errors.push(`accessibilityPrecheck ${c.id}: reference-screen failure must be recorded as inherited_baseline`);
+      }
+    }
+  }
+
+  // §10.3 fonts: a font that is not installed is an inherited_baseline listed to the user, never
+  // silently substituted.
+  for (const f of inventory?.fonts || []) {
+    if (f.installed) continue;
+    const label = `font ${f.family} ${f.style}`;
+    if (plan) {
+      const obs = observations.get(f.baselineRef);
+      if (!obs) errors.push(`${label}: not installed; baselineRef ${f.baselineRef} not found in plan.baseline.observations`);
+      else if (obs.kind !== 'inherited_baseline') errors.push(`${label}: missing font must be recorded as inherited_baseline`);
+      if (plan.status === 'confirmed' && !f.listedToUserRef) errors.push(`${label}: not installed and not listed to the user before confirming the plan (§10.3)`);
+    }
+    if (f.listedToUserRef && plan && !isDecision(f.listedToUserRef)) errors.push(`${label}: listedToUserRef ${f.listedToUserRef} not found`);
   }
 
   // inventory (INVARIANT-16)
@@ -165,9 +209,15 @@ export function validateRunSemantics(run) {
     if (outKey && op.fileKey !== outKey) errors.push(`operation ${op.operationId}: fileKey ${op.fileKey} is not the authorized output (INVARIANT-09)`);
     for (const ref of op.basisRefs || []) {
       if (!basisOk(ref)) errors.push(`operation ${op.operationId}: basisRef ${ref} does not resolve (DEC-06)`);
-      else if (designDecisions.has(ref) && !designDecisions.get(ref).answer) errors.push(`operation ${op.operationId}: basisRef ${ref} is an unanswered design decision (INVARIANT-11)`);
+      else if (designDecisions.has(ref)) {
+        const st = decisionStatus(designDecisions.get(ref));
+        if (st === 'skipped') errors.push(`operation ${op.operationId}: basisRef ${ref} is a skipped design decision; its elements must not be built (DEC-08)`);
+        else if (st !== 'answered') errors.push(`operation ${op.operationId}: basisRef ${ref} is an unanswered design decision (INVARIANT-11)`);
+      }
     }
   }
+  const createdByRun = new Set(ops.filter(o => o.mode === 'write').flatMap(o => o.createdNodeIds || []));
+  for (const e of ledger?.entities || []) { createdByRun.add(e.nodeId); for (const c of e.childNodeIds || []) createdByRun.add(c); }
 
   // ledger
   if (ledger) {
@@ -181,7 +231,28 @@ export function validateRunSemantics(run) {
     const unresolved = ops.filter(o => ['dispatched', 'unknown_outcome'].includes(o.status)).map(o => o.operationId);
     const listed = new Set((ledger.pendingOperations || []).map(o => o.operationId));
     for (const id of unresolved) if (!listed.has(id)) errors.push(`ledger.pendingOperations is missing unresolved operation ${id}`);
+
+    // §2.3 / INVARIANT-17: userAcceptance records the user's view; it never changes status or the evaluation.
+    const ua = ledger.userAcceptance;
+    const ev = audit?.completionEvaluation;
+    if (ua) {
+      if (plan && !isDecision(ua.decisionRef)) errors.push(`ledger.userAcceptance.decisionRef ${ua.decisionRef} not found in plan decisions`);
+      if (!ev) errors.push('ledger.userAcceptance without audit.completionEvaluation: evaluate the run before recording acceptance');
+      else {
+        if (ledger.status !== ev.result) errors.push(`ledger.status ${ledger.status} differs from completionEvaluation.result ${ev.result}; userAcceptance must not change the run status (INVARIANT-17)`);
+        if (ua.evaluationResult && ua.evaluationResult !== ev.result) errors.push(`ledger.userAcceptance.evaluationResult ${ua.evaluationResult} differs from completionEvaluation.result ${ev.result} (INVARIANT-17)`);
+      }
+      const handoffFile = path.join(run.dir || '.', 'handoff.md');
+      if (ev && fs.existsSync(handoffFile)) {
+        const text = fs.readFileSync(handoffFile, 'utf8');
+        if (!text.includes(ev.result) || !text.includes(ua.decisionRef)) errors.push(`handoff.md must list both the completion result (${ev.result}) and the user acceptance (${ua.decisionRef}) (§2.3)`);
+      }
+    }
   }
+  // A stored evaluation can never claim completion it did not earn (INVARIANT-05, INVARIANT-17).
+  const ev = audit?.completionEvaluation;
+  if (ev && ['complete', 'complete_with_exceptions'].includes(ev.result) && !ev.eligible) errors.push(`completionEvaluation.result ${ev.result} with eligible=false`);
+  if (ledger && audit && ['complete', 'complete_with_exceptions'].includes(ledger.status) && ev?.result !== ledger.status) errors.push(`ledger.status ${ledger.status} is not the result of completionEvaluation (${ev ? ev.result : 'none'})`);
 
   // audit
   if (audit) {
@@ -194,9 +265,25 @@ export function validateRunSemantics(run) {
       for (const ref of f.evidenceRefs || []) if (!evidence.has(ref)) errors.push(`finding ${f.id}: evidenceRef ${ref} not found`);
       if (f.decisionRef && !isDecision(f.decisionRef)) errors.push(`finding ${f.id}: decisionRef ${f.decisionRef} not found`);
     }
+    const findingsById = new Map((audit.findings || []).map(f => [f.id, f]));
     for (const x of audit.acceptedExceptions || []) {
       if (!isDecision(x.decisionRef)) errors.push(`exception ${x.id}: decisionRef ${x.decisionRef} not found`);
-      if (x.findingId && !(audit.findings || []).some(f => f.id === x.findingId)) errors.push(`exception ${x.id}: finding ${x.findingId} not found`);
+      if (x.findingId && !findingsById.has(x.findingId)) errors.push(`exception ${x.id}: finding ${x.findingId} not found`);
+      if (findingsById.get(x.findingId)?.gate === 'G5') errors.push(`exception ${x.id}: G5 accessibility finding ${x.findingId} is a hard gate and cannot be accepted as an exception (§9.5)`);
+    }
+    for (const f of audit.findings || []) {
+      if (f.gate === 'G5' && f.status === 'accepted') errors.push(`finding ${f.id}: G5 accessibility finding cannot be accepted (§9.5); resolve it or keep it open`);
+      // §9.5: a new screen that reuses a failing style introduces the defect; it is not baseline.
+      // (Other gates keep inherited_baseline for untouched properties inside library instances, §10.1.)
+      if (f.gate === 'G5' && f.origin === 'inherited_baseline' && f.nodeId && createdByRun.has(f.nodeId)) errors.push(`finding ${f.id}: node ${f.nodeId} was created by this run, so its accessibility failure is introduced, not inherited_baseline (§9.5)`);
+    }
+    const g5 = (audit.gates || []).find(g => g.id === 'G5');
+    const openG5 = (audit.findings || []).filter(f => f.gate === 'G5' && f.status === 'open' && f.origin !== 'inherited_baseline');
+    if (g5?.status === 'pass' && openG5.length) errors.push(`gate G5 pass while G5 finding(s) ${openG5.map(f => f.id).join(', ')} are open`);
+    const exceptionIds = new Set((audit.acceptedExceptions || []).map(x => x.id));
+    for (const b of audit.metrics?.propertyBindings || []) {
+      if (b.exceptionRef && !exceptionIds.has(b.exceptionRef) && !isDecision(b.exceptionRef)) errors.push(`metrics.propertyBindings ${b.nodeId} ${b.property}: exceptionRef ${b.exceptionRef} not found`);
+      if (b.exceptionRef && b.binding !== 'raw') errors.push(`metrics.propertyBindings ${b.nodeId} ${b.property}: only raw values take an exceptionRef`);
     }
     for (const e of audit.evidence || []) {
       if (e.artifactRef && !fs.existsSync(path.join(run.dir || '.', e.artifactRef))) errors.push(`evidence ${e.id}: artifactRef ${e.artifactRef} does not exist`);

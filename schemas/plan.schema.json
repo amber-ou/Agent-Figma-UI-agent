@@ -145,11 +145,63 @@
           "answer": { "type": ["string", "null"] },
           "source": { "$ref": "common.schema.json#/$defs/decisionSource" },
           "evidenceRefs": { "type": "array", "items": { "type": "string" } },
-          "decidedAt": { "$ref": "common.schema.json#/$defs/nullableDateTime" }
+          "decidedAt": { "$ref": "common.schema.json#/$defs/nullableDateTime" },
+          "status": {
+            "description": "v1.4 DEC-08. Optional for older plans: absent means answered when answer is a string, else pending.",
+            "enum": ["pending", "answered", "skipped"]
+          },
+          "delegation": {
+            "description": "v1.4 DEC-07: the user authorised adopting the agent's recommendation for this run only (INVARIANT-18).",
+            "type": "object",
+            "required": ["decisionRef", "scope", "runId"],
+            "properties": {
+              "decisionRef": { "$ref": "common.schema.json#/$defs/localId" },
+              "scope": { "const": "run" },
+              "runId": { "$ref": "common.schema.json#/$defs/runId" }
+            },
+            "additionalProperties": false
+          }
         },
         "additionalProperties": false,
-        "if": { "properties": { "answer": { "type": "string" } } },
-        "then": { "properties": { "decidedAt": { "$ref": "common.schema.json#/$defs/dateTime" } } }
+        "allOf": [
+          { "if": { "properties": { "answer": { "type": "string" } } }, "then": { "properties": { "decidedAt": { "$ref": "common.schema.json#/$defs/dateTime" } } } },
+          { "if": { "required": ["status"], "properties": { "status": { "const": "answered" } } }, "then": { "properties": { "answer": { "type": "string", "minLength": 1 } } } },
+          { "if": { "required": ["status"], "properties": { "status": { "enum": ["pending", "skipped"] } } }, "then": { "properties": { "answer": { "type": "null" } } } },
+          {
+            "description": "DEC-07: a delegated answer is the recommendation, recorded as a user decision; no recommendation means skipped, never delegated.",
+            "if": { "required": ["delegation"] },
+            "then": { "required": ["status"], "properties": { "source": { "const": "user" }, "status": { "const": "answered" }, "recommendation": { "type": "string", "minLength": 1 } } }
+          }
+        ]
+      }
+    },
+    "accessibilityPrecheck": {
+      "description": "v1.4 §9.5: contrast / target-size check of the patterns and styles the plan will reuse, done before Build.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "subject", "status"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/localId" },
+          "kind": { "enum": ["text_contrast", "non_text_contrast", "target_size"] },
+          "subject": { "type": "string", "minLength": 1 },
+          "styleName": { "type": "string" },
+          "sourceNodeIds": { "$ref": "common.schema.json#/$defs/nodeIds" },
+          "foreground": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "background": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "fontSize": { "type": "number", "exclusiveMinimum": 0 },
+          "bold": { "type": "boolean" },
+          "ratio": { "type": "number", "minimum": 1 },
+          "required": { "type": "number", "minimum": 1 },
+          "status": { "enum": ["pass", "fail", "not_verified"] },
+          "baselineRef": { "$ref": "common.schema.json#/$defs/localId" },
+          "decisionRef": { "$ref": "common.schema.json#/$defs/localId" },
+          "note": { "type": "string" }
+        },
+        "additionalProperties": false,
+        "allOf": [
+          { "if": { "properties": { "status": { "const": "fail" } } }, "then": { "required": ["decisionRef"] } }
+        ]
       }
     },
     "scope": { "type": "object" },

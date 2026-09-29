@@ -112,3 +112,14 @@ test('op-header.js builds the exact header the hook parses', async () => {
   assert.deepEqual(parseOpHeader(`${line}\nreturn 1`), { runId: 'ui-20260929-001', operationId: 'rd-0003', mode: 'read' });
   assert.throws(() => figmaUiOpHeader('run', 'op', 'delete'), /mode/);
 });
+
+// M3: use_figma throws when reading findAllWithCriteria on a TEXT/leaf node (ui-20260929-001 op-0001).
+test('fingerprint.js handles direct TEXT and leaf children without touching findAllWithCriteria on them', async () => {
+  const { figmaUiFingerprint } = load({});
+  const throwing = (props) => new Proxy(node(props), { get(t, k) { if (k === 'findAllWithCriteria') throw new TypeError(`node.findAllWithCriteria: no such property on ${t.type} node`); return t[k]; } });
+  const frame = (children) => node({ id: '1:1', type: 'FRAME', name: 'collab/A', width: 200, height: 50, layoutMode: 'VERTICAL', paddingTop: 16, paddingRight: 16, paddingBottom: 16, paddingLeft: 16, itemSpacing: 0, primaryAxisAlignItems: 'MIN', counterAxisAlignItems: 'MIN', fills: [{}], children });
+  const a = await figmaUiFingerprint(frame([throwing({ id: '1:2', type: 'TEXT', characters: 'collab/A' }), throwing({ id: '1:3', type: 'RECTANGLE' })]));
+  const b = await figmaUiFingerprint(frame([throwing({ id: '1:2', type: 'TEXT', characters: 'collab/A edited' }), throwing({ id: '1:3', type: 'RECTANGLE' })]));
+  assert.match(a, /^fp1:[0-9a-f]{8}$/);
+  assert.notEqual(a, b, 'text edits in a direct TEXT child change the fingerprint');
+});

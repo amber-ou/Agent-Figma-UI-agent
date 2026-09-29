@@ -4,6 +4,11 @@
 // settings, fill count, and per child: id, type, main component key and text contents.
 // This is exactly the algorithm used in M1 (fp1:3b000d57 / fp1:38e19867 / fp1:d9899c64).
 // Changing it requires a new prefix (fp2:) — values from different versions are not comparable.
+// M3 fix (still fp1): reading findAllWithCriteria on a TEXT or other leaf node THROWS in use_figma
+// ("no such property") instead of returning undefined, so the old `c.findAllWithCriteria ? … : []`
+// guard aborted any script with a direct TEXT child (ui-20260929-001 op-0001). Children are now
+// narrowed by type; containers and instances hash exactly as before, so M1 values are unchanged.
+const FIGMA_UI_TEXT_CONTAINERS = new Set(['FRAME', 'GROUP', 'COMPONENT', 'COMPONENT_SET', 'INSTANCE', 'SECTION']);
 async function figmaUiFingerprint(node) {
   const norm = {
     v: 1,
@@ -17,7 +22,8 @@ async function figmaUiFingerprint(node) {
   };
   for (const c of ('children' in node ? node.children : [])) {
     const m = c.type === 'INSTANCE' ? await c.getMainComponentAsync() : null;
-    const txt = c.findAllWithCriteria ? c.findAllWithCriteria({ types: ['TEXT'] }).map(t => t.characters) : [];
+    const txt = c.type === 'TEXT' ? [c.characters]
+      : FIGMA_UI_TEXT_CONTAINERS.has(c.type) ? c.findAllWithCriteria({ types: ['TEXT'] }).map(t => t.characters) : [];
     norm.children.push({ id: c.id, type: c.type, mainKey: m ? m.key : null, text: txt });
   }
   const str = JSON.stringify(norm);

@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appendJsonl, readJsonl, operationStates, runDirFor } from './hooks/lib.mjs';
 import { projectRoot, nowIso } from './state-store.mjs';
-import { validateSchema, loadRun } from './validate-artifacts.mjs';
+import { validateSchema, loadRun, decisionStatus } from './validate-artifacts.mjs';
 
 const journalOf = dir => path.join(dir, 'operations.jsonl');
 
@@ -27,7 +27,8 @@ function basisProblems(dir, basisRefs) {
   const problems = [];
   for (const ref of basisRefs || []) {
     if (!known.has(ref)) problems.push(`basisRef ${ref} does not resolve`);
-    else if (dd.has(ref) && !dd.get(ref).answer) problems.push(`basisRef ${ref} is an unanswered design decision`);
+    else if (dd.has(ref) && decisionStatus(dd.get(ref)) === 'skipped') problems.push(`basisRef ${ref} is a skipped design decision; its elements are not built (DEC-08)`);
+    else if (dd.has(ref) && decisionStatus(dd.get(ref)) !== 'answered') problems.push(`basisRef ${ref} is an unanswered design decision`);
   }
   return problems;
 }
