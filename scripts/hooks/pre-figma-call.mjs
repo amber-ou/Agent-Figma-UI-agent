@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   readStdin, projectDir, stateDir, readJson, readJsonl, appendJsonl, operationStates,
-  parseOpHeader, sha256, runDirFor, nowIso, logEvent, UNRESOLVED,
+  parseOpHeader, sha256, runDirFor, nowIso, logEvent, UNRESOLVED, readScriptMutations,
 } from './lib.mjs';
 
 function deny(reason) {
@@ -64,6 +64,11 @@ try {
   if (header.mode === 'read') {
     if (op && op.mode === 'write') {
       deny(`figma-ui: read uses operationId ${header.operationId}, which belongs to a write operation (status=${op.status}); use a separate read operationId`);
+    }
+    // M4: heuristic static check (see readScriptMutations for its limits)
+    const mutations = readScriptMutations(toolInput.code);
+    if (mutations.length) {
+      deny(`figma-ui: ${header.operationId} is declared mode=read but its code can change the canvas (${mutations.join(', ')}). Read-only scripts must not create, remove, move or edit nodes, even temporarily; plan it as a write, or read the data from existing nodes/main components instead. (Heuristic check.)`);
     }
     appendJsonl(journalFile, { operationId: header.operationId, runId: active.runId, mode: 'read', status: 'dispatched', fileKey: toolInput.fileKey, toolUseId: input.tool_use_id, codeSha256: sha256(toolInput.code), timestamps: { dispatchedAt: nowIso() } });
     pass();
