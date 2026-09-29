@@ -1,8 +1,8 @@
 # 交給 Claude Code 的建置指令
 
-版本：1.4 · 修訂日期：2026-09-28 · 配套規格：FIGMA_UI_AGENT_SPEC.md v1.4
+版本：1.5 · 修訂日期：2026-09-29 · 配套規格：FIGMA_UI_AGENT_SPEC.md v1.5
 
-> **狀態：**M0–M2 與第一次真實任務已完成（見 `docs/m1-summary.md`、`docs/m2-summary.md`、`docs/m3-first-run-summary.md`）。前面的初次與 M2 指令保留作紀錄；**接下來請使用文末的「M3 建置指令」。**
+> **狀態：**M0–M3 已完成（見 `docs/m1-summary.md`、`docs/m2-summary.md`、`docs/m3-first-run-summary.md`、`docs/m3-summary.md`）。前面的指令保留作紀錄；**接下來請使用文末的「M4 建置指令」。**
 
 把本檔與 `FIGMA_UI_AGENT_SPEC.md`、`FIGMA_MCP_RESEARCH.md` 放在同一專案。直接將下方指令貼給 Claude Code；CC 應讀取檔案後開始實作，而不是只回覆建議。
 
@@ -164,3 +164,26 @@ M1 完成後，把下方兩條分隔線之間的內容貼給本機 Claude Code�
 完成時交付：檔案清單、implementationStatus／integrationStatus、測試指令與結果、T35–T37 與 PostToolUseFailure 的實測結果、未完成項目，並把總結寫進 `docs/m3-summary.md`。
 
 ---
+## M4 建置指令（v1.5）
+
+把下方兩條分隔線之間的內容貼給本機 Claude Code。
+
+---
+
+請依 `FIGMA_UI_AGENT_SPEC.md` v1.5 進行 M4「完整驗收與交付」（第 13.3、15、17 節）。先讀第 20.3 節（v1.5 變更紀錄）與 `docs/m3-summary.md`。
+
+1. **先收尾兩個待決的 run**（照我的回覆記錄，不自行決定）：`ui-20260928-001` 與 `ui-20260929-001`。
+2. **設計三組基準任務草案**，內容改用 Aiwow 電子名片 LINE OA 的產品情境，先列給我確認，不要直接開始：
+   - A：新增一個多狀態畫面（至少 default／loading／empty／error），手機尺寸加一個較窄或較寬的壓力寬度。
+   - B：既有畫面的局部改版（在 sandbox 頁複製一份既有畫面當作改版對象，不動原頁），含長文字與混合語言，不能改共享主元件。
+   - C：中斷恢復，包含一個已生效但沒收到回應的寫入，以及一處我的人工改動。
+3. 我確認後，每組任務用 `/figma-ui` 跑一次，全部只寫在 sandbox 頁。設計決策依規格詢問我；我可能會對某個 run 授權採用建議（DEC-07）。
+4. **交付文件**：`docs/runbook.md`（日常使用、帳號與權限恢復、hook 阻擋、未知結果對帳的處理步驟），以及 `docs/acceptance-results.md`（P0 必測項逐項結果，標明 offline_fixture／sandbox_integration／visual_review 層級，未測項目與原因）。
+5. **M4 期間順便補的項目**：若我提供 variables 來源 library，補驗 color variable 綁定、mode 切換與 variable import-by-key；有機會時記錄逾時或權限類的失敗事件。
+
+限制照舊：hooks 放行不得輸出 `allow`；read 用獨立 operationId；腳本存取節點屬性前先依 `node.type` 分流（INVARIANT-19）；回傳上限以位元組計；每個 run 結束釋放鎖；未驗證的推論標為假設；變更推到新分支 `feat/m4`，不要直接推 main。
+
+完成時交付：三組任務的完成判定與截圖、runbook、驗收報告、implementationStatus／integrationStatus，並把總結寫進 `docs/m4-summary.md`。
+
+---
+
