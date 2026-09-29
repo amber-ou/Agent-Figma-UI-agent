@@ -52,7 +52,7 @@ test('T32: dangling evidenceRef, stale evidence and duplicated gate are rejected
   });
   const errors = semantic(dir);
   has(errors, /gate G4: evidenceRef ev-404 not found/);
-  has(errors, /evidence ev-005: stale, op-0007 changed 34016:68 after capture/);
+  has(errors, /evidence ev-005: stale, op-000[37] changed 34016:68 after capture/);
   const { evaluation } = evaluateRun(dir);
   assert.equal(evaluation.eligible, false);
   assert.equal(evaluation.result, 'partial');

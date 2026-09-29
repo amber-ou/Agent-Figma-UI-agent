@@ -237,6 +237,13 @@
       }
     ]
   },
+  "flow": {
+    "level": "unchanged",
+    "reason": "M1 adds one two-button footer row from an existing pattern; no task flow is added or changed (v1.6 contract migration of the M1 record).",
+    "sources": [],
+    "status": "confirmed",
+    "confirmedBy": "brief"
+  },
   "decisions": [
     {
       "id": "dec-000",

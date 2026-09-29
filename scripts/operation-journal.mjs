@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appendJsonl, readJsonl, operationStates, runDirFor } from './hooks/lib.mjs';
 import { projectRoot, nowIso } from './state-store.mjs';
-import { validateSchema, loadRun, decisionStatus } from './validate-artifacts.mjs';
+import { validateSchema, loadRun, decisionStatus, validateRun } from './validate-artifacts.mjs';
 
 const journalOf = dir => path.join(dir, 'operations.jsonl');
 
@@ -39,7 +39,13 @@ export function planOperation(dir, op) {
   if (ops.has(op.operationId)) throw new Error(`operationId ${op.operationId} already exists (status ${ops.get(op.operationId).status})`);
   const record = { schemaVersion: '1.2', status: 'planned', createdNodeIds: [], mutatedNodeIds: [], evidenceRefs: [], retry: { attempt: 0, outcomeKnown: false }, ...op, timestamps: { plannedAt: nowIso(), ...(op.timestamps || {}) } };
   const errors = validateSchema('operation', record);
-  if (record.mode === 'write') errors.push(...basisProblems(dir, record.basisRefs));
+  if (record.mode === 'write') {
+    errors.push(...basisProblems(dir, record.basisRefs));
+    // v1.6 (A02): a write is only planned when the Plan/Build boundary holds (authorisation, confirmed
+    // plan and flow, answered decisions, this run's capabilities, no unresolved writes).
+    const gate = validateRun(dir, { stage: 'build' });
+    errors.push(...gate.schemaErrors.map(e => `build gate: ${e}`), ...gate.semanticErrors.map(e => (e.startsWith('build:') ? e : `build gate: ${e}`)));
+  }
   if (errors.length) throw new Error(`invalid operation ${op.operationId}: ${errors.join('; ')}`);
   appendJsonl(journalOf(dir), record);
   return record;
@@ -111,6 +117,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     let out;
     if (cmd === 'plan') out = planOperation(dir, { runId, ...arg });
+    // One independent read-back may confirm several writes of the same composition (v1.6, A05):
+    // {"operationIds":["op-0003","op-0004"],"evidenceRefs":["rd-0005"]}
+    else if (cmd === 'verify' && Array.isArray(arg.operationIds)) out = arg.operationIds.map(id => verifyOperation(dir, id, { ...arg, operationIds: undefined }));
     else if (cmd === 'verify') out = verifyOperation(dir, arg.operationId, arg);
     else if (cmd === 'cancel') out = cancelOperation(dir, arg.operationId);
     else if (cmd === 'reconcile') out = reconcileOperation(dir, arg.operationId, arg);

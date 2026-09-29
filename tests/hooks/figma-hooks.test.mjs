@@ -215,3 +215,22 @@ test('post failure log records isInterrupt, errorType and the first 500 chars of
   e = events().at(-1);
   assert.ok(!('errorHead' in e) && !('isInterrupt' in e), 'success events stay unchanged');
 });
+
+// ---- v1.6 (A06/A07): logging-only hook for every Figma tool ----
+const LOG = path.join(repo, 'scripts', 'hooks', 'log-figma-call.mjs');
+test('log hook records the session and non-write-path Figma calls (duration, category) without content, and never double-logs use_figma', () => {
+  ready();
+  const events = () => fs.readFileSync(path.join(root, '.figma-ui', 'hook-events.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
+  assert.equal(run(LOG, { hook_event_name: 'PostToolUse', tool_name: 'mcp__figma__get_screenshot', tool_use_id: 't1', session_id: 'sess-7', duration_ms: 1300, tool_input: { nodeId: '1:2' }, tool_response: [{ type: 'image', data: 'AAAA' }] }), '', 'never emits a decision');
+  const e = events().at(-1);
+  assert.deepEqual([e.toolName, e.category, e.durationMs, e.sessionId, e.activeRun], ['mcp__figma__get_screenshot', 'screenshot', 1300, 'sess-7', RUN]);
+  assert.ok(!JSON.stringify(e).includes('AAAA') && !JSON.stringify(e).includes('1:2'), 'no tool input or response content is stored');
+  const session = JSON.parse(fs.readFileSync(path.join(root, '.figma-ui', 'session.json'), 'utf8'));
+  assert.equal(session.sessionId, 'sess-7');
+  const before = events().length;
+  run(LOG, { hook_event_name: 'PostToolUse', tool_name: TOOL, tool_use_id: 't2', session_id: 'sess-7', duration_ms: 50, ...call('rd-1', 'read') });
+  assert.equal(events().length, before, 'use_figma is logged by post-figma-call.mjs only');
+  run(POST, { hook_event_name: 'PostToolUse', tool_name: TOOL, tool_use_id: 't2', session_id: 'sess-7', duration_ms: 50, tool_response: 'x // truncated to 20kb', ...call('rd-1', 'read') });
+  const p = events().at(-1);
+  assert.deepEqual([p.durationMs, p.sessionId, p.truncatedResponse], [50, 'sess-7', true]);
+});
