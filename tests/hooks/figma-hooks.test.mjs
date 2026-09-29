@@ -181,3 +181,37 @@ test('a truncated write response ("// truncated to 20kb") is recorded as unknown
   run(POST, { hook_event_name: 'PostToolUse', tool_name: TOOL, tool_use_id: 'tu', tool_response: 'xxxx// truncated to 20kb', ...call('rd-9', 'read') });
   assert.equal(latest('rd-9').status, 'applied');
 });
+
+test('T51: a truncated write response becomes unknown_outcome and blocks the next write on the file until reconciled; reads still pass', () => {
+  ready();
+  planned('op-1');
+  planned('op-2');
+  assert.equal(pre(call('op-1', 'write')).decision, 'pass');
+  run(POST, { hook_event_name: 'PostToolUse', tool_name: TOOL, tool_use_id: 'tu', tool_response: [{ type: 'text', text: '{"createdNodeIds":["1:2"... // truncated to 20kb' }], ...call('op-1', 'write') });
+  assert.equal(latest('op-1').status, 'unknown_outcome');
+  const blocked = pre(call('op-2', 'write'));
+  assert.equal(blocked.decision, 'deny');
+  assert.match(blocked.reason, /op-1=unknown_outcome; reconcile first/);
+  assert.equal(latest('op-2').status, 'planned', 'the blocked write was never dispatched');
+  assert.equal(pre(call('rd-1', 'read')).decision, 'pass', 'read-only reconciliation stays possible');
+});
+
+// ---- M3: PostToolUseFailure event log records field values, not only keys ----
+test('post failure log records isInterrupt, errorType and the first 500 chars of error', () => {
+  ready();
+  const events = () => fs.readFileSync(path.join(root, '.figma-ui', 'hook-events.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
+  run(POST, { hook_event_name: 'PostToolUseFailure', tool_name: TOOL, tool_use_id: 'tu', error: 'x'.repeat(800), is_interrupt: false, ...call('rd-1', 'read') });
+  let e = events().at(-1);
+  assert.equal(e.event, 'PostToolUseFailure');
+  assert.equal(e.isInterrupt, false);
+  assert.equal(e.errorType, 'string');
+  assert.equal(e.errorHead.length, 500);
+  run(POST, { hook_event_name: 'PostToolUseFailure', tool_name: TOOL, tool_use_id: 'tu', error: { message: 'boom' }, ...call('rd-2', 'read') });
+  e = events().at(-1);
+  assert.equal(e.isInterrupt, null);
+  assert.equal(e.errorType, 'object');
+  assert.equal(e.errorHead, '{"message":"boom"}');
+  run(POST, { hook_event_name: 'PostToolUse', tool_name: TOOL, tool_use_id: 'tu', tool_response: 'ok', ...call('rd-3', 'read') });
+  e = events().at(-1);
+  assert.ok(!('errorHead' in e) && !('isInterrupt' in e), 'success events stay unchanged');
+});

@@ -31,3 +31,32 @@
 - 每個 write operation 的 `basisRefs` 必須引用依據。`operation-journal.mjs plan` 與 validator 會拒絕無法解析或引用未回答決策的 basisRefs。
 - 未回答不代表同意。受影響的 section 不得寫入；Build／Validate 中途出現新決策 → 暫停相依寫入並詢問，不先做再問。
 - 使用者先前的決策互相衝突時（例如「要等寬」與「保留新版 icon」），不自行取捨，列出衝突與選項再問。
+
+## 決策狀態（DEC-08，v1.4）
+
+每筆 designDecision 帶 `status`：
+
+| status | answer | 可以當 write 的 basisRef？ |
+|---|---|---|
+| `pending` | `null` | 否（INVARIANT-11） |
+| `answered` | 非空字串，`decidedAt` 有值 | 是 |
+| `skipped` | `null` | 否；對應元素**不得出現在畫布上** |
+
+`pending` 或 `skipped` 的決策會讓 `evaluate-completion` 回 `awaiting_user`（G7）。舊 plan 沒有 `status` 時，由 `answer` 推定。
+
+## 授權採用建議（DEC-07，v1.4）
+
+使用者可以對某個 run 說「設計決策一律採用你的建議」（例如測試 run）。
+
+1. 把授權記進 `plan.decisions`（例如 `dec-006`：「本 run 的設計決策採用 agent 建議；沒有建議的題目略過」）。
+2. 每題仍照上面的格式產生選項與建議。
+3. 有建議的題目：
+
+   ```json
+   {"id": "dec-102", "recommendation": "check", "answer": "check", "source": "user", "status": "answered",
+    "decidedAt": "<時間>", "delegation": {"decisionRef": "dec-006", "scope": "run", "runId": "<本 run>"}}
+   ```
+
+4. **沒有建議的題目不得自己回答**：`status: "skipped"`、`answer: null`，相關元素不建立，run 結束時一次列給使用者。
+5. 授權只對這個 run 有效。`continue <run-id>` 沿用；開新 run 必須重新取得（INVARIANT-01、INVARIANT-18）。validator 會拒絕 `delegation.runId` 與 plan 不同、或 `decisionRef` 不在 `plan.decisions` 的紀錄。
+6. 硬性門檻不因授權豁免。建議若會造成 G5 對比失敗，Plan 階段就要指出（`references/design-quality.md` 的可及性預檢），不能做完才發現。

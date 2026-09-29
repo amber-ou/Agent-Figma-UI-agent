@@ -4,8 +4,8 @@
 // Usage: node scripts/evaluate-completion.mjs <runDir> [--write]
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateRun } from './validate-artifacts.mjs';
-import { atomicWriteJson } from './state-store.mjs';
+import { validateRun, validateSchema, decisionStatus } from './validate-artifacts.mjs';
+import { atomicWriteJson, nowIso } from './state-store.mjs';
 
 export const RULE_VERSION = '12.1@1.2';
 const GATES = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7'];
@@ -51,6 +51,10 @@ export function evaluateCompletion(plan, audit, ledger, now = new Date().toISOSt
   if ((ledger.pendingQuestions || []).length) flag(`pending questions: ${ledger.pendingQuestions.map(q => q.id || q).join(', ')}`, 'awaiting_user');
   const pendingOps = (ledger.pendingOperations || []).filter(o => UNRESOLVED_OPS.has(o.status));
   if (pendingOps.length) flag(`unresolved operations: ${pendingOps.map(o => `${o.operationId}=${o.status}`).join(', ')}`, 'blocked');
+  // v1.4 DEC-08: pending and skipped design decisions are unanswered (G7); skipped ones are listed to
+  // the user at the end of the run, never decided by the agent.
+  const openDecisions = (plan.designDecisions || []).map(d => [d.id, decisionStatus(d)]).filter(([, s]) => s !== 'answered');
+  if (openDecisions.length) flag(`unanswered design decisions: ${openDecisions.map(([id, s]) => `${id}=${s}`).join(', ')}`, 'awaiting_user');
 
   // 4. design tasks: no open critical/major finding affecting delivery
   if (plan.taskType !== 'audit') {
@@ -63,7 +67,10 @@ export function evaluateCompletion(plan, audit, ledger, now = new Date().toISOSt
   // 5. exceptions need decisionRef
   const exceptions = audit.acceptedExceptions || [];
   for (const e of exceptions) if (!e.decisionRef) flag(`exception ${e.id || '?'} without decisionRef`, 'partial');
+  const hardFindings = new Set((audit.findings || []).filter(f => f.gate === 'G5').map(f => f.id));
+  for (const e of exceptions) if (hardFindings.has(e.findingId)) flag(`exception ${e.id}: G5 finding ${e.findingId} is a hard gate and cannot be excepted`, 'partial');
 
+  // ledger.userAcceptance is deliberately not read here (INVARIANT-17).
   const eligible = reasons.length === 0;
   return {
     ruleVersion: RULE_VERSION,
@@ -90,9 +97,38 @@ export function evaluateRun(dir, now = new Date().toISOString()) {
   return { evaluation, run, contractErrors };
 }
 
+// §2.3: the user accepts a run that did not pass §12.1 as a test success. Only ledger.userAcceptance is
+// written; ledger.status and audit.completionEvaluation stay as evaluated (INVARIANT-17).
+export function recordUserAcceptance(dir, { decisionRef, note, now = nowIso() }) {
+  const { run } = validateRun(dir);
+  const ev = run.audit?.completionEvaluation;
+  if (!run.ledger) throw new Error('ledger.json missing');
+  if (!ev) throw new Error('run has no completionEvaluation; run evaluate-completion --write first');
+  if (ev.eligible) throw new Error(`run already evaluates to ${ev.result}; there is nothing to accept`);
+  if (run.ledger.status !== ev.result) throw new Error(`ledger.status ${run.ledger.status} differs from completionEvaluation.result ${ev.result}; re-evaluate first`);
+  const known = [...(run.plan?.decisions || []), ...(run.plan?.designDecisions || [])].some(d => d.id === decisionRef);
+  if (!known) throw new Error(`decisionRef ${decisionRef} not found in plan decisions; record the user's decision first`);
+  const ledger = { ...run.ledger, userAcceptance: { kind: 'test_run', decisionRef, note, acceptedAt: now, evaluationResult: ev.result }, updatedAt: now };
+  const errors = validateSchema('ledger', ledger);
+  if (errors.length) throw new Error(errors.join('; '));
+  atomicWriteJson(path.join(dir, 'ledger.json'), ledger);
+  return ledger.userAcceptance;
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const dir = process.argv[2];
-  if (!dir) { console.error('usage: evaluate-completion.mjs <runDir> [--write]'); process.exit(2); }
+  if (!dir) { console.error('usage: evaluate-completion.mjs <runDir> [--write] | <runDir> --accept-test-run <decisionRef> <note...>'); process.exit(2); }
+  const acceptAt = process.argv.indexOf('--accept-test-run');
+  if (acceptAt > 0) {
+    const [decisionRef, ...note] = process.argv.slice(acceptAt + 1);
+    try {
+      console.log(JSON.stringify(recordUserAcceptance(dir, { decisionRef, note: note.join(' ') }), null, 2));
+      process.exit(0);
+    } catch (err) {
+      console.error(err.message);
+      process.exit(1);
+    }
+  }
   const { evaluation, run } = evaluateRun(dir);
   if (process.argv.includes('--write') && run.audit && run.ledger) {
     run.audit.completionEvaluation = evaluation;

@@ -32,6 +32,19 @@
 
 - 同一語意的候選：依使用者指定 DS → 既有畫面使用情況 → 狀態覆蓋 → token 相容性排序；沒有明確贏家或缺 state 就問。名稱相似不能單獨決定。
 - **版本比對**：以 key 匯入會拿到 library 目前發佈的版本，既有畫面可能停在舊版。Plan 前對要用的 variant 比較新舊（子節點、icon、顏色、尺寸）。不同時在 `componentMap[].versionCheck` 記 `differs`、差異清單與 baseline 觀察，並在 plan 確認時列給使用者。
+- **從既有 instance 取得主元件（§6.2，v1.4）**：目標檔尚未接受 library 更新時，對既有 instance 呼叫 `getMainComponentAsync()` 取得主元件再建立 instance，可拿到與既有畫面相同的版本。以 key 匯入或從 instance 取得，擇一並在 componentMap 的 `reason` 寫明理由。
+- **來源 library 未識別的 remote 元件**（例如 Status Bar、Top bar）：經使用者核准（plan.decisions）後，可用上述方式重用，componentMap `source.kind: "remote_instance"`、inventory 記「來源 library 未識別」；不得重畫或 detach。
+- 同一主元件的舊 instance 可能保留舊結構或 override（第一次真實任務：舊 Button instance 只有一個 icon，新建的有兩個）。外觀差異要列給使用者，不用 override 模仿舊樣子；原因未驗證前標為假設。
+
+## 4a. 字型（§10.3，v1.4）
+
+- 收集要用到的字型（重用元件內的文字、參考畫面的 text styles），以 `figma.listAvailableFontsAsync()` 比對，寫入 `inventory.fonts`（`family`、`style`、`installed`、`usedBy`）。可用 `node scripts/quality-metrics.mjs fonts <required.json> <available.json>` 比對。
+- 未安裝：**不換字型**，也不在 `loadFontAsync` 失敗後改用其他字型。記 `inherited_baseline`（`baselineRef` 指向 `plan.baseline.observations`），在 Plan 列給使用者並記 `listedToUserRef`。只有使用者決定替換時才可填 `substitutedWith`。
+- 截圖時仍要確認沒有缺字或方框（第一次真實任務：Status Bar 的 SF Pro Text 未安裝，Figma 以替代字型顯示）。
+
+## 4b. 品牌資產（REQ-04，v1.4）
+
+參考畫面裡的其他品牌名稱或 logo 記下來，不直接複製；新畫面的產品名稱與 logo 以使用者指定為準，不確定時列為設計決策。
 
 ## 5. 版面 pattern（§6.6）
 

@@ -1,6 +1,6 @@
 # Figma UI Design Agent — Claude Code 建置規格
 
-版本：1.4 · 研究基準日：2026-09-27 · 修訂／補充查核日：2026-09-28（v1.1–v1.4） · 語言：繁體中文
+版本：1.5 · 研究基準日：2026-09-27 · 修訂／補充查核日：2026-09-28、2026-09-29（v1.1–v1.5） · 語言：繁體中文
 
 文件性質：可交付實作的產品／技術規格；不是已完成的 agent，也不是已通過實機測試的證明。
 
@@ -308,6 +308,7 @@ v1.2 起，寫入前的授權、鎖與未知結果阻擋改由第 4.5 節的 Cla
 - **「放行」的實作（v1.3，MUST）：**hook 放行時直接 `exit 0`、不輸出任何 permission decision，讓 Claude Code 照常走權限流程；只有阻擋時才輸出 `deny`。不得輸出 `permissionDecision: "allow"`：它會跳過使用者的權限確認，等同替所有 Figma 呼叫開啟 bypass。M1 第一版曾這樣實作，已修正並有 fixture 測試。
 - **read 不得覆寫 write 狀態（v1.3）：**journal 以 operationId 合併狀態，因此 read 呼叫若沿用 write 的 operationId，會把 `unknown_outcome` 覆蓋成 read 的 applied，繞過對帳。read 一律使用獨立 operationId（例如 `rd-0001`），hook 對重用者阻擋。
 - **實測（E，v1.3）：**Windows 本機上，`.claude/settings.json` 以 `node "$CLAUDE_PROJECT_DIR/scripts/hooks/*.mjs"` 設定的 hooks 對 `mcp__figma__use_figma` 觸發，新增設定後未重啟即生效，`tool_input.fileKey` 可讀；PostToolUseFailure 尚未遇到真實失敗，其 stdin 欄位名稱未驗證。
+- **PostToolUseFailure 實測（E，v1.5）：**`use_figma` 腳本 throw 時觸發。stdin 帶 `error`（字串：錯誤訊息、stack 與 Figma Debug UUID）、`is_interrupt`（實測為 false）、`duration_ms`、`mcp_server` 等欄位，**沒有 `tool_response`**。hook 必須從 `error` 讀取失敗內容；read 失敗記 `failed_known`，write 失敗記 `unknown_outcome` 並先唯讀對帳（M3 已實際發生一次 write 失敗，流程照此執行）。
 - **run 結束時必須釋放鎖並移除 `active-run.json`**（owner token 相符才刪除）。否則 hook 會持續阻擋同專案中所有未帶 op 標頭的 Figma 呼叫。
 - hooks 設定寫入專案 `.claude/settings.json`，與使用者既有設定合併，不覆寫其他 hooks。
 
@@ -325,7 +326,7 @@ v1.2 起，寫入前的授權、鎖與未知結果阻擋改由第 4.5 節的 Cla
 
 `CAP-05`（v1.2）以下 runtime 能力是本規格其他章節的前提，必須在 M1 以最小 probe 驗證並記入 capabilities，未驗證前不得當作可用：`setSharedPluginData`／`getSharedPluginData`（第 11.2、11.4 節所有權標記）、`resolveForConsumer`（第 6.3 節）、library 元件與 variable 的 import-by-key API、字型列舉與載入、截圖取得方式、單次 `use_figma` 回傳大小上限，以及 hooks 對實際 Figma 工具名稱是否觸發。
 
-**M2 量測（v1.4）：**`use_figma` 單次回傳上限為 **20,480 字元**；超過時**靜默截斷**並在結尾附上 `// truncated to 20kb`，不報錯（只量測 ASCII；中文以字元或位元組計算未驗證）。因此寫入腳本只回傳 IDs、狀態與 fingerprint；讀取分批，每批約 15,000 字元以內；看到截斷標記就視為資料不完整；PostToolUse hook 把截斷的 write 回應記為 `unknown_outcome`，必須對帳。
+**回傳上限（M2 量測 ASCII，M3 量測中文，v1.5 更正）：**`use_figma` 單次回傳上限為 **20,480 個 UTF-8 位元組**，不是字元數（v1.4 寫成「20,480 字元」有誤）。超過時**靜默截斷**並在結尾附上 `// truncated to 20kb`，不報錯；截斷可能切在多位元組字元中間，留下 `�`。中文每字 3 位元組，純中文一次約只能回傳 6,826 字（實測 6,815 字完整、6,830 字被截斷）。因此寫入腳本只回傳 IDs、狀態與 fingerprint；讀取分批，每批約 15,000 **位元組**以內（中文約 5,000 字）；看到截斷標記就視為資料不完整；PostToolUse hook 把截斷的 write 回應記為 `unknown_outcome`，必須對帳。
 
 **M1 結果（v1.3）：**verified：sharedPluginData 寫入與跨呼叫讀回、`resolveForConsumer`（既有與新節點）、`importComponentSetByKeyAsync`、字型列舉與載入、`get_screenshot`、hooks Pre／Post 觸發。not_verified：variable import-by-key、PostToolUseFailure 真實觸發、確切回傳上限（已知整頁 `get_metadata` 約 88 萬字元會超限）。詳見 `docs/m1-summary.md` 第 5 節。
 
@@ -785,6 +786,8 @@ BUILD/VALIDATE → RECONCILE → 局部修正 → VALIDATE
 
 實作必須：先讀當下 skill／typings → feature detect → helper 可用則使用 → 否則只採已查證標準 API fallback。對 layout、字型、變數 setter 做型別與值檢查。無法確認的 API 不應憑名稱猜測。
 
+**節點屬性存取（v1.5 實測，MUST）：**在 `use_figma` 裡讀取某類節點不支援的屬性會**丟例外**（例如 TEXT 節點的 `findAllWithCriteria`：`no such property`），而不是回傳 `undefined`。因此 `node.prop ? … : …` 不能當防護，必須先依 `node.type` 分流。M3 的 fingerprint 片段就因此在第一次寫入時失敗，已修正並補測試。
+
 **v1.2：**runtime API 的使用方式（字型、Auto Layout、helpers、page loading）以使用者本機已安裝的官方 Figma plugin skills（例如 `figma-use`、`figma-generate-design`）為準，`figma-ui` skill 在需要時指示載入它們，並把版本記入 capabilities。本專案不另寫一份 runtime API 教學，避免 plugin 升級後內容分歧；`references/runtime-probes.md` 只記錄本專案實測的結果、差異與決策。
 
 資料色彩範圍與 enum 必須驗證；fills／strokes 採新陣列賦值；所有 promise 等待完成。頁面內容要依 runtime 的 async page-loading 規則處理，每次操作顯式指定目標 page。這些是降低跨版本失敗的工程要求，而非假定 MCP 具備資料庫式 transaction。
@@ -818,6 +821,10 @@ BUILD/VALIDATE → RECONCILE → 局部修正 → VALIDATE
    - 使用者刪除 agent 建立的節點：不自動重建，詢問。
    - 使用者改動影響已驗證的 requiredCell：該格 evidence 失效，重驗前不得宣稱完成。
 5. **暫停與交棒。**使用者說「暫停」時，agent 完成或對帳目前的 operation 後停止寫入；恢復時先讀回 Section 範圍並對帳，再繼續。
+**M3 實測（E，v1.5）：**T35–T37 在 sandbox 頁以真實畫布驗證：使用者手動改文字、在 Section 新增方塊、刪除 agent 的 frame 之後，同一腳本內的 precondition guard 分別回傳 `user_modified`、`user_added_nodes`（同時列出缺少的 child）、`deleted`，三次都沒有修改、移動或重建，讀回與截圖確認畫布上只有使用者的改動（run `ui-20260929-001`）。
+
+**腳本中途失敗的副作用（假設）：**M3 有一次 write 腳本在建立 Section 與 frame 之後 throw，唯讀對帳時畫布沒有任何殘留，看起來 Figma 把整批變更還原了。只觀察到 1 次，**不能當成保證**；流程仍一律先唯讀對帳，確認無副作用後才記 `failed_known`（INVARIANT-16）。
+
 6. **可見狀態（P1）。**寫入期間在 Section 名稱加上狀態（例如 `figma-ui / <runId>（agent 編輯中）`），結束後移除，讓使用者在畫布上看得到 agent 正在寫哪裡。會增加寫入次數，因此列 P1。
 
 ### 11.3 操作 journal
@@ -874,7 +881,7 @@ Fingerprint 應只涵蓋本操作依賴的穩定屬性，排除時間戳或無�
 ### 11.5 未知結果與 rollback
 
 - timeout／連線中斷：畫布可能已變；先對帳再決定，不盲目重送。
-- `use_figma` 錯誤回應若含 `safeToRetryWithoutCanvasRead`：值為 `true` 時可修正錯誤後重試；值為 `false` 時先唯讀讀取畫布、確認已變更的內容，再決定下一步。欄位缺失或值無法判讀時視為未知，先讀取，不重送。來源：官方 Figma plugin 的 figma-use skill Critical Rule 14（本機 plugin 2.2.118，2026-09-28 查證；見研究紀錄第 10 節）。此欄位的實際出現與語意仍須依真實錯誤回應驗證，並把觀察到的值記入 operation 與 capabilities；未觀察到前不得當作已驗證能力。其他工具的回應若有等效欄位，同樣依實際 schema 處理。（v1.1 曾寫出此欄位名但未附出處，v1.2 一度移除，後依上述來源恢復。）
+- `use_figma` 錯誤回應若含 `safeToRetryWithoutCanvasRead`：值為 `true` 時可修正錯誤後重試；值為 `false` 時先唯讀讀取畫布、確認已變更的內容，再決定下一步。欄位缺失或值無法判讀時視為未知，先讀取，不重送。來源：官方 Figma plugin 的 figma-use skill Critical Rule 14（本機 plugin 2.2.118，2026-09-28 查證；見研究紀錄第 10 節）。此欄位的實際出現與語意仍須依真實錯誤回應驗證，並把觀察到的值記入 operation 與 capabilities；未觀察到前不得當作已驗證能力。其他工具的回應若有等效欄位，同樣依實際 schema 處理。**M3 實測（v1.5）：**3 次真實 JS 例外（含 1 次 write）的 `error` 中都沒有出現此欄位；逾時、權限類錯誤尚未測試。因此目前一律視為缺欄位：先讀畫布，不重送。（v1.1 曾寫出此欄位名但未附出處，v1.2 一度移除，後依上述來源恢復。）
 - 修改既有節點前保留必要原值；只針對可逆屬性建立補償操作。
 - 新建內容可由精確 owned IDs 回收；刪除前再驗證範圍與 ownership。
 - 高風險改版先在已授權區域建立 draft clone；驗收後再按照使用者選擇整合。
@@ -1166,12 +1173,16 @@ M1 缺權限或素材時，可繼續 M2/M3 的離線部分，但不得把未驗�
 | 項目 | 歸屬 | 說明 |
 |---|---|---|
 | gap-001 variables 來源 library | M2 前由使用者查明 | 查明並啟用後補驗顏色 token 綁定、mode 切換與 variable import-by-key |
-| 協作情境 T35–T37 | M3 | 在 sandbox 頁實測使用者同時改動 agent 節點 |
-| PostToolUseFailure 真實觸發 | M3 | 記錄實際 stdin 欄位與 `safeToRetryWithoutCanvasRead` 的出現情形 |
+| 協作情境 T35–T37 | 已完成（M3） | 三項都偵測到且未覆寫、未重建（第 11.2 節） |
+| PostToolUseFailure 真實觸發 | 已完成（M3） | 欄位見第 4.5 節；`safeToRetryWithoutCanvasRead` 未出現；逾時與權限類錯誤未測 |
 | 確切回傳上限 | M2 | 量測後寫入 capabilities，Discover 依此拆批 |
 | F-001 寬度原因 | 選配 | 推測為目前版 Active 的 icon，未以實驗證實；已依 dec-010 接受為例外 |
-| 確切回傳上限 | 已完成（M2） | 20,480 字元、靜默截斷；中文計算方式未驗證 |
-| v1.4 規則的實作 | M3 | DEC-07／08、userAcceptance、可及性預檢、字型比對、T47–T51（見 `CC_BUILD_PROMPT.md` 的 M3 指令） |
+| 確切回傳上限 | 已完成（M2、M3） | 20,480 個 UTF-8 位元組、靜默截斷（CAP-05） |
+| v1.4 規則的實作 | 已完成（M3） | DEC-07／08、userAcceptance、可及性預檢、字型比對、T47–T51；78 個離線測試 |
+| 基準任務與驗收 | M4 | 見 `CC_BUILD_PROMPT.md` 的 M4 指令 |
+| gap-001、variable import-by-key、逾時與權限類失敗事件 | M4 期間補 | 需使用者先查明 variables 來源 library |
+
+**M3（v1.5，2026-09-29）：**第一部分實作 v1.4 規則（schema、validator、skill、quality-metrics），第二部分在 sandbox 頁完成 T35–T37、PostToolUseFailure 與中文回傳上限的真實測試。詳見 `docs/m3-summary.md`。
 
 M2 以 M1 已實作的 `scripts/hooks/*`、`scripts/evaluate-completion.mjs` 與其測試為基礎擴充，不重寫；測試指令為 `node --test "tests/**/*.test.mjs"`（`node --test tests/` 在 Node 22 會失敗）。
 
@@ -1247,11 +1258,23 @@ INVARIANT-15: read operation 不得使用或覆寫 write operation 的 operation
 INVARIANT-16: 未經驗證的原因推論不得寫成 confirmed 規則或 pattern 限制。
 INVARIANT-17: 使用者接受（userAcceptance）不得改變 ledger.status 或 completionEvaluation；未通過判定的 run 不得稱為 complete。
 INVARIANT-18: 授權採用建議只在該 run 有效；沒有建議的設計決策不得由 agent 自行回答。
+INVARIANT-19: `use_figma` 腳本存取節點屬性前先依 `node.type` 分流，不以屬性是否存在當防護。
 ```
 
 這些應至少以 contract／fixture tests 驗證。prompt 可以描述規則，但程式化 validator 才能攔下可判定的違規狀態。
 
-### 20.3 v1.4 變更紀錄
+### 20.3 v1.5 變更紀錄
+
+依 M3 真實整合測試（`docs/m3-summary.md`，run `ui-20260929-001`）修訂：
+
+- CAP-05：更正回傳上限為 **20,480 個 UTF-8 位元組**（v1.4 誤寫為字元）；補中文實測與分批建議。
+- 第 4.5 節：PostToolUseFailure 的實測 stdin 欄位（`error` 字串、`is_interrupt`，沒有 `tool_response`）。
+- 第 10.4 節：節點屬性存取會丟例外，須依 `node.type` 分流；INVARIANT-19。
+- 第 11.2 節：T35–T37 真實畫布驗證結果；腳本失敗後整批還原記為假設。
+- 第 11.5 節：`safeToRetryWithoutCanvasRead` 在 3 次真實 JS 例外中都未出現。
+- 第 17 節：M3 完成，M4 待辦。
+
+### 20.4 v1.4 變更紀錄
 
 依 M2 量測與第一次真實任務（`docs/m2-summary.md`、`docs/m3-first-run-summary.md`）修訂：
 
@@ -1262,11 +1285,11 @@ INVARIANT-18: 授權採用建議只在該 run 有效；沒有建議的設計決�
 - 第 9.5 節：Plan 階段可及性預檢；參考畫面不合格不能當作合格理由。
 - 第 10.1、12.2 節：paint／text styles 視為 DS token，計入 tokenBinding。
 - 第 10.3 節：本機未安裝字型的處理。
-- CAP-05：`use_figma` 回傳上限 20,480 字元與靜默截斷的處理。
+- CAP-05：`use_figma` 回傳上限與靜默截斷的處理（當時寫成「20,480 字元」，v1.5 更正為 UTF-8 位元組）。
 - 第 13.2 節新增 T47–T51；第 17 節記錄第一次真實任務與 M3 待辦。
 - schemaVersion 維持 `1.2`；`designDecisions[].status`、`delegation` 與 `ledger.userAcceptance` 為新增的選填欄位，由 M3 實作 schema 與 validator。
 
-### 20.4 v1.3 變更紀錄
+### 20.5 v1.3 變更紀錄
 
 依 2026-09-28 使用者本機 M0–M1 實測（`docs/m1-summary.md`、研究紀錄第 10 節）修訂：
 
@@ -1283,7 +1306,7 @@ INVARIANT-18: 授權採用建議只在該 run 有效；沒有建議的設計決�
 - schemaVersion 維持 `1.2`：本版沒有改變資料契約結構，inventory pattern 的 `constraints` 為新增的選填欄位。
 - 第 11.5 節 `safeToRetryWithoutCanvasRead` 已於 PR #2 依官方 figma-use skill Rule 14 恢復，v1.3 沿用。
 
-### 20.5 v1.2 變更紀錄
+### 20.6 v1.2 變更紀錄
 
 使用者於 2026-09-28 確認：本機 Claude Code 執行、可能與 agent 同時編輯、提供 M1 測試檔與唯讀 library、設計決策一律詢問，並同意全部 v1.2 審查建議。v1.2 變更：
 
@@ -1303,7 +1326,7 @@ INVARIANT-18: 授權採用建議只在該 run 有效；沒有建議的設計決�
 
 目前尚無 1.1 artifacts；若日後出現，依下方 1.0 的同樣原則唯讀備份、驗證後遷移（補 designDecisions、basisRefs、mode、patterns，移除 audit.status），不得只改版本字串。
 
-### 20.6 v1.1 變更紀錄與遷移
+### 20.7 v1.1 變更紀錄與遷移
 
 使用者於 2026-09-28 同意全部審查建議。v1.1：統一完成判定並移除分數門檻；基線／新增／回歸分開；runtime consumer 解析優先；補無回傳 ID 與 stale lock 恢復；任務分流；手動 new／continue／resume；來源／輸出分離；提前核心 DS 規格；先做真實垂直流程；同步研究與建置指令。
 

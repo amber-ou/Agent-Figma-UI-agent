@@ -88,6 +88,31 @@
       }
     },
     "styles": { "type": "array" },
+    "fonts": {
+      "description": "v1.4 §10.3: fonts the reused components / reference screens need, compared with listAvailableFontsAsync().",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["family", "style", "installed"],
+        "properties": {
+          "family": { "type": "string", "minLength": 1 },
+          "style": { "type": "string", "minLength": 1 },
+          "installed": { "type": "boolean" },
+          "usedBy": { "type": "array", "items": { "type": "string" } },
+          "baselineRef": { "$ref": "common.schema.json#/$defs/localId" },
+          "listedToUserRef": { "$ref": "common.schema.json#/$defs/localId" },
+          "substitutedWith": {
+            "description": "Only with a user decision (listedToUserRef); the agent never substitutes a missing font on its own.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "allOf": [
+          { "if": { "properties": { "installed": { "const": false } } }, "then": { "required": ["baselineRef"] } },
+          { "if": { "required": ["substitutedWith"] }, "then": { "required": ["listedToUserRef"] } }
+        ]
+      }
+    },
     "patterns": {
       "type": "array",
       "items": {

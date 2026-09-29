@@ -29,7 +29,41 @@
       "properties": { "applicable": { "type": "integer", "minimum": 0 }, "verified": { "type": "integer", "minimum": 0 } },
       "additionalProperties": false
     },
-    "metrics": { "type": "object" },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "propertyBindings": {
+          "description": "v1.4 §10.1/§12.2: read-back token state of each property this run created or changed (input of scripts/quality-metrics.mjs).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["nodeId", "property", "binding", "origin"],
+            "properties": {
+              "nodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
+              "property": { "type": "string", "minLength": 1 },
+              "binding": { "enum": ["variable", "style", "raw"] },
+              "styleKind": { "enum": ["paint", "text", "effect", "grid"] },
+              "styleId": { "$ref": "common.schema.json#/$defs/realId" },
+              "variableId": { "$ref": "common.schema.json#/$defs/realId" },
+              "origin": { "enum": ["introduced", "inherited_baseline", "regression"] },
+              "verified": { "type": "boolean" },
+              "eligible": { "type": "boolean" },
+              "exceptionRef": { "$ref": "common.schema.json#/$defs/localId" },
+              "note": { "type": "string" }
+            },
+            "additionalProperties": false,
+            "allOf": [
+              { "if": { "properties": { "binding": { "const": "style" } } }, "then": { "required": ["styleId", "styleKind"] } },
+              { "if": { "properties": { "binding": { "const": "variable" } } }, "then": { "required": ["variableId"] } }
+            ]
+          }
+        },
+        "tokenBinding": {
+          "description": "String (older runs) or the object computed by scripts/quality-metrics.mjs.",
+          "type": ["string", "object"]
+        }
+      }
+    },
     "score": { "description": "Diagnostic only (§12.3); never part of completionEvaluation.", "type": "object" },
     "findings": {
       "type": "array",
@@ -42,6 +76,10 @@
           "subject": { "enum": ["design", "execution"] },
           "origin": { "$ref": "common.schema.json#/$defs/findingOrigin" },
           "affectsDelivery": { "type": "boolean" },
+          "gate": {
+            "description": "Gate the finding belongs to. G5 findings are hard (§9.5): never accepted as an exception.",
+            "enum": ["G1", "G2", "G3", "G4", "G5", "G6", "G7"]
+          },
           "category": { "type": "string" },
           "nodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
           "screenKey": { "type": "string" },
