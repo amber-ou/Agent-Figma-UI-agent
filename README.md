@@ -14,6 +14,8 @@
 | [docs/m2-summary.md](docs/m2-summary.md) | M2 交付、測試對應與限制 |
 | [docs/setup.md](docs/setup.md) | 安裝、帳號恢復與使用方式 |
 | [docs/use-figma-quality-research.md](docs/use-figma-quality-research.md) | `use_figma` 品質與精準度研究（建議，未實作） |
+| [docs/design-quality-research.md](docs/design-quality-research.md) | 設計品質提升研究（建議，未實作） |
+| [docs/backlog.md](docs/backlog.md) | 研究後記下、尚未排入實作的調整項目與待決定事項 |
 
 ## 安裝
 
