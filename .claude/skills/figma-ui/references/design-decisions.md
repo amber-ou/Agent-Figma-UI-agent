@@ -8,11 +8,14 @@
 
 必問範例（DEC-02，非完整清單）：漸層、陰影、插圖、背景裝飾；強調色或狀態色的位置；DS 未涵蓋的間距、圓角、字級；多個候選元件；表格或卡片、分頁或 tab 等結構取捨；長文字換行或截斷；空狀態與錯誤狀態的呈現與文案語氣；圖示；響應式時隱藏或收合什麼；修正視覺缺陷有多種合理修法；按鈕等文案。
 
-不必逐項問（DEC-03）：直接由 DS、pattern 或指示推得的操作（例如沿用既有 section 間距 variable、使用 DS 的 Primary Button）。這些在 plan 確認時一次列出摘要。
+不必逐項問（DEC-03）：直接由 DS、pattern 或指示推得的操作（例如沿用既有 section 間距 variable、使用 DS 的 Primary Button）。這些記為 `source: ds | existing_pattern | brief`、`status: answered` 的 designDecision（附 `evidenceRefs`），在 plan 確認時**一次列出摘要**，不建成待答問題，也不在 continue／resume 時重問。
 
 ## 問題格式（DEC-04）
 
-同一階段的問題集中一次問，優先在 Plan 問完。
+- 同一階段的問題集中一次問；**每輪 1–3 個實質問題**，優先在 Build 前問完會影響方向的題目。
+- **先找候選再提問**：在 DS、參考畫面與已盤點的元件中找 2–3 個候選，附節點連結；真的找不到才寫「沒有候選」並說明搜尋範圍。
+- 不預先準備固定題庫或固定輪數；只問這次真的沒被決定、而且會影響設計的事。
+- 送出一輪時記 `node scripts/run-report.mjs ask <run-id> <題數>`，收到回覆記 `answered`（量測提問成本）。
 
 ```text
 【設計決策 dec-00N】<畫面>／<元件或區塊>

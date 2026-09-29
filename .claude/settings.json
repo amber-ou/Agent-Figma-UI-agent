@@ -22,6 +22,16 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "matcher": "mcp__.*figma.*__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/log-figma-call.mjs\"",
+            "timeout": 15
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [
@@ -32,6 +42,16 @@
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/post-figma-call.mjs\"",
             "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*figma.*__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/log-figma-call.mjs\"",
+            "timeout": 15
           }
         ]
       }

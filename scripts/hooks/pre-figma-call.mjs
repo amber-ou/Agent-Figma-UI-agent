@@ -39,7 +39,7 @@ try {
 
   header = parseOpHeader(toolInput.code);
   logEvent(root, {
-    event: 'PreToolUse', toolName, toolUseId: input.tool_use_id, activeRun: active?.runId ?? null,
+    event: 'PreToolUse', toolName, toolUseId: input.tool_use_id, activeRun: active?.runId ?? null, sessionId: input.session_id ?? null,
     header, fileKey: toolInput.fileKey ?? null, codeSha256: toolInput.code ? sha256(toolInput.code) : null,
   });
 

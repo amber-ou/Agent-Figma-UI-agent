@@ -33,13 +33,18 @@ export function diagnoseAccount(whoami, { requireWrite = true, targetPlanRef = n
 
 // Build capabilities.json from facts gathered in the session. Tool statuses start as
 // available_unverified; only calls that actually succeeded become verified (CAP-02).
-export function buildCapabilities({ runId, runtime, server, account, tools = [], verifiedTools = {}, features = {}, limits = {}, unverified = [] }) {
+// v1.6 (A06): environmentDiagnosis is the (possibly reused) installation diagnosis; it is kept apart
+// from this run's own facts — account (whoami), target file access and tool calls — which are
+// checked for every run. Features carried over from earlier runs use basis=history and stay
+// available_unverified.
+export function buildCapabilities({ runId, runtime, server, account, tools = [], verifiedTools = {}, features = {}, limits = {}, unverified = [], environmentDiagnosis }) {
   return {
     schemaVersion: '1.2',
     runId,
     runtime,
     server,
     ...(account ? { account } : {}),
+    ...(environmentDiagnosis ? { environmentDiagnosis } : {}),
     tools: tools.map(name => (verifiedTools[name] ? { name, status: 'verified', evidence: verifiedTools[name] } : { name, status: 'available_unverified' })),
     features,
     limits,

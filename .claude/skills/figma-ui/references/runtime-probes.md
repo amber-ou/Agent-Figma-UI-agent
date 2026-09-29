@@ -1,6 +1,8 @@
 # Runtime probe 結果（本專案實測，不是 API 教學）
 
-API 用法以已安裝的官方 Figma skills 為準（`figma:figma-use` 等）。本檔只記錄本專案在使用者本機實測的結果、與文件的差異和我們的處理。**Claude Code 或 Figma plugin 升級後要重測**，並把新結果寫入該 run 的 `capabilities.json`。
+API 用法以已安裝的官方 Figma skills 為準（`figma:figma-use` 等）。本檔只記錄本專案在使用者本機實測的結果、與文件的差異和我們的處理。
+
+**何時重測（v1.6）：**不是每個 run 都重跑整組 probe。本 run 要用到某項能力，而且 Claude Code／Figma plugin 版本與下表不同、或該能力從未驗證過，才做最小 probe。沿用下表的結果寫進 `capabilities.json` 時標 `basis: "history"`、狀態 `available_unverified`；只有本 run 實際成功呼叫過才標 `verified`（`basis: "this_run"`）。安裝診斷是否沿用由 `verify-installation.mjs` 決定，它不能代替本 run 的帳號、檔案與工具確認。
 
 測試環境：Windows、Claude Code 2.1.283、Figma plugin `figma@synced` 2.2.118、remote MCP server `figma`（工具名 `mcp__figma__<tool>`，40 個工具）、Node 22.17.0。日期 2026-09-28；M3 整合測試 2026-09-29（run ui-20260929-001）。
 
