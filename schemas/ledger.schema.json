@@ -65,6 +65,22 @@
       },
       "additionalProperties": false
     },
+    "userAcceptance": {
+      "description": "v1.4 §2.3: the user accepted a run that did not pass §12.1 as a test success. Never changes status or completionEvaluation (INVARIANT-17).",
+      "type": "object",
+      "required": ["kind", "decisionRef", "note", "acceptedAt"],
+      "properties": {
+        "kind": { "const": "test_run" },
+        "decisionRef": { "$ref": "common.schema.json#/$defs/localId" },
+        "note": { "type": "string", "minLength": 1 },
+        "acceptedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "evaluationResult": {
+          "description": "completionEvaluation.result at the time of acceptance, kept for the record.",
+          "enum": ["complete", "complete_with_exceptions", "awaiting_user", "blocked", "partial"]
+        }
+      },
+      "additionalProperties": false
+    },
     "completionEvaluatedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
     "updatedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
   },

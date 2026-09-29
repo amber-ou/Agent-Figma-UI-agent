@@ -8,7 +8,7 @@ argument-hint: "<需求> | continue <run-id> <調整> | resume <run-id>"
 
 # /figma-ui 工作流程
 
-規範唯一來源是專案根目錄的 `FIGMA_UI_AGENT_SPEC.md`（v1.3）。本檔只列流程、階段出口與不可違反的規則；細節在 `references/`，需要時才讀。Figma runtime API（字型、Auto Layout、頁面載入、helpers）一律依已安裝的官方 skill：呼叫任何 `use_figma` 前先載入 `figma:figma-use`，組畫面時再載入 `figma:figma-generate-design`。本專案不另寫 API 教學。
+規範唯一來源是專案根目錄的 `FIGMA_UI_AGENT_SPEC.md`（v1.4）。本檔只列流程、階段出口與不可違反的規則；細節在 `references/`，需要時才讀。Figma runtime API（字型、Auto Layout、頁面載入、helpers）一律依已安裝的官方 skill：呼叫任何 `use_figma` 前先載入 `figma:figma-use`，組畫面時再載入 `figma:figma-generate-design`。本專案不另寫 API 教學。
 
 使用者的引數：`$ARGUMENTS`
 
@@ -28,13 +28,13 @@ argument-hint: "<需求> | continue <run-id> <調整> | resume <run-id>"
 |---|---|---|
 | Intake | 見第 2 節 | brief `stage=confirmed`，`openQuestions` 為空 |
 | Preflight | 見第 3 節 | `capabilities.json`；帳號 `ok`（寫入任務需目標 plan 的 Full seat） |
-| Discover | `references/discovery.md` | `inventory.json`（含 patterns、元件版本比對、variables 來源狀態）；缺口列入 `brief.gaps` |
-| Plan | screens、requiredCells、componentMap、variableMap、patternRefs、設計決策 | `plan.json` `status=confirmed`；每個被引用的 designDecision 都有 answer |
+| Discover | `references/discovery.md` | `inventory.json`（含 patterns、元件版本比對、variables 來源狀態、`fonts` 安裝比對）；缺口列入 `brief.gaps` |
+| Plan | screens、requiredCells、componentMap、variableMap、patternRefs、設計決策、**可及性預檢** | `plan.json` `status=confirmed`；被引用的 designDecision 都是 `answered`；`accessibilityPrecheck` 的 fail 都有對應設計決策；未安裝字型已列給使用者 |
 | Build | 一次一個 operation，見第 4 節 | 每個 write 都 `verified`（以讀回驗證，不以寫入回應代替） |
 | Validate | 結構、截圖實際看圖、狀態、可及性，`references/design-quality.md` | `audit.json`；evidence 在最後一次修改之後 |
-| Handoff | `references/handoff.md` | `node scripts/evaluate-completion.mjs design-runs/<run-id> --write`；`handoff.md`；**釋放鎖** |
+| Handoff | `references/handoff.md` | `node scripts/evaluate-completion.mjs design-runs/<run-id> --write`；`handoff.md`（完成判定與使用者接受分開列）；**釋放鎖** |
 
-完成與否只看 `evaluate-completion.mjs` 的結果（第 12.1 節）。不要自己判定 complete，也不要用分數代替 gates。
+完成與否只看 `evaluate-completion.mjs` 的結果（第 12.1 節）。不要自己判定 complete，也不要用分數代替 gates。使用者把未通過的 run「接受為測試成功」時，只記 `ledger.userAcceptance`（`--accept-test-run`），**不改 `ledger.status` 與 `completionEvaluation`，也不能稱為 complete**（INVARIANT-17）。
 
 ## 2. Intake（新任務必做）
 
@@ -45,6 +45,7 @@ argument-hint: "<需求> | continue <run-id> <調整> | resume <run-id>"
 3. **元件 library** 與 **variables library，分開確認**（v1.3 §6.1）：核准元件 library 不等於核准 variables。寫入 `sources.componentLibraryKeys`／`variableLibraryKeys`，兩者都要在 `approvedLibraryKeys` 內。
 4. 輸出位置與方式：新稿（`new_draft`）或改原稿（`edit_existing`）。**預設建議獨立頁面或小範圍 Section**；不要選有大量既有內容的頁面作寫入位置。
 5. 修改邊界：可以動哪些節點、不能動哪些。
+6. **品牌與產品名稱**（REQ-04，v1.4）：新畫面用的產品名稱、logo 與品牌資產以使用者指定為準。參考畫面可能混有其他品牌的名稱或 logo（第一次真實任務：Aiwow 參考畫面帶有 AileCard logo），不得直接複製，列為設計決策。
 
 開場範例（已知內容要預填）：
 
@@ -64,7 +65,8 @@ brief 確認時寫入 `stage=confirmed`、`output.writeAllowed`、`output.decisi
 
 每一個寫入都照這個順序，不可省略：
 
-1. 確認 plan 已 confirmed、依據齊全（pattern ID、已回答的 designDecision、componentMap／variableMap 項目）。
+1. 確認 plan 已 confirmed、依據齊全（pattern ID、`answered` 的 designDecision、componentMap／variableMap 項目）。`skipped` 決策不能當依據，它對應的元素不建立。
+   建立 instance 時，依 componentMap 記錄的方式取得主元件：以 key 匯入（library 目前發佈版），或從既有 instance 的 `getMainComponentAsync()` 取得（與既有畫面同版本，§6.2）；兩者擇一並在 plan 記錄理由。
 2. 第一次寫入前取得本機鎖：`node scripts/state-store.mjs activate <run-id> <output fileKey>`。鎖被別的 run 持有 → 不搶，先看該 run 的 journal 並詢問使用者。
 3. 記 planned：`node scripts/operation-journal.mjs plan <run-id> '<json>'`（含 `operationId`、`logicalKey`、`kind`、`mode:"write"`、`fileKey`、`basisRefs`、`preconditions`：父節點、既有 child IDs、預期新增數量與類型、預期 fingerprint）。
 4. 呼叫 `use_figma`：第一行是 op 標頭（`snippets/op-header.js`）。建立新根節點的同一腳本內立刻寫所有權標記（`snippets/mark-owned.js`）。修改既有 agent 節點時，腳本開頭先跑 `snippets/precondition-guard.js`；不一致就回傳 conflict、不改任何東西。腳本回傳所有 created／mutated IDs。
@@ -74,11 +76,15 @@ hook 擋下時照原因處理（補標頭、先對帳、取得授權）；**不�
 
 ## 5. 一律先問的情況
 
-- **設計決策**（`references/design-decisions.md`）：DS、已確認 pattern 或使用者指示沒有決定的外觀／層級／體驗選擇，一律以 2–3 個選項詢問，記入 `plan.designDecisions`；未回答的決策所影響的 section 不得寫入。不確定算不算設計決策時，當作是。
+- **設計決策**（`references/design-decisions.md`）：DS、已確認 pattern 或使用者指示沒有決定的外觀／層級／體驗選擇，一律以 2–3 個選項詢問，記入 `plan.designDecisions`（帶 `status`）；未回答的決策所影響的 section 不得寫入。不確定算不算設計決策時，當作是。
+- **授權採用建議**（DEC-07，v1.4）：使用者可以對**這個 run** 授權「一律採用你的建議」。仍要逐題產生選項與建議；有建議的題目 `answer`＝建議、`source: user`、`status: answered`，並加 `delegation`（指向 plan.decisions 中的授權、`scope: run`、本 run ID）。**沒有建議的題目不得自己決定**：`status: skipped`、相關元素不建立、run 結束時列給使用者。授權不延續到新 run（`continue` 同一 run 才沿用）。硬性門檻（例如 G5 對比）不因授權豁免；建議會造成 G5 失敗時，要在 Plan 階段指出。
 - 新增 token／元件、wrap、改共享主元件、替換字型、改範圍、缺權限、資產或字型不可用。
 - 發現使用者改了 agent 的節點、在 Section 內新增或刪除節點（`references/collaboration.md`）：不覆寫、不重建，回報差異並詢問。
 - 新匯入元件與既有畫面使用的版本外觀不同（v1.3 §6.2）：列給使用者、記為 `inherited_baseline`；不在目標檔接受 library 更新，也不用 override 模仿舊版，除非使用者決定。
-- variables 來源 library 未識別：記為 gap，需要顏色 token 的驗證標 `not_verified`，**不得用 raw value 冒充綁定**。
+- variables 來源 library 未識別：記為 gap，需要顏色 token 的驗證標 `not_verified`，**不得用 raw value 冒充綁定**。既有 paint／text／effect styles 屬於 DS token，可沿用並計入 tokenBinding（§10.1）；優先用參考畫面實際使用的 style，不以名稱或色值相近自行挑選。
+- **可及性預檢不合格**（§9.5，v1.4）：準備沿用的 style 對比不足時，照抄參考畫面不算合格理由。Plan 階段記入 `plan.accessibilityPrecheck`（`status: fail`），參考畫面本身記 `inherited_baseline`，並以設計決策列出替代方案（優先同系列、對比足夠的既有 style）。新畫面沿用不合格 style 是 `introduced`，G5 為 fail，**不能以例外豁免**。
+- **字型未安裝**（§10.3，v1.4）：不換字型，也不在 `loadFontAsync` 失敗後改用別的字型。記入 `inventory.fonts`（`installed: false`、`baselineRef`）並在 Plan 列給使用者（`listedToUserRef`）；截圖時仍要確認沒有缺字。
+- **品牌名稱或 logo** 與使用者指定不同（REQ-04）。
 
 沒有回覆不代表同意；可以繼續不相依的唯讀工作。
 
@@ -92,7 +98,9 @@ hook 擋下時照原因處理（補標頭、先對帳、取得授權）；**不�
 
 ## 7. 收尾
 
-Handoff 後、或使用者要求停止時：`node scripts/state-store.mjs release <run-id>`（owner token 相符才刪除鎖與 `active-run.json`）。**不釋放會讓 hook 持續阻擋本專案所有未帶 op 標頭的 Figma 呼叫。** 回報時分開列 implementation 與 integration 狀態、未驗證項與下一步。
+Handoff 後、或使用者要求停止時：`node scripts/state-store.mjs release <run-id>`（owner token 相符才刪除鎖與 `active-run.json`）。**不釋放會讓 hook 持續阻擋本專案所有未帶 op 標頭的 Figma 呼叫。** 回報時分開列 implementation 與 integration 狀態、未驗證項與下一步；有 `skipped` 的設計決策時一次列出。
+
+使用者表示「接受為測試成功」：先把使用者的決定記入 `plan.decisions`，再執行 `node scripts/evaluate-completion.mjs design-runs/<run-id> --accept-test-run <decisionRef> <說明>`。回報與 handoff 同時寫完成判定結果（例如 `awaiting_user`）與使用者接受，並列出仍開啟的 findings 與待決項目。
 
 ## 參考檔
 

@@ -1,6 +1,6 @@
 # 安裝與使用
 
-Spec v1.3 · 適用 Windows／macOS／Linux 本機 Claude Code。
+Spec v1.4 · 適用 Windows／macOS／Linux 本機 Claude Code。
 
 ## 1. 需求
 
@@ -25,7 +25,13 @@ npm install
 node scripts/verify-installation.mjs
 ```
 
-Windows PowerShell 若出現「已停用指令碼執行，無法載入 npm.ps1」，改用 `npm.cmd install`，或先執行 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`。
+### Windows PowerShell 注意事項
+
+- `npm install` 若出現「已停用指令碼執行，無法載入 npm.ps1」（PowerShell 執行原則擋下 `npm.ps1`），擇一處理：
+  - 改用 `npm.cmd install`（不改任何系統設定，建議先用這個）；之後的 npm 指令也用 `npm.cmd`，例如 `npm.cmd test`。
+  - 或執行 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`，只改目前使用者的執行原則，之後可直接用 `npm`。
+- 測試指令的 glob 要加引號：`node --test "tests/**/*.test.mjs"`。`node --test tests/` 在 Node 22 會失敗。
+- `node` 指令本身不受執行原則影響，`node scripts/*.mjs` 可直接執行。
 
 `verify-installation.mjs` 檢查 Claude Code、Figma MCP 連線、plugin 版本、專案 hooks、skill 與依賴；`problems` 為空才算完成。
 
@@ -72,4 +78,8 @@ run 結束（或暫停）一定要 `node scripts/state-store.mjs release <run-id
 | `node scripts/preflight.mjs diagnose <whoami.json> [planRef]` | 帳號與 seat 診斷 |
 | `node scripts/validate-artifacts.mjs design-runs/<run-id>` | schema＋跨檔檢查 |
 | `node scripts/evaluate-completion.mjs design-runs/<run-id> [--write]` | 唯一完成判定（§12.1） |
+| `node scripts/evaluate-completion.mjs design-runs/<run-id> --accept-test-run <decisionRef> <說明>` | 記錄使用者接受為測試成功（§2.3）；不改 status 與完成判定 |
+| `node scripts/quality-metrics.mjs token-binding design-runs/<run-id> [--write]` | tokenBinding：variable binding 與 style 套用分開統計（§12.2） |
+| `node scripts/quality-metrics.mjs contrast <#fg> <#bg> [fontSizePx] [bold]` | 可及性預檢的對比計算（§9.5） |
+| `node scripts/quality-metrics.mjs fonts <required.json> <available.json>` | 字型安裝比對（§10.3） |
 | `node --test "tests/**/*.test.mjs"` | 離線 fixture 測試 |
