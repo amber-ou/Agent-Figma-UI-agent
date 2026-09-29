@@ -1,6 +1,16 @@
-# Discover（spec §6、§8.1）
+# Discover（spec §6、§8.1，v1.6 範圍化）
 
-目標：找出本次需要的元件、variables、styles 與版面 pattern，寫入 `inventory.json`。範圍以本次需求為限，不下載整個組織 library。
+目標：找出**本次需要的**元件、variables、styles、字型與版面 pattern，寫入 `inventory.json`。只有任務本身要求時才盤點整個檔案或 library。
+
+## 0. 範圍（v1.6）
+
+- 有明確基準（使用者指定的畫面、Plan 引用的 pattern）就先用它；**不固定要找幾張參考**。基準不足或互相衝突時才擴大範圍，並說明為什麼擴大。
+- 只讀需求相關的 subtree；大型頁面先取頂層摘要，再縮小。
+- 同來源、同版本的元件屬性與版本比較做一次就好；不同 override、mode 或版本分開記，不混用。
+- 大型資料分批回傳並保留完整性標記；Discover 的讀取 helper 在 `snippets/discover-helpers.js`：
+  - `figmaUiPage(items, { cursor, maxBytes })`：依 UTF-8 位元組分頁，回傳 `complete`／`nextCursor`；單筆超過上限時標 `oversizedItem`，要縮小範圍，不採用被切掉的值。
+  - `figmaUiInstanceGroups(root, { limit })`：instance 依元件、主元件節點（版本）、variant、屬性值、override 欄位與 explicit mode 分組；掃描上限寫在結果（`limited`）。
+  - `figmaUiFontCheck(required)`：在 Figma 端只比對本次需要的字型，不回傳整份清單。
 
 ## 1. 四種資源集合（§6.1）
 
@@ -17,7 +27,7 @@
 
 1. 頁面：`use_figma` 讀 `figma.root.children`（id、name、children 數）。
 2. 參考畫面：先取頂層摘要（id、type、name、bounds），再只讀相關 frame。大型頁面不要整頁 `get_metadata`。
-3. 參考畫面中的 instances：`getMainComponentAsync()` → key、`remote`、所屬 component set key、variant 名稱；依 set key 去重。抽樣上限要寫明（M1 為前 1,500 個 instance）。
+3. 參考畫面中的 instances：`figmaUiInstanceGroups`（`getMainComponentAsync()` → key、主元件節點 id、`remote`、所屬 component set key、variant 名稱）。抽樣上限要寫明（預設 1,500）。
 4. bindings：`boundVariables` → `getVariableByIdAsync` → 名稱、key、collection（名稱、key、modes）、`remote`、scopes；用 `resolveForConsumer(node)` 取得生效值。
 5. library 檔（唯讀）：依 key 比對元件是否真的來自核准的元件 library。
 6. 未解析的項目才用 `search_design_system`，**一次一個 query**。
@@ -38,7 +48,7 @@
 
 ## 4a. 字型（§10.3，v1.4）
 
-- 收集要用到的字型（重用元件內的文字、參考畫面的 text styles），以 `figma.listAvailableFontsAsync()` 比對，寫入 `inventory.fonts`（`family`、`style`、`installed`、`usedBy`）。可用 `node scripts/quality-metrics.mjs fonts <required.json> <available.json>` 比對。
+- 收集要用到的字型（重用元件內的文字、參考畫面的 text styles），在 Figma 端用 `figmaUiFontCheck` 比對，只回傳需要的結果，寫入 `inventory.fonts`（`family`、`style`、`installed`、`usedBy`）。本機已有兩份清單時，也可以用 `node scripts/quality-metrics.mjs fonts <required.json> <available.json>`。
 - 未安裝：**不換字型**，也不在 `loadFontAsync` 失敗後改用其他字型。記 `inherited_baseline`（`baselineRef` 指向 `plan.baseline.observations`），在 Plan 列給使用者並記 `listedToUserRef`。只有使用者決定替換時才可填 `substitutedWith`。
 - 截圖時仍要確認沒有缺字或方框（第一次真實任務：Status Bar 的 SF Pro Text 未安裝，Figma 以替代字型顯示）。
 
@@ -48,7 +58,7 @@
 
 ## 5. 版面 pattern（§6.6）
 
-1. 選 2–3 個與本次需求最相近的既有畫面，請使用者確認；找不到就問，不自行挑風格差異大的畫面。
+1. 從明確基準開始（使用者指定的畫面，或與本次需求最相近、同產品同平台的既有畫面）；不足或衝突時才加入其他畫面。基準不明就問，不自行挑風格差異大的畫面。
 2. 量測：寬度、grid、外距與 section 間距（對應哪個 spacing variable）、頁首／導航、標題層級與 text styles、卡片／列表／表單／dialog 的組合、主次 action 位置、空狀態與錯誤呈現、背景與裝飾（漸層、陰影、插圖）。
 3. 每個 pattern：`id`、`sourceNodeIds`、`measured`、使用的元件／variables、`occurrences`、證據。來源畫面互相矛盾 → 列差異並詢問。
 4. **重現照抄實際做法**（例如兩顆按鈕都是 FILL 加相同內距），不要用「看起來一樣的數值」替代（例如改成固定寬度）。建好後量測並與範例比對，同時考慮元件版本差異。

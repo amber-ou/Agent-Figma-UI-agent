@@ -85,17 +85,50 @@
           "evidence": { "type": "array", "items": { "type": "string" } },
           "value": {},
           "notes": { "type": "string" },
-          "checkedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+          "checkedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+          "basis": {
+            "description": "v1.6 (A06): this_run = a call in this run succeeded; history = carried over from runtime-probes.md or an earlier run. A history result is never verified for this run.",
+            "enum": ["this_run", "history"]
+          }
         },
         "additionalProperties": false,
-        "if": { "properties": { "status": { "const": "verified" } } },
-        "then": { "required": ["evidence"], "properties": { "evidence": { "minItems": 1 } } }
+        "allOf": [
+          { "if": { "properties": { "status": { "const": "verified" } } }, "then": { "required": ["evidence"], "properties": { "evidence": { "minItems": 1 } } } },
+          { "if": { "required": ["basis"], "properties": { "basis": { "const": "history" } } }, "then": { "properties": { "status": { "not": { "const": "verified" } } } } }
+        ]
       }
+    },
+    "environmentDiagnosis": {
+      "description": "v1.6 (A06): the installation diagnosis this run relied on (verify-installation.mjs). It is separate from this run's account, file and tool checks, which are always done per run.",
+      "type": "object",
+      "required": ["mode", "checkedAt"],
+      "properties": {
+        "mode": { "enum": ["full", "reused"] },
+        "reason": { "type": "string" },
+        "checkedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "cachedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "fingerprintDigest": { "type": "string" },
+        "problems": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
     },
     "limits": {
       "type": "object",
       "properties": {
+        "useFigmaReturnBytes": {
+          "description": "v1.6: the use_figma response limit in UTF-8 bytes (20,480 measured in M2/M3).",
+          "type": "object",
+          "properties": {
+            "status": { "$ref": "common.schema.json#/$defs/capabilityStatus" },
+            "maxObservedOk": { "type": ["integer", "null"] },
+            "firstFailure": { "type": ["integer", "null"] },
+            "behaviourAboveLimit": { "type": "string" },
+            "evidence": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        },
         "useFigmaReturnChars": {
+          "description": "Deprecated (v1.4 name, kept for old capabilities files): the limit is counted in UTF-8 bytes, use useFigmaReturnBytes.",
           "type": "object",
           "properties": {
             "status": { "$ref": "common.schema.json#/$defs/capabilityStatus" },

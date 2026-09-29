@@ -1,8 +1,8 @@
 # 交給 Claude Code 的建置指令
 
-版本：1.5 · 修訂日期：2026-09-29 · 配套規格：FIGMA_UI_AGENT_SPEC.md v1.5
+版本：1.6 · 修訂日期：2026-09-29 · 配套規格：FIGMA_UI_AGENT_SPEC.md v1.6
 
-> **狀態：**M0–M3 已完成（見 `docs/m1-summary.md`、`docs/m2-summary.md`、`docs/m3-first-run-summary.md`、`docs/m3-summary.md`）。前面的指令保留作紀錄；**接下來請使用文末的「M4 建置指令」。**
+> **狀態：**M0–M3 與 v1.6 流程精簡（階段 A，離線實作，見 `docs/workflow-simplification-record.md`）已完成。前面的指令保留作紀錄；**接下來請使用文末的「M4 建置指令」**，它已改為 v1.6。
 
 把本檔與 `FIGMA_UI_AGENT_SPEC.md`、`FIGMA_MCP_RESEARCH.md` 放在同一專案。直接將下方指令貼給 Claude Code；CC 應讀取檔案後開始實作，而不是只回覆建議。
 
@@ -170,7 +170,7 @@ M1 完成後，把下方兩條分隔線之間的內容貼給本機 Claude Code�
 
 ---
 
-請依 `FIGMA_UI_AGENT_SPEC.md` v1.5 進行 M4「完整驗收與交付」（第 13.3、15、17 節）。先讀第 20.3 節（v1.5 變更紀錄）與 `docs/m3-summary.md`。
+請依 `FIGMA_UI_AGENT_SPEC.md` v1.6 進行 M4「完整驗收與交付」（第 13.3、15、17 節）。先讀第 20.3 節（v1.6 變更紀錄）、`docs/workflow-simplification-record.md` 與 `docs/m3-summary.md`。v1.6 的流程（階段式驗證、按需 flow、按需環境診斷、`run-report.mjs` 產生的 handoff 與量測）只有離線測試，M4 的三組任務同時是它的第一次真實驗證：每組任務結束後附上 `node scripts/run-report.mjs metrics <run-id>` 的結果。
 
 1. **先收尾兩個待決的 run**（照我的回覆記錄，不自行決定）：`ui-20260928-001` 與 `ui-20260929-001`。
 2. **設計三組基準任務草案**，內容改用 Aiwow 電子名片 LINE OA 的產品情境，先列給我確認，不要直接開始：

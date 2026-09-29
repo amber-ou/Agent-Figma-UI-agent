@@ -3,14 +3,15 @@
 ## resume <run-id>
 
 1. `node scripts/state-store.mjs resolve <run-id>`；不存在或多義 → 問。
-2. `node scripts/validate-artifacts.mjs design-runs/<run-id>`：記錄 schema／跨檔錯誤；有 `operations.jsonl` 截斷最後一行 → 必須對帳。
-3. `node scripts/operation-journal.mjs summary <run-id>`，依 `nextStep`：
+2. `node scripts/run-context.mjs <run-id> resume`：列出已確認（不重問）的內容、仍開放的問題與下一步。
+3. `node scripts/validate-artifacts.mjs design-runs/<run-id> --stage <目前階段>`：記錄 schema／跨檔錯誤；有 `operations.jsonl` 截斷最後一行 → 必須對帳。
+4. `node scripts/operation-journal.mjs summary <run-id>`，依 `nextStep`：
    - `reconcile`：有 `dispatched`（CC 中斷、沒有後續事件）或 `unknown_outcome` → 下面的對帳流程。**不要重送 create。**
    - `verify`：有 `applied` 未驗證 → 用 read operationId 讀回再 verify。
    - `dispatch_planned` / `none`：繼續上次未完成的階段。
-4. 讀回 ledger 的 entities（`figma.getNodeByIdAsync` 逐一檢查存在、type、parent、所有權標記與 fingerprint）。有差異依 `collaboration.md` 處理。
-5. 只重問過期或有衝突的資訊（例如檔案權限改變、使用者改了節點）；其餘沿用已確認的 brief 與 plan。
-6. 需要寫入時重新 `activate`；鎖被其他 run 持有 → 不搶，先看該 run 的 journal 再問使用者是否接手。
+5. 讀回 ledger 的 entities（`figma.getNodeByIdAsync` 逐一檢查存在、type、parent、所有權標記與 fingerprint）。有差異依 `collaboration.md` 處理。
+6. 只重問過期或有衝突的資訊（例如檔案權限改變、使用者改了節點）；其餘沿用已確認的 brief 與 plan。
+7. 需要寫入時重新 `activate`；鎖被其他 run 持有 → 不搶，先看該 run 的 journal 再問使用者是否接手。
 
 ## 未知結果對帳（§11.4）
 
@@ -19,7 +20,7 @@
 1. 從 operation 的 `preconditions` 取父節點、既有 child IDs、預期新增數量與類型、logicalKey。
 2. 唯讀讀取父節點：比對 child IDs 前後差異；在父節點範圍內找帶相同 `runId`／`operationId`／`logicalKey` 標記的節點（`snippets/mark-owned.js` 的 `figmaUiFindOwned`），再退回名稱＋類型＋結構比對。
 3. 只有候選唯一且類型、結構、內容都符合意圖時，才記 `node scripts/operation-journal.mjs reconcile <run-id> '{"operationId":…,"outcome":"applied","evidenceRefs":["rd-…"],"createdNodeIds":[…]}'`。
-4. 確定沒有副作用（父節點完全沒變、沒有帶標記的節點）才記 `failed_known`，然後建新的 attempt（新 operationId）。
+4. 確定沒有副作用（父節點完全沒變、沒有帶標記的節點）才記 `failed_known`，然後建新的 attempt（新 operationId）。M3 曾觀察到失敗腳本的變更被整批還原，但只有 1 次，是假設；不能因此跳過對帳直接重試。`failed_known` 與 `cancelled` 的 write 不需要（也不能）補 verified。
 5. 多個候選、部分建立、有協作者新增、或證據不足 → 保持 unknown，保留現況並詢問；不刪、不重建。
 
 ## `use_figma` 錯誤

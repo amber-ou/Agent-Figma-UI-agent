@@ -36,7 +36,9 @@ try {
     errorType: input.error === undefined ? 'undefined' : input.error === null ? 'null' : Array.isArray(input.error) ? 'array' : typeof input.error,
     errorHead: (typeof input.error === 'string' ? input.error : JSON.stringify(input.error ?? null)).slice(0, 500),
   } : {};
-  logEvent(root, { event, toolName: input.tool_name, toolUseId: input.tool_use_id, activeRun: active?.runId ?? null, header, inputKeys: Object.keys(input), ...failureFields });
+  // v1.6 (A07): duration and session feed the run metrics (scripts/run-report.mjs); no content is logged.
+  const truncatedResponse = event !== 'PostToolUseFailure' && /truncated to \d+\s*kb/i.test(typeof rawResult === 'string' ? rawResult : JSON.stringify(rawResult ?? null));
+  logEvent(root, { event, toolName: input.tool_name, toolUseId: input.tool_use_id, activeRun: active?.runId ?? null, sessionId: input.session_id ?? null, durationMs: input.duration_ms ?? null, header, truncatedResponse, inputKeys: Object.keys(input), ...failureFields });
 
   if (!active || !header || header.runId !== active.runId) process.exit(0);
 

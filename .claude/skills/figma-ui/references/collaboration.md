@@ -20,7 +20,7 @@
 | 使用者改了 agent 建立的節點（`user_modified`） | 視為使用者的決定：不覆寫、不還原。回報差異並問：採納（更新 plan 與 fingerprint 基準）或怎麼處理 |
 | Section 或 agent frame 內出現新節點（`user_added_nodes`） | 保留，不移動、不刪除；回報並問是否納入範圍 |
 | agent 節點被刪除（`deleted`／`user_removed_nodes`） | 不自動重建；詢問 |
-| 改動影響已驗證的 requiredCell | 該格 evidence 改 `superseded`，重驗前不能宣稱完成 |
+| 改動影響已驗證的 requiredCell | 在 ledger 該 entity 記 `userChangeDetectedAt`；該格 evidence 改 `superseded`，重驗前不能宣稱完成（validator 會把之前擷取的證據判為過期） |
 
 多個節點帶相同所有權標記（使用者複製過）→ 多義，停下來問，不挑一個刪。
 

@@ -21,7 +21,7 @@
 
 ## 視覺（G4）
 
-每完成一個 composition 或局部修正都要截圖並**實際看圖**：文字被切、重疊、缺字或方框、placeholder、對齊與層級。
+截圖以完成的 composition 或一個修正批次為單位，並**實際看圖**：文字被切、重疊、缺字或方框、placeholder、對齊與層級。高風險的版面或文字修正後立即截該局部；最後仍要覆蓋每個適用 requiredCell。不要對沒有變動的部分重複截圖。
 
 - CJK：Inter 等拉丁字型沒有中文字形，Figma 用 fallback 顯示（baseline）；仍要確認沒有缺字或方框，並檢查 `hasMissingFont`。
 - 長內容：2 倍文字長度、長英文無空白、大數字、空值、驗證錯誤等適用案例寫入 evidence。
@@ -30,16 +30,19 @@
 
 一般文字對比 ≥ 4.5:1，大字 ≥ 3:1（14px Bold 不算大字）；必要非文字 UI ≥ 3:1；pointer target ≥ 24×24（44×44 只是體驗目標）。透明色要算合成背景。鍵盤、螢幕閱讀器、zoom 屬實作層，列在 `implementationVerificationRequired`。
 
-## Evidence（§12.5）
+## Evidence（§12.5，v1.6）
 
 - 預設：`toolRef`（實際工具名、擷取時間）＋ nodeId ＋ 看圖後的審查摘要。本機 PNG 選配（`artifactRef`）。
-- 每個 requiredCell 需要「最後一次修改之後」的結構與截圖證據；有新修改時，舊證據改 `superseded`。
+- **對應到 cell**：每筆證據寫 `cellKeys`（它證明的 `plan.requiredCells[].key`）以及 `viewport`／`state`／`mode`。完成判定只看指名該 cell 的證據；同一畫面的 default 截圖不能充當 error 或另一個 viewport。一張截圖同時拍到多個狀態 frame 時，可以列多個 cellKeys。
+- **對應到版本與範圍**：`subject` 寫 `rootNodeId`、`scopeNodeIds`（composition 內的節點）、`ancestorNodeIds`（父層、設定 mode 的 frame）與 `afterOperationId`（擷取前最後一個生效的 write；沒有就 null）。
+- **失效**：之後的 write 動到範圍、子節點、父層布局或 mode（包含字型與文字修改），或 ledger 記錄了使用者改動（`userChangeDetectedAt`），證據就過期：改 `superseded` 並重讀受影響的 composition。後續 write 的目標不明、或結果未知時，validator 判定「無法確定」，同樣要重讀，不猜有效。所以 planned write 一定要寫 `scopeRootIds`。
+- **舊資料**：v1.6 前沒有 `cellKeys` 的證據，只有在該畫面剛好只有一個適用 cell 時才算數；其他情況要補新的證據，不猜配。
 - `modify` 任務先截修改前基線，完成後再截，確認範圍外沒變。
 
 ## Gates 與完成（§12.1）
 
 G1 範圍、G2 覆蓋、G6 可追溯、G7 阻礙一律 pass；G3–G5 pass 或有 plan 依據的 not_applicable。G5 的 finding 是硬性門檻，不能接受為例外；G5 不能在有 open 的 G5 finding 時標 pass。`not_verified` 不能完成，也不能改成 not_applicable。設計任務不能留有影響交付的 open critical／major finding；audit 任務可以回報任何嚴重度的受查缺陷。例外只能是非硬性，且要 decisionRef。分數只作診斷。
 
-最後一律跑 `node scripts/evaluate-completion.mjs design-runs/<run-id> --write`，它會先做 schema 與跨檔檢查。
+最後一律跑 `node scripts/evaluate-completion.mjs design-runs/<run-id> --write`：它先做完整的 schema 與跨檔檢查，再直接讀 journal（applied 未 verified、未送出也未取消的 planned、dispatched／unknown_outcome 都不能完成），最後依 §12.1 判定並記下資料摘要（`inputDigest`）。資料變了就要重跑。
 
 原因推論在實驗前一律標 `causeStatus: "hypothesis"`。M1 曾把寬度差異歸因於文字長度，改字後結果不變，推論被推翻。

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://figma-ui.local/schemas/audit.schema.json",
-  "title": "audit.json — single source of findings; no run status (spec §12, §20)",
+  "title": "audit.json — single source of findings; no run status (spec v1.6 §12, §20)",
   "type": "object",
   "required": ["schemaVersion", "runId", "taskType", "gates", "coverage", "findings", "evidence", "acceptedExceptions", "completionEvaluation"],
   "properties": {
@@ -110,8 +110,26 @@
           "kind": { "enum": ["structure", "screenshot", "contrast", "check"] },
           "nodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
           "screenKey": { "type": "string" },
+          "cellKeys": {
+            "description": "v1.6 (A03): plan.requiredCells keys this evidence covers. Matching is by cell, never by screenKey alone. Legacy evidence without cellKeys only counts when its screen has exactly one applicable cell.",
+            "$ref": "common.schema.json#/$defs/refs"
+          },
           "viewport": { "type": ["string", "null"] },
+          "state": { "type": ["string", "null"] },
           "mode": { "type": ["string", "null"] },
+          "subject": {
+            "description": "v1.6 (A03): the delivery version and scope this evidence shows. afterOperationId is the last write applied before capture (null when none); scope/ancestor ids let the validator invalidate evidence when a later write touches the composition, its parent layout or modes.",
+            "type": "object",
+            "required": ["rootNodeId", "afterOperationId"],
+            "properties": {
+              "rootNodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
+              "scopeNodeIds": { "$ref": "common.schema.json#/$defs/nodeIds" },
+              "ancestorNodeIds": { "$ref": "common.schema.json#/$defs/nodeIds" },
+              "afterOperationId": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/localId" }] },
+              "fingerprint": { "type": "string", "pattern": "^fp[0-9]+:[0-9a-f]{8}$" }
+            },
+            "additionalProperties": false
+          },
           "toolRef": {
             "oneOf": [
               { "type": "null" },
@@ -169,6 +187,11 @@
             "result": { "enum": ["complete", "complete_with_exceptions", "awaiting_user", "blocked", "partial"] },
             "coverage": { "type": "object" },
             "reasons": { "type": "array", "items": { "type": "string" } },
+            "inputDigest": {
+              "description": "v1.6 (A02): sha256 of the artifacts and journal the evaluation was computed from; a different digest means the data changed and the run must be evaluated again.",
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
             "evaluatedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
           },
           "additionalProperties": false
