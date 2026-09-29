@@ -13,6 +13,7 @@
 | [docs/m3-first-run-summary.md](docs/m3-first-run-summary.md) | 第一次真實任務總結 |
 | [docs/m2-summary.md](docs/m2-summary.md) | M2 交付、測試對應與限制 |
 | [docs/setup.md](docs/setup.md) | 安裝、帳號恢復與使用方式 |
+| [docs/storybook-research.md](docs/storybook-research.md) | Storybook 整合研究與導入提案（尚未納入規格） |
 
 ## 安裝
 
