@@ -92,7 +92,7 @@ hook 擋下時照原因處理（補標頭、先對帳、取得授權）；**不�
 
 - 頁面清單用 `use_figma` 讀 `figma.root.children`；`get_metadata` 不帶 nodeId 只會列第一頁。
 - 不對整頁呼叫 `get_metadata`（大型頁面會超過輸出上限）；先取頂層摘要，再縮小到 frame／section。
-- **`use_figma` 單次回傳上限 20,480 字元，超過會靜默截斷**（結尾出現 `// truncated to 20kb`，不報錯）。寫入腳本只回傳 IDs、狀態與 fingerprint；讀取要分批，每批約 15,000 字元以內。看到截斷標記就當作資料不完整，縮小範圍重讀（`references/runtime-probes.md`）。
+- **`use_figma` 單次回傳上限 20,480 個 UTF-8 位元組（不是字元；中文每字 3 B，約 6,800 字），超過會靜默截斷**（結尾出現 `// truncated to 20kb`，不報錯，可能切在字中間留下 `�`；M3 實測）。寫入腳本只回傳 IDs、狀態與 fingerprint；讀取要分批，每批約 15,000 位元組以內。看到截斷標記就當作資料不完整，縮小範圍重讀（`references/runtime-probes.md`）。
 - `search_design_system` 一次只送 1 個 query；library 未啟用時空結果不代表不存在。
 - library 是否已加入目標檔，以 `get_libraries` 與 runtime `teamLibrary` 兩種讀法一致為準。
 

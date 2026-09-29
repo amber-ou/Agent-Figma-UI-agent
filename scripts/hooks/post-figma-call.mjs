@@ -30,7 +30,13 @@ try {
   const rawResult = event === 'PostToolUseFailure' ? (input.error ?? input.tool_response) : input.tool_response;
   const resultText = summarize(rawResult);
 
-  logEvent(root, { event, toolName: input.tool_name, toolUseId: input.tool_use_id, activeRun: active?.runId ?? null, header, inputKeys: Object.keys(input) });
+  // M3: on failure also record the values needed to characterise real PostToolUseFailure input.
+  const failureFields = event === 'PostToolUseFailure' ? {
+    isInterrupt: input.is_interrupt ?? null,
+    errorType: input.error === undefined ? 'undefined' : input.error === null ? 'null' : Array.isArray(input.error) ? 'array' : typeof input.error,
+    errorHead: (typeof input.error === 'string' ? input.error : JSON.stringify(input.error ?? null)).slice(0, 500),
+  } : {};
+  logEvent(root, { event, toolName: input.tool_name, toolUseId: input.tool_use_id, activeRun: active?.runId ?? null, header, inputKeys: Object.keys(input), ...failureFields });
 
   if (!active || !header || header.runId !== active.runId) process.exit(0);
 

@@ -195,3 +195,23 @@ test('T51: a truncated write response becomes unknown_outcome and blocks the nex
   assert.equal(latest('op-2').status, 'planned', 'the blocked write was never dispatched');
   assert.equal(pre(call('rd-1', 'read')).decision, 'pass', 'read-only reconciliation stays possible');
 });
+
+// ---- M3: PostToolUseFailure event log records field values, not only keys ----
+test('post failure log records isInterrupt, errorType and the first 500 chars of error', () => {
+  ready();
+  const events = () => fs.readFileSync(path.join(root, '.figma-ui', 'hook-events.jsonl'), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
+  run(POST, { hook_event_name: 'PostToolUseFailure', tool_name: TOOL, tool_use_id: 'tu', error: 'x'.repeat(800), is_interrupt: false, ...call('rd-1', 'read') });
+  let e = events().at(-1);
+  assert.equal(e.event, 'PostToolUseFailure');
+  assert.equal(e.isInterrupt, false);
+  assert.equal(e.errorType, 'string');
+  assert.equal(e.errorHead.length, 500);
+  run(POST, { hook_event_name: 'PostToolUseFailure', tool_name: TOOL, tool_use_id: 'tu', error: { message: 'boom' }, ...call('rd-2', 'read') });
+  e = events().at(-1);
+  assert.equal(e.isInterrupt, null);
+  assert.equal(e.errorType, 'object');
+  assert.equal(e.errorHead, '{"message":"boom"}');
+  run(POST, { hook_event_name: 'PostToolUse', tool_name: TOOL, tool_use_id: 'tu', tool_response: 'ok', ...call('rd-3', 'read') });
+  e = events().at(-1);
+  assert.ok(!('errorHead' in e) && !('isInterrupt' in e), 'success events stay unchanged');
+});
