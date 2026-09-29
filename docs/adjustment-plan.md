@@ -2,6 +2,9 @@
 
 日期：2026-09-29 · 基準：spec v1.4 ＋ `feat/m3`（commit `b98036d`，尚未合併到 main） · 目標版本：spec **v1.5**
 
+> **已被取代（2026-09-29）：**使用者改採「UI Agent 流程精簡」任務書，已實作為 spec v1.6（`docs/workflow-simplification-record.md`）。本計畫**不執行**；其中的階段 1–4、固定三輪問答、十題政策、`spec.json` 規則引擎、以寫入回傳代替讀回等，不在 v1.6 範圍。保留作研究紀錄。
+
+
 這份文件整合三份研究的**全部調整**，確認後才執行。研究細節見：
 
 - `docs/use-figma-quality-research.md`（U-xx：`use_figma` 精準度）

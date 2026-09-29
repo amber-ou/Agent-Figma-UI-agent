@@ -2,6 +2,9 @@
 
 更新：2026-09-29（加入 S-xx 與研究問題紀錄） · 對應 spec v1.4
 
+> **v1.6 狀態（2026-09-29）：**本清單是研究提案。已實作的是 spec v1.6 流程精簡（`docs/workflow-simplification-record.md`），與本清單不同；S-01～S-07、U-04（廣泛 lint）、U-11（以寫入回傳代替讀回）、D-09 屬 v1.6 階段 C「本次不做」。其餘項目仍是未排程的提案。
+
+
 研究後**記下、尚未排入實作**的調整。全部項目的執行計畫與待確認決策整理在 `docs/adjustment-plan.md`。M3 已排定的項目（v1.4 規則、T35–T37 協作實測、PostToolUseFailure、中文回傳上限）在 `CC_BUILD_PROMPT.md` 的「M3 建置指令」，不重複列在這裡。
 
 採用某一項時：先做需要的決策 → 寫回 `FIGMA_UI_AGENT_SPEC.md`（spec 是唯一規範來源）→ 實作與測試 → 在這裡把狀態改為 `done` 並附上 commit 或文件。

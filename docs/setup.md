@@ -1,6 +1,6 @@
 # 安裝與使用
 
-Spec v1.4 · 適用 Windows／macOS／Linux 本機 Claude Code。
+Spec v1.6 · 適用 Windows／macOS／Linux 本機 Claude Code。
 
 ## 1. 需求
 
@@ -33,7 +33,7 @@ node scripts/verify-installation.mjs
 - 測試指令的 glob 要加引號：`node --test "tests/**/*.test.mjs"`。`node --test tests/` 在 Node 22 會失敗。
 - `node` 指令本身不受執行原則影響，`node scripts/*.mjs` 可直接執行。
 
-`verify-installation.mjs` 檢查 Claude Code、Figma MCP 連線、plugin 版本、專案 hooks、skill 與依賴；`problems` 為空才算完成。
+`verify-installation.mjs` 檢查 Claude Code、Figma MCP 連線、plugin 版本、專案 hooks、skill 與依賴；`problems` 為空才算完成。v1.6 起它是**按需**的：同一個 Claude Code session 裡、環境（Claude Code／Node／OS 版本、Figma plugin 與 MCP 設定、專案 settings／lockfile／skill）沒變時沿用上次的診斷（輸出 `diagnosis.mode: "reused"`），首次 session、有變更、上次有問題或紀錄損毀時完整重跑。要強制重跑加 `--force`；沒有 session id 時的沿用時間可用環境變數 `FIGMA_UI_DIAG_MAX_AGE_MIN` 調整（預設 60 分鐘）。沿用診斷不代表 run 的帳號與檔案權限已確認，這些每個 run 都會重新檢查。
 
 在 Claude Code 內執行 `/mcp` 完成 Figma OAuth（由使用者操作，不貼 token）。
 
@@ -65,7 +65,8 @@ node scripts/verify-installation.mjs
 |---|---|---|
 | `design-runs/<run-id>/` | brief、capabilities、inventory、plan、ledger、operations.jsonl、audit、handoff | 否（`.gitignore`） |
 | `.figma-ui/active-run.json`、`.figma-ui/locks/` | 目前 run 與本機寫入鎖 | 否 |
-| `.figma-ui/hook-events.jsonl` | hooks 觸發紀錄（不含程式碼內容，只有 hash） | 否 |
+| `.figma-ui/hook-events.jsonl` | hooks 觸發紀錄（不含程式碼內容，只有 hash；v1.6 另記工具類別、耗時與 session id） | 否 |
+| `.figma-ui/session.json`、`.figma-ui/diagnostics.json` | 最近一次 Figma 呼叫的 session id；上次的安裝診斷（按需沿用） | 否 |
 
 run 結束（或暫停）一定要 `node scripts/state-store.mjs release <run-id>`；否則 hooks 會持續阻擋本專案所有未帶 op 標頭的 Figma 呼叫。
 
@@ -76,8 +77,11 @@ run 結束（或暫停）一定要 `node scripts/state-store.mjs release <run-id
 | `node scripts/state-store.mjs new\|resolve\|parse\|activate\|release\|active` | run 建立、解析、鎖 |
 | `node scripts/operation-journal.mjs plan\|verify\|cancel\|reconcile\|summary <run-id> [json]` | 操作紀錄 |
 | `node scripts/preflight.mjs diagnose <whoami.json> [planRef]` | 帳號與 seat 診斷 |
-| `node scripts/validate-artifacts.mjs design-runs/<run-id>` | schema＋跨檔檢查 |
-| `node scripts/evaluate-completion.mjs design-runs/<run-id> [--write]` | 唯一完成判定（§12.1） |
+| `node scripts/run-context.mjs <run-id> new\|continue\|resume` | 這次還要問什麼、已確認什麼（不重問）、下一步 |
+| `node scripts/validate-artifacts.mjs design-runs/<run-id> [--stage intake\|plan\|build\|final]` | 階段式 schema＋跨檔檢查；不帶 `--stage` 為完整檢查 |
+| `node scripts/evaluate-completion.mjs design-runs/<run-id> [--write]` | 唯一完成判定（§12.1），Handoff 的最終入口（已含完整檢查） |
+| `node scripts/run-report.mjs phase\|ask\|answered\|metrics\|handoff <run-id> …` | 階段與提問紀錄、最低量測、由 artifacts 產生 handoff.md |
+| `node scripts/verify-installation.mjs [--force]` | 按需的安裝診斷 |
 | `node scripts/evaluate-completion.mjs design-runs/<run-id> --accept-test-run <decisionRef> <說明>` | 記錄使用者接受為測試成功（§2.3）；不改 status 與完成判定 |
 | `node scripts/quality-metrics.mjs token-binding design-runs/<run-id> [--write]` | tokenBinding：variable binding 與 style 套用分開統計（§12.2） |
 | `node scripts/quality-metrics.mjs contrast <#fg> <#bg> [fontSizePx] [bold]` | 可及性預檢的對比計算（§9.5） |

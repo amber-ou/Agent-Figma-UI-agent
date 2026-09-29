@@ -1,8 +1,8 @@
 # Figma MCP UI 設計研究紀錄
 
-版本：1.5 · 原研究日期：2026-09-27 · 補充查核／修訂：2026-09-28、2026-09-29（v1.1–v1.5）。
+版本：1.6 · 原研究日期：2026-09-27 · 補充查核／修訂：2026-09-28、2026-09-29（v1.1–v1.6）。
 
-目的：為「Claude Code 讀取指定檔案的 library／variables 並延伸 UI」提供來源與限制。規範以 FIGMA_UI_AGENT_SPEC.md v1.5 為唯一來源；本文件不另定義完成條件。
+目的：為「Claude Code 讀取指定檔案的 library／variables 並延伸 UI」提供來源與限制。規範以 FIGMA_UI_AGENT_SPEC.md v1.6 為唯一來源；本文件不另定義完成條件。
 
 ## 1. 研究方式與可信度
 
@@ -242,7 +242,7 @@ M1 在使用者授權的測試檔跑通真實垂直流程，run `ui-20260928-m1`
 
 | 觀察（E） | 來源 | 主規格處理 |
 |---|---|---|
-| `use_figma` 回傳上限 20,480 字元，超過時靜默截斷並附 `// truncated to 20kb` | M2 唯讀量測（ASCII） | CAP-05；hook 把截斷的 write 記為 unknown_outcome |
+| `use_figma` 回傳上限 20,480 個 UTF-8 位元組（M2 以 ASCII 量測時記為「字元」，M3 以中文量測更正），超過時靜默截斷並附 `// truncated to 20kb` | M2 唯讀量測（ASCII）、M3 中文量測 | CAP-05；hook 把截斷的 write 記為 unknown_outcome |
 | 參考畫面的顏色與文字多用 paint／text styles，variables 很少 | 第一次真實任務 Discover | 第 10.1、12.2 節 |
 | 參考畫面的文字 style 對比不足（3.34:1），照抄後 G5 fail | 第一次真實任務 Validate | 第 9.5 節可及性預檢 |
 | 主元件字型（SF Pro Text）本機未安裝 | 第一次真實任務 Validate | 第 10.3 節 |
@@ -262,3 +262,13 @@ M1 在使用者授權的測試檔跑通真實垂直流程，run `ui-20260928-m1`
 | 腳本 throw 後畫布沒有殘留（只觀察 1 次） | op-0001、rd-0006 | 第 11.2 節記為假設 |
 | T35–T37：guard 偵測到使用者改動、新增、刪除，皆未覆寫或重建 | op-0003～op-0005、rd-0008、截圖 | 第 11.2 節 |
 
+## 14. v1.6 決策紀錄（流程精簡，2026-09-29）
+
+v1.6 是流程優化，依使用者接受的評估與任務書修訂，**沒有新的真實 Figma 量測**。相關外部觀察：
+
+| 觀察 | 分級 | 主規格處理 |
+|---|---|---|
+| 官方 figma-use skill 2.2.123（`figma/mcp-server-guide` commit `38308b7`）的 Rule 5 改為「依可安全重試決定批次，寫入回傳的 IDs／數量／bounds 即算結構驗證，組合後截一張圖、修正後再一張」；本機仍是 2.2.118 | D（官方 skill 內容）；本機未升級 | 採用批次與截圖節奏（第 8.3 節），但**保留每次寫入後的獨立讀回**：本專案有協作衝突與 unknown_outcome 對帳需求，本次任務書也明定不以寫入回傳代替驗證 |
+| 研究時檢視的 LLM 設計評論與提問相關研究（`docs/design-quality-research.md`、`docs/extension-spec-research.md`）只讀到搜尋摘要 | U | 不作為規範數據；v1.6 只採用「先找候選、每輪 1–3 題、按需 flow」這類流程規則 |
+
+v1.6 新增的診斷沿用、量測與 handoff 產生只有離線測試（offline_fixture）；第一次真實驗證排在 M4。

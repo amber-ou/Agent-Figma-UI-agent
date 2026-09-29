@@ -1,6 +1,6 @@
 # Agent-Figma-UI-agent
 
-在 Claude Code 中透過官方 Figma MCP 讀取既有 library／components／variables，直接在 Figma 繪製與延伸原生 UI 的 agent。目前規格為 v1.5；M0–M3 已完成（含第一次真實任務與協作情境的真實測試）。下一步為 M4（三組基準任務、runbook 與驗收報告），指令見 `CC_BUILD_PROMPT.md` 文末。
+在 Claude Code 中透過官方 Figma MCP 讀取既有 library／components／variables，直接在 Figma 繪製與延伸原生 UI 的 agent。目前規格為 v1.6；M0–M3 已完成（含第一次真實任務與協作情境的真實測試），v1.6 流程精簡已完成離線實作（見 `docs/workflow-simplification-record.md`）。下一步為 M4（三組基準任務、runbook 與驗收報告，同時是 v1.6 流程的第一次真實驗證），指令見 `CC_BUILD_PROMPT.md` 文末。
 
 啟動：在 Claude Code 輸入 `/figma-ui <需求>`；續改 `/figma-ui continue <run-id> <調整>`；恢復 `/figma-ui resume <run-id>`。詳見 [docs/setup.md](docs/setup.md)。
 
@@ -8,16 +8,19 @@
 |---|---|
 | [FIGMA_UI_AGENT_SPEC.md](FIGMA_UI_AGENT_SPEC.md) | 主規格：功能、架構、行為契約與驗收（唯一規範來源） |
 | [FIGMA_MCP_RESEARCH.md](FIGMA_MCP_RESEARCH.md) | 研究紀錄：來源、能力差異、未驗證事項 |
-| [CC_BUILD_PROMPT.md](CC_BUILD_PROMPT.md) | 交給 Claude Code 的建置指令（含 M2 指令） |
+| [CC_BUILD_PROMPT.md](CC_BUILD_PROMPT.md) | 交給 Claude Code 的建置指令（文末為 M4 指令） |
+| [docs/workflow-simplification-record.md](docs/workflow-simplification-record.md) | v1.6 流程精簡的實作紀錄（A01–A07） |
+| [docs/qa-integration-contract.md](docs/qa-integration-contract.md) | Design QA agent 接入契約與就緒條件（階段 B，未就緒） |
+| [docs/m3-summary.md](docs/m3-summary.md) | M3 總結：v1.4 規則與真實整合 |
 | [docs/m1-summary.md](docs/m1-summary.md) | M1 實測總結 |
 | [docs/m3-first-run-summary.md](docs/m3-first-run-summary.md) | 第一次真實任務總結 |
 | [docs/m2-summary.md](docs/m2-summary.md) | M2 交付、測試對應與限制 |
 | [docs/setup.md](docs/setup.md) | 安裝、帳號恢復與使用方式 |
-| [docs/use-figma-quality-research.md](docs/use-figma-quality-research.md) | `use_figma` 品質與精準度研究（建議，未實作） |
-| [docs/design-quality-research.md](docs/design-quality-research.md) | 設計品質提升研究（建議，未實作） |
-| [docs/extension-spec-research.md](docs/extension-spec-research.md) | 延伸既有畫面時，要從檔案抽哪些規格、問哪些問題（建議，未實作） |
-| [docs/adjustment-plan.md](docs/adjustment-plan.md) | 整合所有研究的調整計畫與待確認決策（確認後才執行） |
-| [docs/backlog.md](docs/backlog.md) | 研究後記下、尚未排入實作的調整項目與待決定事項 |
+| [docs/use-figma-quality-research.md](docs/use-figma-quality-research.md) | `use_figma` 品質與精準度研究（歷史研究提案） |
+| [docs/design-quality-research.md](docs/design-quality-research.md) | 設計品質提升研究（歷史研究提案） |
+| [docs/extension-spec-research.md](docs/extension-spec-research.md) | 延伸規格表研究（歷史研究提案；部分被 v1.6 取代） |
+| [docs/adjustment-plan.md](docs/adjustment-plan.md) | 研究提案的調整計畫（已被 v1.6 任務書取代，不執行） |
+| [docs/backlog.md](docs/backlog.md) | 研究提案的待辦紀錄（已依 v1.6 標注狀態） |
 
 ## 安裝
 
