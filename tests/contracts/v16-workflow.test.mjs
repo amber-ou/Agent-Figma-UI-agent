@@ -264,3 +264,24 @@ test('A04: new / continue / resume ask different things; nothing is re-asked onc
   assert.match(r.next[0], /reconcile unresolved writes read-only/);
   assert.deepEqual(r.ask, []);
 });
+
+// M4: first write of a new run probes nativeWrite (found in the first real v1.6 run, ui-20260929-002)
+test('M4: only the first write of a run may probe nativeWrite, and only with basis "history"', () => {
+  const fresh = (nativeWrite) => {
+    const dir = copyM1({
+      capabilities: c => { c.features.nativeWrite = nativeWrite; },
+      ledger: l => { l.entities = []; l.lastVerifiedOperationId = null; },
+    });
+    fs.writeFileSync(path.join(dir, 'operations.jsonl'), '');
+    return dir;
+  };
+  // history basis, no write yet → the first write can be planned
+  const ok = fresh({ status: 'available_unverified', basis: 'history' });
+  assert.equal(planOperation(ok, write('op-0100')).status, 'planned');
+  // once a write has been dispatched, nativeWrite must be verified in this run
+  appendOp(ok, { operationId: 'op-0100', status: 'dispatched', mode: 'write' });
+  assert.throws(() => planOperation(ok, write('op-0101')), /nativeWrite must be verified/);
+  // without a history basis there is nothing to probe from
+  assert.throws(() => planOperation(fresh({ status: 'available_unverified' }), write('op-0100')), /nativeWrite must be verified/);
+  assert.throws(() => planOperation(fresh({ status: 'unknown', basis: 'history' }), write('op-0100')), /nativeWrite must be verified/);
+});

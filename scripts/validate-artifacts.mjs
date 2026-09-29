@@ -445,8 +445,7 @@ export function validateRunSemantics(run, { stage = 'final' } = {}) {
 
   // capabilities: unknown cannot be a write precondition
   if (capabilities && brief?.output?.writeAllowed) {
-    const write = capabilities.features?.nativeWrite;
-    if (!write || write.status !== 'verified') errors.push('capabilities.features.nativeWrite must be verified before writes are allowed');
+    if (!nativeWriteReady(run)) errors.push('capabilities.features.nativeWrite must be verified before writes are allowed (only the first write of a run may probe it, with basis "history")');
     if (capabilities.account && capabilities.account.status !== 'ok') errors.push('capabilities.account is blocked; writes are not allowed (§4.2.1)');
   }
 
@@ -454,6 +453,17 @@ export function validateRunSemantics(run, { stage = 'final' } = {}) {
   if (stage === 'build') errors.push(...buildReadiness(run, { isDecision }));
 
   return { errors, deferred };
+}
+
+// M4: a new run cannot verify nativeWrite before its first write, yet the Build boundary blocked that
+// first write. The first write of a run may therefore act as the probe, but only when nativeWrite is
+// available_unverified with basis "history" (verified in an earlier run) and this run has not dispatched
+// any write yet. Once a write exists, nativeWrite must be verified in this run.
+export function nativeWriteReady(run) {
+  const w = run?.capabilities?.features?.nativeWrite;
+  if (w?.status === 'verified') return true;
+  const anyWrite = (run?.operations || []).some(o => o.mode === 'write' && !['planned', 'cancelled'].includes(o.status));
+  return !anyWrite && w?.status === 'available_unverified' && w?.basis === 'history';
 }
 
 export function buildReadiness(run, { isDecision } = {}) {
@@ -483,7 +493,7 @@ export function buildReadiness(run, { isDecision } = {}) {
   }
   if (!capabilities) errors.push('build: capabilities.json is required');
   else {
-    if (capabilities.features?.nativeWrite?.status !== 'verified') errors.push('build: capabilities.features.nativeWrite must be verified in this run');
+    if (!nativeWriteReady(run)) errors.push('build: capabilities.features.nativeWrite must be verified in this run (only the first write may probe it, with basis "history")');
     if (!capabilities.account || capabilities.account.status !== 'ok') errors.push('build: capabilities.account must be ok for this run (§4.2.1)');
   }
   if (run.journalTruncated) errors.push('build: operations.jsonl has a truncated last line; reconcile first');
