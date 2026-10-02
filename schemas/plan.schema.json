@@ -594,16 +594,86 @@
             "$ref": "common.schema.json#/$defs/policyRef"
           },
           "confirmation": {
-            "description": "v1.7 DEC-09: how the user confirmed a prefilled list row",
+            "$ref": "common.schema.json#/$defs/rowConfirmation"
+          },
+          "skippedBy": {
+            "description": "v1.8 DEC-08: who marked the decision skipped. user = the user saw the row and chose to skip it (resolved, INVARIANT-28); agent = marked before the user saw it (still open). Absent on a skipped decision means agent (records before v1.8).",
             "enum": [
-              "prefilled_confirmed",
-              "user_modified",
-              "user_filled"
+              "user",
+              "agent"
             ]
           }
         },
         "additionalProperties": false,
         "allOf": [
+          {
+            "description": "v1.8 DEC-08: skippedBy only on skipped decisions",
+            "if": {
+              "required": [
+                "skippedBy"
+              ]
+            },
+            "then": {
+              "required": [
+                "status"
+              ],
+              "properties": {
+                "status": {
+                  "const": "skipped"
+                }
+              }
+            }
+          },
+          {
+            "description": "v1.8 DEC-09: user_skipped is the user's explicit skip (skippedBy user)",
+            "if": {
+              "required": [
+                "confirmation"
+              ],
+              "properties": {
+                "confirmation": {
+                  "const": "user_skipped"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "status",
+                "skippedBy"
+              ],
+              "properties": {
+                "status": {
+                  "const": "skipped"
+                },
+                "skippedBy": {
+                  "const": "user"
+                }
+              }
+            }
+          },
+          {
+            "description": "v1.8: a user skip is recorded with confirmation user_skipped",
+            "if": {
+              "required": [
+                "skippedBy"
+              ],
+              "properties": {
+                "skippedBy": {
+                  "const": "user"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "confirmation"
+              ],
+              "properties": {
+                "confirmation": {
+                  "const": "user_skipped"
+                }
+              }
+            }
+          },
           {
             "if": {
               "properties": {
@@ -706,6 +776,67 @@
             }
           }
         ]
+      }
+    },
+    "undefinedBehaviors": {
+      "description": "v1.8 DEC-11: dynamic behaviour that does not change the static screen (timing, dismissal, animation, transition, gesture). Never asked and never a designDecision; listed in the handoff as \"未定義，交由實作決定\".",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "behavior"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "behavior": {
+            "type": "string",
+            "minLength": 1,
+            "description": "what the implementation has to decide, e.g. how long the toast stays"
+          },
+          "kind": {
+            "enum": [
+              "timing",
+              "dismissal",
+              "animation",
+              "transition",
+              "gesture",
+              "other"
+            ]
+          },
+          "screenKey": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "excludedSkillsLoaded": {
+      "description": "v1.8 §4.7: an excluded skill that was loaded anyway (e.g. auto-loaded because the task mentions Figma). Its conflicting content is not adopted; the handoff lists it.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "skill",
+          "notAdopted"
+        ],
+        "properties": {
+          "skill": {
+            "type": "string",
+            "minLength": 1
+          },
+          "notAdopted": {
+            "type": "string",
+            "minLength": 1,
+            "description": "what was not adopted and why"
+          }
+        },
+        "additionalProperties": false
       }
     },
     "accessibilityPrecheck": {
@@ -1126,6 +1257,10 @@
           "runOnly": {
             "description": "v1.7 §4.6: a setting valid for this run only (test-round rule, DEC-07 delegation); never suggested or written as a product policy",
             "type": "boolean"
+          },
+          "confirmation": {
+            "description": "v1.8 DEC-09: scope and authorisation rows of the prefilled list (product, platform, library, output, boundary, plan confirmation) record how the user confirmed them, like design decisions",
+            "$ref": "common.schema.json#/$defs/rowConfirmation"
           },
           "policySuggestion": {
             "description": "v1.7 POL-05: a user preference that may apply to the whole product; listed in the handoff, written only if the user ticks it",

@@ -53,12 +53,35 @@ export function decisionStatus(d) {
   return d.status || (typeof d.answer === 'string' && d.answer ? 'answered' : 'pending');
 }
 
+// v1.8 INVARIANT-28: a decision is resolved when answered, or skipped by the user who saw the row.
+// A skip the agent recorded (or a skip without skippedBy, written before v1.8) is still open.
+export function decisionResolved(d) {
+  const st = decisionStatus(d);
+  return st === 'answered' || (st === 'skipped' && d.skippedBy === 'user');
+}
+
+// v1.8 (§20): the shapes real runs got wrong, with the correct format in the message, so a run does
+// not have to guess field by field. Matched on contract + instance path + keyword.
+const SHAPE_HINTS = [
+  { name: 'brief', path: /^\/viewports\/\d+$/, hint: 'each viewport is an object, e.g. {"name":"mobile","width":390,"height":844}' },
+  { name: 'capabilities', path: /^\/limits\/[A-Za-z]+$/, keyword: 'type', hint: 'limits.useFigmaReturnBytes / useFigmaReturnChars / getMetadataWholePage are objects, e.g. {"status":"verified","maxObservedOk":20480,"firstFailure":null,"evidence":["rd-0001"]}; searchDesignSystemQueriesPerCall is an integer or null' },
+  { name: 'capabilities', path: /^\/environmentDiagnosis$/, keyword: 'additionalProperties', hint: 'environmentDiagnosis takes mode, reason, checkedAt, cachedAt, fingerprintDigest, problems, note (copy the "diagnosis" block of verify-installation.mjs)' },
+  { name: 'audit', path: /^\/evidence\/\d+\/toolRef$/, keyword: 'additionalProperties', hint: 'toolRef is {"tool":"mcp__figma__use_figma","operation":"rd-0006","capturedAt":"<ISO time>"}; put the read operationId in "operation" (there is no readOperationId)' },
+];
+
+function shapeHint(name, e) {
+  const h = SHAPE_HINTS.find(x => x.name === name && x.path.test(e.instancePath || '') && (!x.keyword || x.keyword === e.keyword));
+  return h ? ` — hint: ${h.hint}` : '';
+}
+
+export const SKELETON_HINT = 'for a schema-valid starting point run: node scripts/artifact-skeleton.mjs <contract> <run-id>';
+
 // ---- syntax: one document against one schema ----
 export function validateSchema(name, doc) {
   const validate = getAjv().getSchema(schemaId(name));
   if (!validate) throw new Error(`unknown schema ${name}`);
   const ok = validate(doc);
-  return ok ? [] : validate.errors.map(e => `${name}${e.instancePath || ''} ${e.message}${e.params && e.params.allowedValues ? ` (${e.params.allowedValues.join('|')})` : ''}${e.params && e.params.additionalProperty ? ` (${e.params.additionalProperty})` : ''}`);
+  return ok ? [] : validate.errors.map(e => `${name}${e.instancePath || ''} ${e.message}${e.params && e.params.allowedValues ? ` (${e.params.allowedValues.join('|')})` : ''}${e.params && e.params.additionalProperty ? ` (${e.params.additionalProperty})` : ''}${shapeHint(name, e)}`);
 }
 
 export function loadRun(dir, { root } = {}) {
@@ -212,6 +235,7 @@ export function validateRunSemantics(run, { stage = 'final' } = {}) {
     dup((plan.requiredCells || []).map(c => c.key), 'requiredCell');
     dup((plan.componentMap || []).map(c => c.id), 'componentMap');
     dup((plan.variableMap || []).map(c => c.id), 'variableMap');
+    dup((plan.undefinedBehaviors || []).map(u => u.id), 'undefinedBehavior');
   }
   if (inventory) dup((inventory.patterns || []).map(p => p.id), 'pattern');
   if (audit) {
@@ -586,6 +610,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const dir = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--stage');
   if (!dir || !STAGES.includes(stage)) { console.error(`usage: validate-artifacts.mjs <runDir> [--stage ${STAGES.join('|')}]  (default final = every check)`); process.exit(2); }
   const { ok, schemaErrors, semanticErrors, deferred, notices } = validateRun(dir, { stage });
-  console.log(JSON.stringify({ ok, stage, schemaErrors, semanticErrors, deferred, notices }, null, 2));
+  console.log(JSON.stringify({ ok, stage, schemaErrors, semanticErrors, deferred, notices, ...(schemaErrors.length ? { hint: SKELETON_HINT } : {}) }, null, 2));
   process.exit(ok ? 0 : 1);
 }

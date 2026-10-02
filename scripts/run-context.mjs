@@ -6,12 +6,13 @@
 // Usage: node scripts/run-context.mjs <run-id> [new|continue|resume]
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadRun, decisionStatus } from './validate-artifacts.mjs';
+import { loadRun, decisionStatus, decisionResolved } from './validate-artifacts.mjs';
 import { journalSummary } from './operation-journal.mjs';
-import { projectRoot, runDirFor } from './state-store.mjs';
+import { projectRoot, runDirFor, readJson } from './state-store.mjs';
+import { stateDir } from './hooks/lib.mjs';
 import { loadPolicy, loadLocal, appliedPolicies, contrastPolicy } from './product-policy.mjs';
 
-export function runContext(dir, mode = 'continue', { root } = {}) {
+export function runContext(dir, mode = 'continue', { root, pluginVersion } = {}) {
   if (!['new', 'continue', 'resume'].includes(mode)) throw new Error(`unknown mode ${mode}`);
   const run = loadRun(dir, { root });
   const { brief, plan, ledger } = run;
@@ -31,6 +32,7 @@ export function runContext(dir, mode = 'continue', { root } = {}) {
       const st = decisionStatus(d);
       if (d.source === 'product_policy') continue; // listed under applied, never asked (POL-03)
       if (st === 'answered') confirmed.push(`${d.id} (${d.source})`);
+      else if (decisionResolved(d)) confirmed.push(`${d.id} (skipped by the user)`); // v1.8 INVARIANT-28
       else ask.push({ kind: 'design_decision', item: d.id, status: st, question: d.question });
     }
     const flow = plan.flow;
@@ -73,6 +75,24 @@ export function runContext(dir, mode = 'continue', { root } = {}) {
   }
   for (const d of plan?.designDecisions || []) if (d.source === 'product_policy') applied.push(`${d.id} ← ${d.policyRef}`);
   ask.unshift(...first);
+
+  // v1.8 §4.2.2: an outdated Figma plugin is asked at the very top of the Intake list, every run (the
+  // answer is brief.pluginVersionChoice, valid for this run only). latest unknown → one notice line.
+  const pv = pluginVersion ?? run.capabilities?.server?.pluginVersion ?? readJson(path.join(stateDir(policyRoot), 'diagnostics.json'))?.report?.pluginVersion ?? null;
+  if (!pv) notices.push('Figma plugin version not checked yet: run node scripts/verify-installation.mjs (§4.2.2)');
+  else if (pv.status === 'latest_unknown') notices.push(`無法確認 Figma plugin 是否為最新版（本機 ${pv.installed}）；不擋 run`);
+  else if (pv.status === 'outdated') {
+    const choice = brief?.pluginVersionChoice;
+    if (choice && choice.installed === pv.installed && choice.latest === pv.latest) confirmed.push(`Figma plugin version: ${choice.choice} (${choice.installed} < ${choice.latest}, this run only)`);
+    else ask.unshift({
+      kind: 'plugin_version', item: 'Figma plugin version (§4.2.2)', label: '只限本 run', installed: pv.installed, latest: pv.latest, synced: pv.synced,
+      question: pv.synced
+        ? `Figma plugin 本機 ${pv.installed}，官方最新 ${pv.latest}。這份 plugin 由 claude.ai 帳號同步（@synced），本機不一定能自行升級。要等帳號同步更新，還是這次照舊版跑？（只限本 run，下次 run 會再問）`
+        : `Figma plugin 本機 ${pv.installed}，官方最新 ${pv.latest}。要先升級，還是這次照舊版跑？（只限本 run，下次 run 會再問）`,
+      options: pv.synced ? ['wait_for_sync（等帳號同步更新）', 'use_current（這次照舊版跑）'] : ['upgrade_first（先升級）', 'use_current（這次照舊版跑）'],
+      recordAs: 'brief.pluginVersionChoice',
+    });
+  }
 
   const journal = journalSummary(dir);
   const next = [];

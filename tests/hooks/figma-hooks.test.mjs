@@ -47,6 +47,8 @@ function activate() {
   writeJson(path.join(root, '.figma-ui', 'active-run.json'), { runId: RUN, ownerToken: 'tok' });
   fs.mkdirSync(runDir(), { recursive: true });
   fs.writeFileSync(journal(), '');
+  // v1.8 §4.2.3: Preflight records the connection the run uses; writes need it
+  writeJson(path.join(runDir(), 'capabilities.json'), { server: { toolPrefix: 'mcp__figma__' } });
 }
 function confirmBrief() {
   writeJson(path.join(runDir(), 'brief.json'), { stage: 'confirmed', output: { fileKey: OUT_KEY, writeAllowed: true, decisionRef: 'dec-000' } });

@@ -1,4 +1,4 @@
-# Handoff（spec v1.7 §2.3、§7.5、§15）
+# Handoff（spec v1.8 §2.3、§7.5、§15）
 
 ## 順序
 
@@ -16,13 +16,16 @@
 主文只有：
 
 1. **完成判定**（與 evaluator 一致）與使用者接受（若有，註明「接受為測試成功不等於 complete」）。
-2. **Figma 連結**：輸出檔案與本 run 建立或修改的主要節點。
+2. **Figma 連結**：輸出檔案與本 run 建立或修改的主要節點（v1.8：`ledger.entities` 由 verify 自動寫入；另列 journal 中已驗證 write 建立與修改的節點數）。
 3. **交付範圍**：畫面，以及每個 requiredCell（viewport · state · mode）對應的證據；缺的標「缺」。
 4. **必要互動與狀態**：flow 程度、步驟、分支、結束方式與目的地。
 5. **驗證結果**：覆蓋率、gates、tokenBinding、findings 與已接受例外；註明 Design QA 尚未接入，驗證由 UI agent 完成。
 6. **產品政策**（v1.7，第 11 項）：本 run 套用的產品政策；依產品政策未檢查對比時註明（實作端要知道這項沒有驗證）；政策建議清單，沒有時寫「無」。只限本次的設定（測試回合規則、DEC-07 授權）不列入。
-7. **待決與未驗證**：待答問題、未回答或 skipped 的設計決策、flow 待確認、open findings、fail／not_verified 的 gates、判定原因、實作層待驗項目。精簡不能讓這些消失。
-8. **下一步**。
+7. **未定義，交由實作決定**（v1.8，第 12 項）：`plan.undefinedBehaviors` 的動態行為（DEC-11，未提問），以及使用者明確略過（`skippedBy: user`）的決策與其影響（相關元素未建立）。沒有時寫「無」。
+8. **待決與未驗證**：待答問題、未回答或 `skippedBy: agent` 的設計決策、flow 待確認、open findings、fail／not_verified 的 gates、判定原因、實作層待驗項目，以及被載入但未採用的排除 skill（§4.7）。精簡不能讓這些消失。
+9. **下一步**。
+
+交接內容用繁體中文（ASK-08）；技術名詞、ID 與指令保留原文。
 
 之後附兩段短資料：**依據**（指向 brief、plan、inventory、audit、operations.jsonl，不重抄資源與操作細節）與**量測**（階段時間、讀／寫／截圖次數、工具時間、截斷、失敗、重試、提問輪數與預填／留空列數、使用者等待時間、實質決策數；沒有紀錄的標 unknown，不填 0）。
 

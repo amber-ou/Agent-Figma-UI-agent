@@ -8,6 +8,14 @@
 
 必問範例（DEC-02，非完整清單）：漸層、陰影、插圖、背景裝飾；強調色或狀態色的位置；DS 未涵蓋的間距、圓角、字級；多個候選元件；表格或卡片、分頁或 tab 等結構取捨；長文字換行或截斷；空狀態與錯誤狀態的呈現與文案語氣；圖示；響應式時隱藏或收合什麼；修正視覺缺陷有多種合理修法；按鈕等文案。
 
+**動態行為不問（DEC-11，v1.8）**：本 agent 只交付靜態 Figma 畫面。只影響動態行為、不影響靜態畫面的問題**不提問、不建 designDecision、不放進預填清單**，例如 Toast 停留幾秒後消失、能否手動關閉、動畫、轉場、手勢、載入時間。改記在 `plan.undefinedBehaviors`：
+
+```json
+{"id": "ub-01", "behavior": "錯誤 Toast 停留多久、能否手動關閉", "kind": "timing", "screenKey": "share-failed"}
+```
+
+handoff 第 12 項會把它們列為「未定義，交由實作決定」，並寫出需要決定的是什麼。動態行為會改變靜態畫面時（例如要不要畫出關閉按鈕、要不要畫出 loading 狀態），**只就畫面上看得到的部分**提問。這是通用規則，不是任何產品的政策。
+
 不必逐項問（DEC-03）：直接由 DS、pattern、指示或產品政策推得的操作（例如沿用既有 section 間距 variable、使用 DS 的 Primary Button、產品政策說不檢查對比）。這些記為 `source: ds | existing_pattern | brief | product_policy`、`status: answered` 的 designDecision（附 `evidenceRefs`；`product_policy` 必須附 `policyRef`，例如 `aiwow#policies/accessibility.contrast`），在 plan 確認時**一次列出摘要**，不建成待答問題，也不在 continue／resume 時重問。
 
 ## 問題格式（DEC-04）與預填清單（DEC-09，v1.7）
@@ -40,8 +48,10 @@ v1.7 起，同一階段所有待決的設計決策，以及要使用者回答的
   | `prefilled_confirmed` | 照預填確認 |
   | `user_modified` | 改了預填 |
   | `user_filled` | 填了留空的列 |
+  | `user_skipped` | 使用者看過並明確略過（v1.8；`status: skipped`、`skippedBy: user`） |
 
-- 留空的列 agent **不得自行填入**；使用者表示略過 → `status: skipped`。沒回覆不代表同意。
+- 留空的列 agent **不得自行填入**；使用者表示略過 → `status: skipped`、`skippedBy: user`、`confirmation: user_skipped`。沒回覆不代表同意。
+- **範圍與授權類的列**（v1.8）：產品、平台、元件／variables library、輸出位置、修改邊界、確認計畫等記在 `plan.decisions`，也加上同樣的 `confirmation`，例如 `{"id":"dec-002","decision":"variables library：本次沒有","scope":"sources","source":"user","decidedAt":"…","confirmation":"user_modified"}`。metrics 把兩種列一起算（`run-report.mjs metrics` 的 `decisions.confirmationByKind` 分開列）。
 
 ## 產品政策題優先（DEC-10，v1.7）
 
@@ -64,7 +74,7 @@ v1.7 起，同一階段所有待決的設計決策，以及要使用者回答的
 
 ## 記錄與強制（DEC-05、DEC-06）
 
-- 寫入 `plan.designDecisions`：`id`、`question`、`options`、`recommendation`（可 null）、`answer`（未回答為 null）、`source`（只能是 `user | ds | existing_pattern | brief | product_policy`；`product_policy` 必須附可解析的 `policyRef`）、`evidenceRefs`、`decidedAt`，以及 v1.7 的選填 `confirmation`。
+- 寫入 `plan.designDecisions`：`id`、`question`、`options`、`recommendation`（可 null）、`answer`（未回答為 null）、`source`（只能是 `user | ds | existing_pattern | brief | product_policy`；`product_policy` 必須附可解析的 `policyRef`）、`evidenceRefs`、`decidedAt`，以及 v1.7 的選填 `confirmation`、v1.8 的 `skippedBy`。
 - `designDecisions` 與 `plan.decisions`（範圍、授權、例外）分開存，但共用 ID 命名空間。
 - 每個 write operation 的 `basisRefs` 必須引用依據。`operation-journal.mjs plan` 與 validator 會拒絕無法解析或引用未回答決策的 basisRefs。
 - 未回答不代表同意。受影響的 section 不得寫入；Build／Validate 中途出現新決策 → 暫停相依寫入並詢問，不先做再問。
@@ -80,7 +90,15 @@ v1.7 起，同一階段所有待決的設計決策，以及要使用者回答的
 | `answered` | 非空字串，`decidedAt` 有值 | 是 |
 | `skipped` | `null` | 否；對應元素**不得出現在畫布上** |
 
-`pending` 或 `skipped` 的決策會讓 `evaluate-completion` 回 `awaiting_user`（G7）。舊 plan 沒有 `status` 時，由 `answer` 推定。
+v1.8 起 `skipped` 要記 `skippedBy`（DEC-08、INVARIANT-28）：
+
+| skippedBy | 什麼時候 | 完成判定（G7） |
+|---|---|---|
+| `user` | 使用者看過題目並明確略過（`confirmation: user_skipped`） | **已解決**，不擋完成；handoff 第 12 項列出略過的決策與影響 |
+| `agent` | 使用者還沒看過就被標成略過（例如 DEC-07 授權下沒有建議的題目） | 仍是待答，`awaiting_user`；handoff 列給使用者，確認略過後改成 `user` |
+| （沒有） | v1.8 前的舊紀錄 | 當作 `agent`，不自動放寬 |
+
+`pending` 與 `skippedBy: agent` 的決策會讓 `evaluate-completion` 回 `awaiting_user`（G7）。舊 plan 沒有 `status` 時，由 `answer` 推定。
 
 ## 授權採用建議（DEC-07，v1.4）
 
@@ -95,7 +113,7 @@ v1.7 起，同一階段所有待決的設計決策，以及要使用者回答的
     "decidedAt": "<時間>", "delegation": {"decisionRef": "dec-006", "scope": "run", "runId": "<本 run>"}}
    ```
 
-4. **沒有建議的題目不得自己回答**：`status: "skipped"`、`answer: null`，相關元素不建立，run 結束時一次列給使用者。
+4. **沒有建議的題目不得自己回答**：`status: "skipped"`、`skippedBy: "agent"`、`answer: null`，相關元素不建立，run 結束時一次列給使用者（仍是待答）。
 5. 授權只對這個 run 有效。`continue <run-id>` 沿用；開新 run 必須重新取得（INVARIANT-01、INVARIANT-18）。validator 會拒絕 `delegation.runId` 與 plan 不同、或 `decisionRef` 不在 `plan.decisions` 的紀錄。授權本身記 `runOnly: true`：它和用授權回答的題目都不會列成產品政策建議（POL-05）。
 6. v1.7：授權等同「本 run 的預填清單一律確認」（DEC-09）；**留空的列仍要使用者回答**，否則為 `skipped`。
 7. 硬性門檻不因授權豁免。建議若會造成 G5 對比失敗，Plan 階段就要指出（`references/design-quality.md` 的可及性預檢），不能做完才發現。

@@ -137,6 +137,15 @@
         "product_policy"
       ]
     },
+    "rowConfirmation": {
+      "description": "v1.7/v1.8 DEC-09: how the user confirmed a prefilled list row (user_skipped: the user explicitly skipped it, v1.8)",
+      "enum": [
+        "prefilled_confirmed",
+        "user_modified",
+        "user_filled",
+        "user_skipped"
+      ]
+    },
     "severity": {
       "enum": [
         "critical",

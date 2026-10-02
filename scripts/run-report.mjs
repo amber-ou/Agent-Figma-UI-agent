@@ -17,10 +17,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { projectRoot, runDirFor, atomicWriteJson, nowIso, readJson } from './state-store.mjs';
 import { readJsonl, stateDir } from './hooks/lib.mjs';
-import { loadRun, validateSchema, decisionStatus, evidenceCoversCell, evaluationIsCurrent } from './validate-artifacts.mjs';
+import { loadRun, validateSchema, decisionStatus, decisionResolved, evidenceCoversCell, evaluationIsCurrent } from './validate-artifacts.mjs';
 import { suggestFromRun } from './product-policy.mjs';
 
-export const SPEC_VERSION = '1.7';
+export const SPEC_VERSION = '1.8';
 const PHASES = ['intake', 'preflight', 'discover', 'plan', 'build', 'validate', 'handoff', 'reconcile'];
 
 function updateLedger(dir, fn) {
@@ -35,9 +35,15 @@ function updateLedger(dir, fn) {
   return next;
 }
 
+// v1.8 (§14, §20): entering the phase the run is already in (e.g. handoff again while wrapping up) is
+// not a new phase; it is not recorded twice, so no duration turns negative.
 export function recordPhase(dir, phase, at = nowIso()) {
   if (!PHASES.includes(phase)) throw new Error(`unknown phase ${phase}`);
-  return updateLedger(dir, l => ({ ...l, phase, phaseHistory: [...(l.phaseHistory || []), { phase, enteredAt: at }] }));
+  return updateLedger(dir, l => {
+    const history = l.phaseHistory || [];
+    if (history.at(-1)?.phase === phase) return { ...l, phase };
+    return { ...l, phase, phaseHistory: [...history, { phase, enteredAt: at }] };
+  });
 }
 
 // v1.7 DEC-09: a round is one prefilled list; prefilled and blank rows are counted separately.
@@ -83,7 +89,12 @@ export function runMetrics(dir, { root = projectRoot(), events: given } = {}) {
   // phases
   const history = ledger.phaseHistory || [];
   const end = ledger.completionEvaluatedAt || null;
-  const phases = history.map((p, i) => ({ phase: p.phase, enteredAt: p.enteredAt, durationMs: ms(p.enteredAt, history[i + 1]?.enteredAt || end) }));
+  const phases = history.map((p, i) => {
+    const d = ms(p.enteredAt, history[i + 1]?.enteredAt || end);
+    // the evaluation can precede the last phase entry (a re-entry recorded before v1.8): unknown, not negative
+    if (d !== null && d < 0) unknown.push(`duration of ${p.phase} (entered ${p.enteredAt}, after the evaluation)`);
+    return { phase: p.phase, enteredAt: p.enteredAt, durationMs: d !== null && d < 0 ? null : d };
+  });
   if (!history.length) unknown.push('phase timing (no ledger.phaseHistory)');
 
   // tool calls
@@ -139,17 +150,28 @@ export function runMetrics(dir, { root = projectRoot(), events: given } = {}) {
     };
   }
   const dd = run.plan?.designDecisions || [];
+  // v1.8 DEC-09: scope / authorisation rows (plan.decisions) record confirmation too; both count.
+  const rows = [...dd, ...(run.plan?.decisions || [])];
+  const byConfirmation = list => ({
+    prefilledConfirmed: list.filter(d => d.confirmation === 'prefilled_confirmed').length,
+    userModified: list.filter(d => d.confirmation === 'user_modified').length,
+    userFilled: list.filter(d => d.confirmation === 'user_filled').length,
+    userSkipped: list.filter(d => d.confirmation === 'user_skipped').length,
+  });
   const decisions = run.plan ? {
     designDecisions: dd.length,
+    scopeDecisions: (run.plan.decisions || []).length,
     answeredByUser: dd.filter(d => d.source === 'user' && decisionStatus(d) === 'answered' && !d.delegation).length,
     delegated: dd.filter(d => d.delegation).length,
     fromDsPatternOrBrief: dd.filter(d => d.source !== 'user' && d.source !== 'product_policy').length,
     fromProductPolicy: dd.filter(d => d.source === 'product_policy').length,
-    prefilledConfirmed: dd.filter(d => d.confirmation === 'prefilled_confirmed').length,
-    userModified: dd.filter(d => d.confirmation === 'user_modified').length,
-    userFilled: dd.filter(d => d.confirmation === 'user_filled').length,
+    ...byConfirmation(rows),
+    confirmationByKind: { designDecisions: byConfirmation(dd), scopeDecisions: byConfirmation(run.plan.decisions || []) },
     pending: dd.filter(d => decisionStatus(d) === 'pending').length,
     skipped: dd.filter(d => decisionStatus(d) === 'skipped').length,
+    skippedByUser: dd.filter(d => decisionStatus(d) === 'skipped' && d.skippedBy === 'user').length,
+    skippedByAgent: dd.filter(d => decisionStatus(d) === 'skipped' && d.skippedBy !== 'user').length,
+    undefinedBehaviors: (run.plan.undefinedBehaviors || []).length,
   } : null;
   if (!decisions) unknown.push('decisions (no plan.json)');
 
@@ -199,6 +221,22 @@ export function productPolicySection(dir, { brief, audit, root = projectRoot() }
   return L;
 }
 
+// v1.8 §15 item 12: dynamic behaviour that was never asked (DEC-11) and decisions the user skipped
+// (DEC-08, skippedBy user). Skips the agent recorded are not here: they stay under 待決.
+export function implementationDefinedSection(plan) {
+  const L = ['## 未定義，交由實作決定', ''];
+  const behaviors = plan?.undefinedBehaviors || [];
+  L.push('- 動態行為（本 agent 只交付靜態畫面，未提問，DEC-11）：');
+  if (!behaviors.length) L.push('  - 無');
+  for (const b of behaviors) L.push(`  - ${b.id}${b.screenKey ? `（${b.screenKey}）` : ''}：${b.behavior}${b.kind ? `［${b.kind}］` : ''}${b.note ? `；${b.note}` : ''}`);
+  const skipped = (plan?.designDecisions || []).filter(d => decisionStatus(d) === 'skipped' && d.skippedBy === 'user');
+  L.push('- 使用者明確略過的決策（相關元素未建立，DEC-08）：');
+  if (!skipped.length) L.push('  - 無');
+  for (const d of skipped) L.push(`  - ${d.id}：${d.question}${d.context ? `（${d.context}）` : ''} → 影響：畫面上不建立這項決策的元素；需要時由實作或下一個 run 決定`);
+  L.push('');
+  return L;
+}
+
 export function renderHandoff(dir, { root = projectRoot(), metrics } = {}) {
   const run = loadRun(dir);
   const { brief, plan, audit, ledger } = run;
@@ -216,9 +254,15 @@ export function renderHandoff(dir, { root = projectRoot(), metrics } = {}) {
 
   L.push('## Figma', '');
   if (brief.output?.fileUrl) L.push(`- 檔案：${brief.output.fileUrl}`);
-  const roots = (ledger.entities || []).filter(e => e.active && ['PAGE', 'SECTION', 'FRAME', 'COMPONENT', 'INSTANCE'].includes(e.type));
+  // v1.8 (T76): every active entity is a root (one per logicalKey, written on verify); the journal
+  // gives the created / modified node counts, so a run that changed nodes never reads "none".
+  const roots = (ledger.entities || []).filter(e => e.active);
   for (const e of roots) L.push(`- ${e.logicalKey}（${e.type}）：${fileKey ? nodeUrl(fileKey, e.nodeId) : e.nodeId}`);
-  if (!roots.length) L.push('- （本 run 沒有建立或修改節點）');
+  const verifiedWrites = (run.operations || []).filter(o => o.mode === 'write' && o.status === 'verified' && !o.effectSummary?.noChange);
+  const created = new Set(verifiedWrites.flatMap(o => o.createdNodeIds || []));
+  const mutated = new Set(verifiedWrites.flatMap(o => o.mutatedNodeIds || []).filter(id => !created.has(id)));
+  if (created.size || mutated.size) L.push(`- 本 run 建立 ${created.size} 個、修改 ${mutated.size} 個節點（已讀回驗證的 write：${verifiedWrites.map(o => o.operationId).join('、')}）`);
+  if (!roots.length && !created.size && !mutated.size) L.push('- （本 run 沒有建立或修改節點）');
   L.push('');
 
   L.push('## 交付範圍', '');
@@ -255,15 +299,22 @@ export function renderHandoff(dir, { root = projectRoot(), metrics } = {}) {
 
   L.push(...productPolicySection(dir, { brief, audit, root }));
 
+  L.push(...implementationDefinedSection(plan));
+
   L.push('## 待決與未驗證', '');
   const open = [];
   for (const q of ledger.pendingQuestions || []) open.push(`待答問題 ${q.id}：${q.question}`);
-  for (const d of plan.designDecisions || []) { const st = decisionStatus(d); if (st !== 'answered') open.push(`設計決策 ${d.id}（${st}）：${d.question}`); }
+  for (const d of plan.designDecisions || []) {
+    if (decisionResolved(d)) continue;
+    const st = decisionStatus(d);
+    open.push(`設計決策 ${d.id}（${st === 'skipped' ? `skipped，由 ${d.skippedBy || 'agent'} 標記，使用者尚未確認略過` : st}）：${d.question}`);
+  }
   for (const u of flow?.unknowns || []) if (u.status === 'open') open.push(`流程待確認 ${u.id}：${u.question}`);
   for (const f of findings.filter(f => f.status === 'open')) open.push(`finding ${f.id}（${f.severity}${f.gate ? `, ${f.gate}` : ''}）${f.observed ? `：${f.observed}` : ''}`);
   for (const g of (audit.gates || []).filter(g => ['fail', 'not_verified'].includes(g.status))) open.push(`gate ${g.id} ${g.status}${g.note ? `：${g.note}` : ''}`);
   for (const r of ev.reasons || []) open.push(`判定原因：${r}`);
   for (const x of audit.implementationVerificationRequired || []) open.push(`實作層待驗：${x}`);
+  for (const s of plan.excludedSkillsLoaded || []) open.push(`排除的 skill 被載入：${s.skill}（未採用：${s.notAdopted}，§4.7）`);
   L.push(...(open.length ? open.map(o => `- ${o}`) : ['- 無']), '');
 
   L.push('## 下一步', '');
@@ -283,7 +334,7 @@ export function renderHandoff(dir, { root = projectRoot(), metrics } = {}) {
   L.push('## 量測', '');
   L.push(`- 階段：${m.phases.length ? m.phases.map(p => `${p.phase} ${fmtMs(p.durationMs)}`).join('、') : 'unknown'}`);
   L.push(`- 工具：${m.tools ? `read ${m.tools.attributedByRun.read + m.tools.attributedByTimeWindow.read}、write ${m.tools.attributedByRun.write + m.tools.attributedByTimeWindow.write}、截圖 ${m.tools.attributedByRun.screenshot + m.tools.attributedByTimeWindow.screenshot}；工具時間 ${fmtMs(m.tools.toolTimeMs)}；截斷 ${m.tools.truncatedResponses}；失敗 ${m.tools.failures}` : 'unknown'}；重試 ${m.journal.retries}、對帳 ${m.journal.reconciled}`);
-  L.push(`- 提問：${m.questions ? `${m.questions.rounds} 輪、${m.questions.questions} 題${m.questions.prefilledRows != null || m.questions.blankRows != null ? `（預填 ${m.questions.prefilledRows ?? 'unknown'}、留空 ${m.questions.blankRows ?? 'unknown'}）` : ''}；使用者等待 ${fmtMs(m.questions.userWaitMs)}` : 'unknown'}；實質設計決策（使用者回答）${m.decisions ? m.decisions.answeredByUser : 'unknown'}`);
+  L.push(`- 提問：${m.questions ? `${m.questions.rounds} 輪、${m.questions.questions} 題${m.questions.prefilledRows != null || m.questions.blankRows != null ? `（預填 ${m.questions.prefilledRows ?? 'unknown'}、留空 ${m.questions.blankRows ?? 'unknown'}）` : ''}；使用者等待 ${fmtMs(m.questions.userWaitMs)}` : 'unknown'}；實質設計決策（使用者回答）${m.decisions ? m.decisions.answeredByUser : 'unknown'}${m.decisions ? `；確認方式（設計決策與範圍／授權列合計）：照預填 ${m.decisions.prefilledConfirmed}、改過 ${m.decisions.userModified}、自己填 ${m.decisions.userFilled}、略過 ${m.decisions.userSkipped}` : ''}`);
   if (m.unknown.length) L.push(`- 未記錄（不是 0）：${m.unknown.join('；')}`);
   L.push('');
   return L.join('\n');
