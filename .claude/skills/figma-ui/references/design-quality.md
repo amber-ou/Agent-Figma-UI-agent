@@ -9,6 +9,8 @@
   - `fail`：參考畫面本身的問題記 `inherited_baseline`（`baselineRef`），並以 designDecision 列出替代（`decisionRef`，優先同系列、對比足夠的既有 style）。參考畫面不合格不能當作照抄的理由。
   - 新畫面沿用不合格的 style 是 `introduced`：finding 標 `gate: "G5"`，G5 為 fail，**不能**用 acceptedExceptions 或 accepted finding 豁免（validator 會拒絕）。第一次真實任務的 01-04 說明文字 style 對白底只有 3.34:1，就是在 Validate 才被擋下。
 
+- **產品政策（v1.7，§9.5）**：產品政策 `accessibility.contrast.required = false` 時，預檢不放對比項、Validate 不產生對比 finding，G5 記 `contrast: { status: "not_applicable", policyRef }`，其他可及性項照常；見 `references/product-policy.md`。政策為 `true` 或尚未決定時照上面的規則，G5 對比是硬性門檻。
+
 ## 結構（G3）
 
 - 重複控制項用既有 COMPONENT／COMPONENT_SET 的 INSTANCE；不 detach；透過公開 properties 改 label／icon／state。

@@ -8,7 +8,7 @@
 //   stored evaluation is not the evaluation of the current data (evaluate-completion first).
 // Usage:
 //   node scripts/run-report.mjs phase <run-id> <phase>
-//   node scripts/run-report.mjs ask <run-id> <questionCount>
+//   node scripts/run-report.mjs ask <run-id> <questionCount> [--prefilled N] [--blank M]   (v1.7 DEC-09 rows)
 //   node scripts/run-report.mjs answered <run-id>
 //   node scripts/run-report.mjs metrics <run-id>
 //   node scripts/run-report.mjs handoff <run-id> [--write]
@@ -18,8 +18,9 @@ import { fileURLToPath } from 'node:url';
 import { projectRoot, runDirFor, atomicWriteJson, nowIso, readJson } from './state-store.mjs';
 import { readJsonl, stateDir } from './hooks/lib.mjs';
 import { loadRun, validateSchema, decisionStatus, evidenceCoversCell, evaluationIsCurrent } from './validate-artifacts.mjs';
+import { suggestFromRun } from './product-policy.mjs';
 
-export const SPEC_VERSION = '1.6';
+export const SPEC_VERSION = '1.7';
 const PHASES = ['intake', 'preflight', 'discover', 'plan', 'build', 'validate', 'handoff', 'reconcile'];
 
 function updateLedger(dir, fn) {
@@ -39,13 +40,22 @@ export function recordPhase(dir, phase, at = nowIso()) {
   return updateLedger(dir, l => ({ ...l, phase, phaseHistory: [...(l.phaseHistory || []), { phase, enteredAt: at }] }));
 }
 
-export function recordQuestionRound(dir, questionCount, at = nowIso()) {
+// v1.7 DEC-09: a round is one prefilled list; prefilled and blank rows are counted separately.
+export function recordQuestionRound(dir, questionCount, at = nowIso(), { prefilled, blank } = {}) {
   const n = Number(questionCount);
   if (!Number.isInteger(n) || n < 1) throw new Error('questionCount must be a positive integer');
+  const rows = {};
+  for (const [k, v] of [['prefilledRows', prefilled], ['blankRows', blank]]) {
+    if (v === undefined || v === null) continue;
+    const x = Number(v);
+    if (!Number.isInteger(x) || x < 0) throw new Error(`${k} must be a non-negative integer`);
+    rows[k] = x;
+  }
+  if (rows.prefilledRows !== undefined && rows.blankRows !== undefined && rows.prefilledRows + rows.blankRows !== n) throw new Error(`prefilled (${rows.prefilledRows}) + blank (${rows.blankRows}) rows must equal questionCount (${n})`);
   return updateLedger(dir, l => {
     const rounds = l.questionRounds || [];
     if (rounds.some(r => !r.answeredAt)) throw new Error('the previous question round is still open; record "answered" first');
-    return { ...l, questionRounds: [...rounds, { id: `qr-${String(rounds.length + 1).padStart(3, '0')}`, phase: l.phase, askedAt: at, answeredAt: null, questionCount: n }] };
+    return { ...l, questionRounds: [...rounds, { id: `qr-${String(rounds.length + 1).padStart(3, '0')}`, phase: l.phase, askedAt: at, answeredAt: null, questionCount: n, ...rows }] };
   });
 }
 
@@ -123,6 +133,9 @@ export function runMetrics(dir, { root = projectRoot(), events: given } = {}) {
       questions: ledger.questionRounds.reduce((a, r) => a + r.questionCount, 0),
       openRounds: ledger.questionRounds.length - answered.length,
       userWaitMs: answered.length ? answered.reduce((a, r) => a + ms(r.askedAt, r.answeredAt), 0) : null,
+      // v1.7 DEC-09: null when no round recorded the split (not 0)
+      prefilledRows: ledger.questionRounds.some(r => r.prefilledRows !== undefined) ? ledger.questionRounds.reduce((a, r) => a + (r.prefilledRows || 0), 0) : null,
+      blankRows: ledger.questionRounds.some(r => r.blankRows !== undefined) ? ledger.questionRounds.reduce((a, r) => a + (r.blankRows || 0), 0) : null,
     };
   }
   const dd = run.plan?.designDecisions || [];
@@ -130,7 +143,11 @@ export function runMetrics(dir, { root = projectRoot(), events: given } = {}) {
     designDecisions: dd.length,
     answeredByUser: dd.filter(d => d.source === 'user' && decisionStatus(d) === 'answered' && !d.delegation).length,
     delegated: dd.filter(d => d.delegation).length,
-    fromDsPatternOrBrief: dd.filter(d => d.source !== 'user').length,
+    fromDsPatternOrBrief: dd.filter(d => d.source !== 'user' && d.source !== 'product_policy').length,
+    fromProductPolicy: dd.filter(d => d.source === 'product_policy').length,
+    prefilledConfirmed: dd.filter(d => d.confirmation === 'prefilled_confirmed').length,
+    userModified: dd.filter(d => d.confirmation === 'user_modified').length,
+    userFilled: dd.filter(d => d.confirmation === 'user_filled').length,
     pending: dd.filter(d => decisionStatus(d) === 'pending').length,
     skipped: dd.filter(d => decisionStatus(d) === 'skipped').length,
   } : null;
@@ -155,6 +172,31 @@ export function formatTokenBinding(tb) {
   const ratio = tb.ratio ?? (tb.denominator != null && tb.bound != null ? `${tb.bound}/${tb.denominator}` : 'unknown');
   const styles = typeof tb.styleApplications === 'object' ? tb.styleApplications?.total : tb.styleApplications;
   return `${ratio}（variables ${v(tb.variableBindings)}、styles ${v(styles)}、raw ${v(tb.raw)}）`;
+}
+
+// v1.7 §15 item 11: applied product policies and product-policy suggestions (POL-05). Suggestions
+// are only written to the policy file when the user ticks them (POL-04); run-only settings are never
+// listed. When contrast was not checked because of the product policy, say so (§9.5).
+export function productPolicySection(dir, { brief, audit, root = projectRoot() } = {}) {
+  const L = ['## 產品政策', ''];
+  const product = brief?.product;
+  if (!product) L.push('- 未套用：v1.7 前建立的 run（brief 沒有 product）');
+  else if (!product.productId) L.push('- 未套用：產品尚未確定（REQ-05）');
+  else {
+    const applied = product.appliedPolicies || [];
+    L.push(`- 產品：${product.displayName || product.productId}（${product.productId}）`);
+    L.push(`- 本 run 套用的政策：${applied.length ? applied.map(a => `${a.summary}（${a.policyRef}）`).join('；') : '無（政策檔沒有項目）'}`);
+  }
+  const g5 = (audit?.gates || []).find(g => g.id === 'G5');
+  const contrastRef = g5?.contrast?.status === 'not_applicable' ? g5.contrast.policyRef : g5?.status === 'not_applicable' ? g5.policyRef : null;
+  if (contrastRef) L.push(`- **依產品政策未檢查對比**（${contrastRef}）：文字與非文字對比都沒有驗證，實作端請知悉；點擊區等其他可及性項目照常檢查。`);
+  let s = { suggestions: [] };
+  try { s = suggestFromRun(dir, { root }); } catch { /* no plan yet */ }
+  L.push('- 政策建議（勾選的才會寫入產品政策；沒勾選的只留在本 run）：');
+  if (!s.suggestions.length) L.push('  - 無');
+  for (const x of s.suggestions) L.push(`  - [ ] ${x.id}：${x.text}（${x.appliesTo}；來源 ${x.source}${x.conflictsWith ? `；與 ${x.conflictsWith} 衝突` : ''}${x.alsoIn ? `；也出現在 ${x.alsoIn.join('、')}` : ''}）`);
+  L.push('');
+  return L;
 }
 
 export function renderHandoff(dir, { root = projectRoot(), metrics } = {}) {
@@ -211,6 +253,8 @@ export function renderHandoff(dir, { root = projectRoot(), metrics } = {}) {
   L.push(`- Findings：${findings.length} 筆（open ${findings.filter(f => f.status === 'open').length}、resolved ${findings.filter(f => f.status === 'resolved').length}、accepted ${findings.filter(f => f.status === 'accepted').length}）；例外 ${(audit.acceptedExceptions || []).map(x => `${x.id}（${x.decisionRef}）`).join('、') || '無'}`);
   L.push('- Design QA：尚未接入（階段 B）；本 run 的適用驗證全部由 UI agent 完成。', '');
 
+  L.push(...productPolicySection(dir, { brief, audit, root }));
+
   L.push('## 待決與未驗證', '');
   const open = [];
   for (const q of ledger.pendingQuestions || []) open.push(`待答問題 ${q.id}：${q.question}`);
@@ -239,7 +283,7 @@ export function renderHandoff(dir, { root = projectRoot(), metrics } = {}) {
   L.push('## 量測', '');
   L.push(`- 階段：${m.phases.length ? m.phases.map(p => `${p.phase} ${fmtMs(p.durationMs)}`).join('、') : 'unknown'}`);
   L.push(`- 工具：${m.tools ? `read ${m.tools.attributedByRun.read + m.tools.attributedByTimeWindow.read}、write ${m.tools.attributedByRun.write + m.tools.attributedByTimeWindow.write}、截圖 ${m.tools.attributedByRun.screenshot + m.tools.attributedByTimeWindow.screenshot}；工具時間 ${fmtMs(m.tools.toolTimeMs)}；截斷 ${m.tools.truncatedResponses}；失敗 ${m.tools.failures}` : 'unknown'}；重試 ${m.journal.retries}、對帳 ${m.journal.reconciled}`);
-  L.push(`- 提問：${m.questions ? `${m.questions.rounds} 輪、${m.questions.questions} 題；使用者等待 ${fmtMs(m.questions.userWaitMs)}` : 'unknown'}；實質設計決策（使用者回答）${m.decisions ? m.decisions.answeredByUser : 'unknown'}`);
+  L.push(`- 提問：${m.questions ? `${m.questions.rounds} 輪、${m.questions.questions} 題${m.questions.prefilledRows != null || m.questions.blankRows != null ? `（預填 ${m.questions.prefilledRows ?? 'unknown'}、留空 ${m.questions.blankRows ?? 'unknown'}）` : ''}；使用者等待 ${fmtMs(m.questions.userWaitMs)}` : 'unknown'}；實質設計決策（使用者回答）${m.decisions ? m.decisions.answeredByUser : 'unknown'}`);
   if (m.unknown.length) L.push(`- 未記錄（不是 0）：${m.unknown.join('；')}`);
   L.push('');
   return L.join('\n');
@@ -247,12 +291,12 @@ export function renderHandoff(dir, { root = projectRoot(), metrics } = {}) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [cmd, runId, ...rest] = process.argv.slice(2);
-  const usage = 'usage: run-report.mjs phase <run-id> <phase> | ask <run-id> <questionCount> | answered <run-id> | metrics <run-id> | handoff <run-id> [--write]';
+  const usage = 'usage: run-report.mjs phase <run-id> <phase> | ask <run-id> <questionCount> [--prefilled N] [--blank M] | answered <run-id> | metrics <run-id> | handoff <run-id> [--write]';
   if (!cmd || !runId) { console.error(usage); process.exit(2); }
   const dir = runDirFor(projectRoot(), runId);
   try {
     if (cmd === 'phase') console.log(JSON.stringify(recordPhase(dir, rest[0]).phaseHistory.at(-1)));
-    else if (cmd === 'ask') console.log(JSON.stringify(recordQuestionRound(dir, rest[0]).questionRounds.at(-1)));
+    else if (cmd === 'ask') { const opt = n => { const i = rest.indexOf(n); return i >= 0 ? rest[i + 1] : undefined; }; console.log(JSON.stringify(recordQuestionRound(dir, rest[0], undefined, { prefilled: opt('--prefilled'), blank: opt('--blank') }).questionRounds.at(-1))); }
     else if (cmd === 'answered') console.log(JSON.stringify(recordAnswered(dir).questionRounds.findLast(r => r.answeredAt)));
     else if (cmd === 'metrics') console.log(JSON.stringify(runMetrics(dir), null, 2));
     else if (cmd === 'handoff') {

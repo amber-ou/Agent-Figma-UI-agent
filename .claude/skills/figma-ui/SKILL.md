@@ -8,7 +8,7 @@ argument-hint: "<需求> | continue <run-id> <調整> | resume <run-id>"
 
 # /figma-ui 工作流程
 
-規範唯一來源是專案根目錄的 `FIGMA_UI_AGENT_SPEC.md`（v1.6）。本檔只列流程、階段出口與不可違反的規則；細節在 `references/`，需要時才讀。一般設計 run **不需要**讀研究紀錄、建置里程碑或 `docs/` 的歷史總結。Figma runtime API（字型、Auto Layout、頁面載入、helpers）一律依已安裝的官方 skill：呼叫任何 `use_figma` 前先載入 `figma:figma-use`，組畫面時再載入 `figma:figma-generate-design`。本專案不另寫 API 教學。
+規範唯一來源是專案根目錄的 `FIGMA_UI_AGENT_SPEC.md`（v1.7）。本檔只列流程、階段出口與不可違反的規則；細節在 `references/`，需要時才讀。一般設計 run **不需要**讀研究紀錄、建置里程碑或 `docs/` 的歷史總結。Figma runtime API（字型、Auto Layout、頁面載入、helpers）一律依已安裝的官方 skill：呼叫任何 `use_figma` 前先載入 `figma:figma-use`，組畫面時再載入 `figma:figma-generate-design`。本專案不另寫 API 教學。
 
 交付只有原生、可編輯的 Figma；程式實作由前端工程師負責。
 
@@ -42,9 +42,18 @@ argument-hint: "<需求> | continue <run-id> <調整> | resume <run-id>"
 
 ## 2. Intake（新任務）
 
-先把使用者已提供的內容整理成摘要讓他確認，只問缺的部分；**每輪 1–3 個實質問題**，格式「目前狀況 → 影響 → 選項 → 建議」。能先找到候選（檔案、頁面、library、元件）就先找，讓問題變成選擇題。送出一輪問題時記 `node scripts/run-report.mjs ask <run-id> <題數>`，收到回覆後記 `run-report.mjs answered <run-id>`。必須取得：
+先把使用者已提供的內容整理成摘要讓他確認，只問缺的部分。能先找到候選（檔案、頁面、library、元件）就先找，讓問題變成選擇題。待答的項目一次列成**預填清單**（DEC-09，格式見第 5 節）。送出清單時記 `node scripts/run-report.mjs ask <run-id> <列數> --prefilled <預填列數> --blank <留空列數>`，收到回覆後記 `run-report.mjs answered <run-id>`。
 
-1. 產品與平台、主要使用者與任務、交付畫面與狀態。
+**Intake 順序（v1.7，REQ-05／06、POL-03）**：
+
+1. **確定產品**：需求寫了產品就採用；沒寫就先問（`run-context.mjs` 會把它列在最前面）。**不從上次 run、目標檔案或參考畫面推定**（INVARIANT-25）。
+2. **載入產品政策**：`node scripts/product-policy.mjs apply <run-id> <productId>`，把結果記入 `brief.product`。在 intake 摘要列一行它回傳的「已套用產品政策：…」。政策已決定的項目不再問，也不放進預填清單。沒有政策檔 → 問是否建立新產品（POL-02），確認後 `product-policy.mjs init <run-id> <productId> <名稱> --decision <decisionRef>`。政策缺對比政策 → 政策題排在預填清單最前面（DEC-10，見第 5 節）。
+3. **確認 library**：使用者提供的 library 直接用於 Discover；沒提供、找不到、讀不到或沒在目標檔啟用時就問，不改用其他 library，也不以 raw value 代替（REQ-06）。`.figma-ui/products/<productId>.local.json` 的 library 和檔案只能當預填候選（`product-policy.mjs local <productId>`），要本次確認才能用。
+4. 其餘必須取得的項目如下。
+
+必須取得：
+
+1. 產品（REQ-05）與平台、主要使用者與任務、交付畫面與狀態。
 2. 參考檔案（URL）。解析 node-id 後**先辨識節點類型**：可能是頁面（PAGE）而非 frame（§8.1）。
 3. **元件 library** 與 **variables library，分開確認**（§6.1）：核准元件 library 不等於核准 variables。寫入 `sources.componentLibraryKeys`／`variableLibraryKeys`，兩者都要在 `approvedLibraryKeys` 內。
 4. 輸出位置與方式：新稿（`new_draft`）或改原稿（`edit_existing`）。**預設建議獨立頁面或小範圍 Section**；不要選有大量既有內容的頁面作寫入位置。
@@ -53,9 +62,13 @@ argument-hint: "<需求> | continue <run-id> <調整> | resume <run-id>"
 
 已知內容要預填，例如：
 
-> 我先整理你提供的內容：任務＝延伸；參考＝<連結>（node-id 指向頁面「v1.1.2」）。還缺：元件與 variables 各用哪個 library（可能不是同一個，我可以先盤點給你選）？成果放哪個檔案、哪一頁？建議開獨立 Section，不動既有內容。
+> 我先整理你提供的內容：產品＝Aiwow；任務＝延伸；參考＝<連結>（node-id 指向頁面「v1.1.2」）。
+> 已套用產品政策：Aiwow — 對比：不適用（不檢查、不詢問對比；其他可及性項照常）
+> 還缺的項目列在下面的清單：元件與 variables 各用哪個 library（可能不是同一個）、成果放哪個檔案哪一頁（建議開獨立 Section，不動既有內容）。
 
-brief 確認時寫入 `stage=confirmed`、`output.writeAllowed`、`output.decisionRef`（指向 plan.decisions 中使用者的授權），並跑 `validate-artifacts.mjs … --stage intake`。
+brief 確認時寫入 `stage=confirmed`、`output.writeAllowed`、`output.decisionRef`（指向 plan.decisions 中使用者的授權），並跑 `validate-artifacts.mjs … --stage intake`。v1.7 起新 run 的 brief 一定有 `product`；`productId` 還是 null 時 intake 不能確認。
+
+**記憶分層（§4.6，INVARIANT-26）**：本 run 的決策、只限本次的規則（測試回合規則、DEC-07 授權）、使用者在過程中提到的偏好，只存在 `design-runs/<run-id>/`。產品政策只存在 `product-policies/<productId>.json`，而且只經使用者回答或確認後由 `product-policy.mjs write` 寫入（POL-04、INVARIANT-24）。**不得把任何 run 決策或產品政策寫進 Claude Code 的自動記憶（`~/.claude/projects/<project>/memory/`）、`CLAUDE.md` 或其他會被自動載入的檔案**，否則會在使用者不知情時套用到之後的 run。
 
 ## 3. Preflight
 
@@ -79,16 +92,22 @@ hook 擋下時照原因處理（補標頭、先對帳、取得授權）；**不�
 
 ## 5. 什麼時候問、怎麼問
 
-- **已決定的不重問**（DEC-03）：DS、已確認 pattern、使用者指示或 brief 已決定的內容，在 Plan 確認時用一段摘要列出（記為 `source: ds | existing_pattern | brief` 的 designDecision），不建成待答問題。
-- **設計決策**（`references/design-decisions.md`）：DS、已確認 pattern 或使用者指示沒有決定的外觀／層級／體驗選擇，先找候選，再以 2–3 個選項詢問，記入 `plan.designDecisions`（帶 `status`）；未回答的決策所影響的 section 不得寫入。不確定算不算設計決策時，當作是。同階段的問題集中，每輪 1–3 題，優先在 Build 前問完會影響方向的題目。
+- **已決定的不重問**（DEC-03）：DS、已確認 pattern、使用者指示、brief 或**產品政策**已決定的內容，在 Plan 確認時用一段摘要列出（記為 `source: ds | existing_pattern | brief | product_policy` 的 designDecision；`product_policy` 必須帶可解析的 `policyRef`，例如 `aiwow#policies/accessibility.contrast`），不建成待答問題。
+- **預填清單**（DEC-09，v1.7）：同一階段所有待決的設計決策，以及要使用者回答的範圍與授權問題，**一次**列成一份清單（取代「每輪 1–3 題」）。每列：編號、問題（含情境與選項摘要）、答案欄。
+  - 有建議 → 答案欄填建議並標「建議，請確認」。沒有建議、或屬品牌、產品方向、文案內容、個資等只有使用者能判斷的 → 答案欄留空。
+  - 使用者確認前全部是 `pending`（預填值只存在 `recommendation`，`answer` 為 null），不能被 write 引用。
+  - 確認後 `answer` 為最後的值、`source: user`、`status: answered`，並記 `confirmation`：照預填確認 `prefilled_confirmed`、改了預填 `user_modified`、填了留空的列 `user_filled`。
+  - 留空的列 agent **不得自行填入**；使用者表示略過 → `skipped`。產品政策已決定的項目不出現在清單。
+- **產品政策題優先**（DEC-10，v1.7）：產品政策檔還沒有 `accessibility.contrast` 時，在第一個需要它的 run，把政策題排在清單最前面並標「產品政策」（例如「<產品> 的 design system 要遵守對比（WCAG）規則嗎？」）。回答「是」或「否」都用 `product-policy.mjs write` 寫入政策檔（先把使用者的回答記成 plan.decisions 的一筆，再以它作 `decisionRef`），之後該產品的 run 不再問。測試回合「只限本輪」的回答（`runOnly: true`）是本 run 的決策，不是政策題的回答。細節見 `references/product-policy.md`。
+- **設計決策**（`references/design-decisions.md`）：DS、已確認 pattern、產品政策或使用者指示沒有決定的外觀／層級／體驗選擇，先找候選，再給 2–3 個選項，放進預填清單，記入 `plan.designDecisions`（帶 `status`）；未回答的決策所影響的 section 不得寫入。不確定算不算設計決策時，當作是。優先在 Build 前問完會影響方向的題目。
 - **Flow 判斷**（`references/flow.md`）：依操作歧義與變更影響決定 `unchanged`／`partial`／`task_flow`，不看畫面數。局部樣式修改記 `unchanged` 加理由即可，不做流程訪談；新按鈕去哪裡不清楚，就只問那一題（flow unknown）。不自行補業務規則。
 - **授權採用建議**（DEC-07）：使用者可以對**這個 run** 授權「一律採用你的建議」。仍要逐題產生選項與建議；有建議的題目 `answer`＝建議、`source: user`、`status: answered`，並加 `delegation`（指向 plan.decisions 中的授權、`scope: run`、本 run ID）。**沒有建議的題目不得自己決定**：`status: skipped`、相關元素不建立、run 結束時列給使用者。授權不延續到新 run。硬性門檻（例如 G5 對比）不因授權豁免。
 - 新增 token／元件、wrap、改共享主元件、替換字型、改範圍、缺權限、資產或字型不可用。
 - 發現使用者改了 agent 的節點、在 Section 內新增或刪除節點（`references/collaboration.md`）：不覆寫、不重建，回報差異並詢問；在 ledger entity 記 `userChangeDetectedAt`（相關證據因此失效）。
 - 新匯入元件與既有畫面使用的版本外觀不同（§6.2）：列給使用者、記為 `inherited_baseline`；不在目標檔接受 library 更新，也不用 override 模仿舊版，除非使用者決定。
 - variables 來源 library 未識別：記為 gap，需要顏色 token 的驗證標 `not_verified`，**不得用 raw value 冒充綁定**。既有 paint／text／effect styles 屬於 DS token，可沿用並計入 tokenBinding。
-- **可及性預檢不合格**（§9.5）：照抄參考畫面不算合格理由；Plan 階段記入 `plan.accessibilityPrecheck`，並以設計決策列出替代方案。新畫面沿用不合格 style 是 `introduced`，G5 fail，**不能以例外豁免**。
-- **字型未安裝**（§10.3）：不換字型；記入 `inventory.fonts` 並在 Plan 列給使用者。
+- **可及性預檢不合格**（§9.5）：照抄參考畫面不算合格理由；Plan 階段記入 `plan.accessibilityPrecheck`，並以設計決策列出替代方案。新畫面沿用不合格 style 是 `introduced`，G5 fail，**不能以例外豁免**。**例外只有產品政策**：`accessibility.contrast.required = false` 時，不檢查、不詢問、不記對比（預檢與 finding 都不能有對比項），G5 記 `contrast: { status: "not_applicable", policyRef }`，點擊區等其他可及性項照常決定 G5；handoff 會註明「依產品政策未檢查對比」。政策尚未決定時先問政策題。
+- **字型未安裝**（§10.3）：不換字型；記入 `inventory.fonts` 並在 Plan 列給使用者。比對範圍要包含準備使用的**元件內部**實際使用的字型：用 `snippets/discover-helpers.js` 的 `figmaUiComponentFonts(<主元件 id>)` 讀主元件本身（不建立 instance），再交給 `figmaUiFontCheck`（M4 漏掉了 Status Bar 內的 SF Pro Text）。
 - **品牌名稱或 logo** 與使用者指定不同（REQ-04）。
 
 沒有回覆不代表同意；可以繼續不相依的唯讀工作。
@@ -106,7 +125,7 @@ hook 擋下時照原因處理（補標頭、先對帳、取得授權）；**不�
 
 - 截圖以完成的 composition 或一個修正批次為單位；高風險的版面或文字修正後**立即**截該局部看圖。最後仍要覆蓋每個適用 requiredCell。
 - 每筆 evidence 寫 `cellKeys`（它證明的 requiredCell）、`state`，以及 `subject`（`rootNodeId`、`scopeNodeIds`、`ancestorNodeIds`、`afterOperationId`）。default 的截圖不能拿來證明 error 或另一個 viewport。後來的寫入動到範圍、父層布局或 mode，或偵測到使用者改動，舊證據改 `superseded` 並重讀；無法判定時也重讀，不猜有效。
-- Handoff：`evaluate-completion.mjs … --write`，再 `run-report.mjs handoff <run-id> --write`（從 artifacts 組出簡短 handoff，不手寫重複事實）。最後 `node scripts/state-store.mjs release <run-id>`（owner token 相符才刪除鎖與 `active-run.json`）。**不釋放會讓 hook 持續阻擋本專案所有未帶 op 標頭的 Figma 呼叫。**
+- Handoff：`evaluate-completion.mjs … --write`，再 `run-report.mjs handoff <run-id> --write`（從 artifacts 組出簡短 handoff，不手寫重複事實）。handoff 第 11 項會列出本 run 套用的產品政策和**政策建議**（`product-policy.mjs suggest <run-id>`；測試回合規則、DEC-07 授權這類只限本次的設定不會列入；沒有建議時寫「無」）。使用者勾選的建議，先記成 plan.decisions 的一筆，再用 `product-policy.mjs write` 寫入；沒勾選的只留在本 run，政策檔不變。最後 `node scripts/state-store.mjs release <run-id>`（owner token 相符才刪除鎖與 `active-run.json`）。**不釋放會讓 hook 持續阻擋本專案所有未帶 op 標頭的 Figma 呼叫。**
 - 回報時分開列 implementation 與 integration 狀態、未驗證項與下一步；有 `skipped` 的設計決策時一次列出。使用者表示「接受為測試成功」：先把使用者的決定記入 `plan.decisions`，再 `evaluate-completion.mjs … --accept-test-run <decisionRef> <說明>`。
 - Design QA agent 尚未接入（`docs/qa-integration-contract.md`）：UI agent 維持目前全部適用驗證，不把交付改成「待 QA」。
 
@@ -115,7 +134,8 @@ hook 擋下時照原因處理（補標頭、先對帳、取得授權）；**不�
 | 檔案 | 何時讀 |
 |---|---|
 | `references/discovery.md` | Discover：範圍、元件版本、variables 來源、字型 |
-| `references/design-decisions.md` | 任何可能是設計決策的時候 |
+| `references/design-decisions.md` | 任何可能是設計決策的時候；預填清單的格式 |
+| `references/product-policy.md` | Intake 確定產品、套用或寫入產品政策、Handoff 政策建議 |
 | `references/flow.md` | Plan：判斷要不要整理任務流程 |
 | `references/design-quality.md` | Plan 與 Validate：品質契約、gates、evidence |
 | `references/collaboration.md` | 寫入前後、使用者可能同時編輯時 |

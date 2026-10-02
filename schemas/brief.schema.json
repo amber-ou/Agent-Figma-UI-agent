@@ -3,54 +3,180 @@
   "$id": "https://figma-ui.local/schemas/brief.schema.json",
   "title": "brief.json (spec §7.1, §20)",
   "type": "object",
-  "required": ["schemaVersion", "runId", "workflow", "taskType", "stage", "goal", "sources", "output", "designSystem", "requiredModes", "reviewScope", "decisionRefs", "openQuestions"],
+  "required": [
+    "schemaVersion",
+    "runId",
+    "workflow",
+    "taskType",
+    "stage",
+    "goal",
+    "sources",
+    "output",
+    "designSystem",
+    "requiredModes",
+    "reviewScope",
+    "decisionRefs",
+    "openQuestions"
+  ],
   "properties": {
-    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
-    "runId": { "$ref": "common.schema.json#/$defs/runId" },
-    "workflow": { "$ref": "common.schema.json#/$defs/workflow" },
-    "taskType": { "$ref": "common.schema.json#/$defs/taskType" },
-    "stage": { "enum": ["intake", "confirmed"] },
-    "goal": { "type": "string", "minLength": 1 },
-    "audience": { "type": "array", "items": { "type": "string" } },
-    "platform": { "type": ["string", "null"] },
-    "locale": { "type": "string" },
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion"
+    },
+    "runId": {
+      "$ref": "common.schema.json#/$defs/runId"
+    },
+    "workflow": {
+      "$ref": "common.schema.json#/$defs/workflow"
+    },
+    "taskType": {
+      "$ref": "common.schema.json#/$defs/taskType"
+    },
+    "stage": {
+      "enum": [
+        "intake",
+        "confirmed"
+      ]
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audience": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "platform": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "locale": {
+      "type": "string"
+    },
     "sources": {
       "type": "object",
-      "required": ["referenceFiles", "designSystemFiles", "approvedLibraryKeys"],
+      "required": [
+        "referenceFiles",
+        "designSystemFiles",
+        "approvedLibraryKeys"
+      ],
       "properties": {
-        "referenceFiles": { "type": "array", "items": { "$ref": "#/$defs/sourceFile" } },
-        "designSystemFiles": { "type": "array", "items": { "$ref": "#/$defs/sourceFile" } },
+        "referenceFiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceFile"
+          }
+        },
+        "designSystemFiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sourceFile"
+          }
+        },
         "approvedLibraryKeys": {
           "description": "Union of every approved library (components and variables).",
-          "type": "array", "items": { "$ref": "common.schema.json#/$defs/libraryKey" }, "uniqueItems": true
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/libraryKey"
+          },
+          "uniqueItems": true
         },
         "componentLibraryKeys": {
           "description": "v1.3 §6.1: libraries approved as component sources.",
-          "type": "array", "items": { "$ref": "common.schema.json#/$defs/libraryKey" }, "uniqueItems": true
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/libraryKey"
+          },
+          "uniqueItems": true
         },
         "variableLibraryKeys": {
           "description": "v1.3 §6.1: libraries approved as variable sources; approving components does not approve variables.",
-          "type": "array", "items": { "$ref": "common.schema.json#/$defs/libraryKey" }, "uniqueItems": true
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/libraryKey"
+          },
+          "uniqueItems": true
         }
       },
       "additionalProperties": false
     },
     "output": {
       "oneOf": [
-        { "type": "null" },
+        {
+          "type": "null"
+        },
         {
           "type": "object",
-          "required": ["fileKey", "pageId", "scopeRootIds", "createNewFile", "placement", "writeAllowed", "decisionRef"],
+          "required": [
+            "fileKey",
+            "pageId",
+            "scopeRootIds",
+            "createNewFile",
+            "placement",
+            "writeAllowed",
+            "decisionRef"
+          ],
           "properties": {
-            "fileUrl": { "type": ["string", "null"] },
-            "fileKey": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/fileKey" }] },
-            "pageId": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/nodeId" }] },
-            "pageName": { "type": ["string", "null"] },
-            "scopeRootIds": { "$ref": "common.schema.json#/$defs/nodeIds" },
-            "createNewFile": { "type": "boolean" },
-            "placement": { "enum": ["new_draft", "edit_existing"] },
-            "writeAllowed": { "type": "boolean" },
-            "decisionRef": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/localId" }] }
+            "fileUrl": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "fileKey": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "common.schema.json#/$defs/fileKey"
+                }
+              ]
+            },
+            "pageId": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "common.schema.json#/$defs/nodeId"
+                }
+              ]
+            },
+            "pageName": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "scopeRootIds": {
+              "$ref": "common.schema.json#/$defs/nodeIds"
+            },
+            "createNewFile": {
+              "type": "boolean"
+            },
+            "placement": {
+              "enum": [
+                "new_draft",
+                "edit_existing"
+              ]
+            },
+            "writeAllowed": {
+              "type": "boolean"
+            },
+            "decisionRef": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "common.schema.json#/$defs/localId"
+                }
+              ]
+            }
           },
           "additionalProperties": false
         }
@@ -58,91 +184,347 @@
     },
     "designSystem": {
       "type": "object",
-      "required": ["discoverySource", "reusePolicy", "allowNewTokens", "allowNewComponents", "allowWrap", "allowMainComponentEdits"],
+      "required": [
+        "discoverySource",
+        "reusePolicy",
+        "allowNewTokens",
+        "allowNewComponents",
+        "allowWrap",
+        "allowMainComponentEdits"
+      ],
       "properties": {
-        "discoverySource": { "enum": ["ask_user", "user_specified", "discovered_and_confirmed"] },
-        "reusePolicy": { "enum": ["strict"] },
-        "allowNewTokens": { "type": "boolean" },
-        "allowNewComponents": { "type": "boolean" },
-        "allowWrap": { "type": "boolean" },
-        "allowMainComponentEdits": { "type": "boolean" },
-        "decisionRefs": { "$ref": "common.schema.json#/$defs/refs" }
+        "discoverySource": {
+          "enum": [
+            "ask_user",
+            "user_specified",
+            "discovered_and_confirmed"
+          ]
+        },
+        "reusePolicy": {
+          "enum": [
+            "strict"
+          ]
+        },
+        "allowNewTokens": {
+          "type": "boolean"
+        },
+        "allowNewComponents": {
+          "type": "boolean"
+        },
+        "allowWrap": {
+          "type": "boolean"
+        },
+        "allowMainComponentEdits": {
+          "type": "boolean"
+        },
+        "decisionRefs": {
+          "$ref": "common.schema.json#/$defs/refs"
+        }
       },
       "additionalProperties": false
     },
     "viewports": {
       "type": "array",
-      "items": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string" }, "width": { "type": "number" } } }
+      "items": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "width": {
+            "type": "number"
+          }
+        }
+      }
     },
-    "requiredScreens": { "type": "array", "items": { "type": "string" } },
-    "requiredStates": { "type": "array", "items": { "type": "string" } },
-    "requiredModes": { "type": "array", "items": { "type": "string" } },
-    "reviewScope": { "type": "array", "items": { "type": "string" } },
-    "decisionRefs": { "$ref": "common.schema.json#/$defs/refs" },
-    "constraints": { "type": "array", "items": { "type": "string" } },
-    "references": { "type": "array" },
-    "assumptions": { "type": "array", "items": { "type": "string" } },
-    "gaps": { "type": "array", "items": { "$ref": "#/$defs/gap" } },
-    "openQuestions": { "type": "array", "items": { "type": "string" } },
-    "approvalPolicy": { "enum": ["ask_on_problem", "ask_on_any_error"] },
-    "delivery": { "type": "array", "items": { "enum": ["figma", "audit", "handoff"] } }
+    "requiredScreens": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "requiredStates": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "requiredModes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reviewScope": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "decisionRefs": {
+      "$ref": "common.schema.json#/$defs/refs"
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "references": {
+      "type": "array"
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "gaps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/gap"
+      }
+    },
+    "openQuestions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "approvalPolicy": {
+      "enum": [
+        "ask_on_problem",
+        "ask_on_any_error"
+      ]
+    },
+    "delivery": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "figma",
+          "audit",
+          "handoff"
+        ]
+      }
+    },
+    "product": {
+      "description": "v1.7 §7.5 POL-03: the product of this run and the product policies applied at intake. productId null = not determined yet (ask, REQ-05).",
+      "type": "object",
+      "required": [
+        "productId"
+      ],
+      "properties": {
+        "productId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "request",
+            "user_answer"
+          ]
+        },
+        "policyDigest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "appliedPolicies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "policyRef",
+              "summary"
+            ],
+            "properties": {
+              "policyRef": {
+                "$ref": "common.schema.json#/$defs/policyRef"
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "value": {}
+            },
+            "additionalProperties": false
+          }
+        },
+        "appliedAt": {
+          "$ref": "common.schema.json#/$defs/dateTime"
+        },
+        "newProduct": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
   },
   "additionalProperties": false,
   "allOf": [
     {
-      "if": { "properties": { "taskType": { "const": "audit" } } },
-      "then": { "properties": { "output": { "type": "null" } } }
-    },
-    {
-      "if": { "properties": { "stage": { "const": "confirmed" }, "taskType": { "enum": ["extend", "modify"] } } },
+      "if": {
+        "properties": {
+          "taskType": {
+            "const": "audit"
+          }
+        }
+      },
       "then": {
         "properties": {
-          "openQuestions": { "maxItems": 0 },
+          "output": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "stage": {
+            "const": "confirmed"
+          },
+          "taskType": {
+            "enum": [
+              "extend",
+              "modify"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "openQuestions": {
+            "maxItems": 0
+          },
           "output": {
             "type": "object",
             "properties": {
-              "fileKey": { "$ref": "common.schema.json#/$defs/fileKey" },
-              "writeAllowed": { "const": true },
-              "decisionRef": { "$ref": "common.schema.json#/$defs/localId" }
+              "fileKey": {
+                "$ref": "common.schema.json#/$defs/fileKey"
+              },
+              "writeAllowed": {
+                "const": true
+              },
+              "decisionRef": {
+                "$ref": "common.schema.json#/$defs/localId"
+              }
             }
           }
         }
       }
     },
     {
-      "if": { "properties": { "stage": { "const": "confirmed" }, "taskType": { "const": "audit" } } },
-      "then": { "properties": { "openQuestions": { "maxItems": 0 } } }
+      "if": {
+        "properties": {
+          "stage": {
+            "const": "confirmed"
+          },
+          "taskType": {
+            "const": "audit"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "openQuestions": {
+            "maxItems": 0
+          }
+        }
+      }
     }
   ],
   "$defs": {
     "sourceFile": {
       "type": "object",
-      "required": ["fileKey", "purpose"],
+      "required": [
+        "fileKey",
+        "purpose"
+      ],
       "properties": {
-        "fileUrl": { "type": "string" },
-        "fileKey": { "$ref": "common.schema.json#/$defs/fileKey" },
-        "nodeIds": { "$ref": "common.schema.json#/$defs/nodeIds" },
+        "fileUrl": {
+          "type": "string"
+        },
+        "fileKey": {
+          "$ref": "common.schema.json#/$defs/fileKey"
+        },
+        "nodeIds": {
+          "$ref": "common.schema.json#/$defs/nodeIds"
+        },
         "nodeTypes": {
           "description": "v1.3 §8.1: resolved type of each URL node-id (a node-id may point at a PAGE).",
-          "type": "object", "additionalProperties": { "type": "string" }
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         },
-        "libraryKey": { "$ref": "common.schema.json#/$defs/libraryKey" },
-        "provides": { "type": "array", "items": { "enum": ["components", "variables", "styles", "screens"] } },
-        "purpose": { "type": "string" }
+        "libraryKey": {
+          "$ref": "common.schema.json#/$defs/libraryKey"
+        },
+        "provides": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "components",
+              "variables",
+              "styles",
+              "screens"
+            ]
+          }
+        },
+        "purpose": {
+          "type": "string"
+        }
       },
       "additionalProperties": false
     },
     "gap": {
       "type": "object",
-      "required": ["id", "need", "status"],
+      "required": [
+        "id",
+        "need",
+        "status"
+      ],
       "properties": {
-        "id": { "$ref": "common.schema.json#/$defs/localId" },
-        "need": { "type": "string" },
-        "searched": { "type": "array", "items": { "type": "string" } },
-        "candidates": { "type": "array" },
-        "status": { "enum": ["unresolved", "resolved", "accepted"] },
-        "impact": { "type": "string" },
-        "decisionRef": { "$ref": "common.schema.json#/$defs/localId" }
+        "id": {
+          "$ref": "common.schema.json#/$defs/localId"
+        },
+        "need": {
+          "type": "string"
+        },
+        "searched": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "candidates": {
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "unresolved",
+            "resolved",
+            "accepted"
+          ]
+        },
+        "impact": {
+          "type": "string"
+        },
+        "decisionRef": {
+          "$ref": "common.schema.json#/$defs/localId"
+        }
       },
       "additionalProperties": false
     }

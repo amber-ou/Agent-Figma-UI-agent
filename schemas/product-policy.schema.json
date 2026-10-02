@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://figma-ui.local/schemas/product-policy.schema.json",
+  "title": "Product policy (spec v1.7 §7.5, layer 2 of §4.6)",
+  "description": "One file per product in product-policies/<productId>.json (in git). Never contains Figma URLs, fileKeys, accounts or secrets (POL-01); those live in .figma-ui/products/<productId>.local.json. Only the user decides its content (POL-04, INVARIANT-24). Semantic checks (file name, unique rule IDs, no figma.com URL / fileKey / fileUrl anywhere, history append-only and covering every item) are in scripts/product-policy.mjs.",
+  "type": "object",
+  "required": ["schemaVersion", "productId", "displayName", "policies", "rules", "history"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "productId": { "$ref": "#/$defs/productId" },
+    "displayName": { "type": "string", "minLength": 1 },
+    "policies": {
+      "description": "Policy items defined by the spec. v1.7 defines only accessibility.contrast.",
+      "type": "object",
+      "properties": {
+        "accessibility.contrast": {
+          "allOf": [{ "$ref": "#/$defs/decided" }],
+          "type": "object",
+          "required": ["value"],
+          "properties": {
+            "value": {
+              "type": "object",
+              "required": ["required"],
+              "properties": { "required": { "type": "boolean" } },
+              "additionalProperties": false
+            },
+            "decidedBy": true, "decidedAt": true, "origin": true, "runId": true, "decisionRef": true, "note": true
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "rules": {
+      "description": "Other product rules the user decided (naming, brand usage, ...).",
+      "type": "array",
+      "items": {
+        "allOf": [{ "$ref": "#/$defs/decided" }],
+        "type": "object",
+        "required": ["id", "text", "appliesTo"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "text": { "type": "string", "minLength": 1 },
+          "appliesTo": { "enum": ["design_decision", "naming", "brand", "other"] },
+          "decidedBy": true, "decidedAt": true, "origin": true, "runId": true, "decisionRef": true, "note": true
+        },
+        "additionalProperties": false
+      }
+    },
+    "history": {
+      "description": "Append-only log of every add / modify / remove (POL-01).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["at", "action", "target", "from", "to", "origin"],
+        "properties": {
+          "at": { "$ref": "#/$defs/when" },
+          "action": { "enum": ["add", "modify", "remove"] },
+          "target": { "type": "string", "pattern": "^(policies/accessibility\\.contrast|rules/[a-z0-9][a-z0-9-]*|product)$" },
+          "from": {},
+          "to": {},
+          "origin": { "$ref": "#/$defs/origin" },
+          "runId": { "type": ["string", "null"] },
+          "decisionRef": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "productId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "when": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2}))?$" },
+    "origin": { "enum": ["policy_question", "handoff_suggestion", "user_instruction"] },
+    "decided": {
+      "type": "object",
+      "required": ["decidedBy", "decidedAt", "origin"],
+      "properties": {
+        "decidedBy": { "const": "user" },
+        "decidedAt": { "$ref": "#/$defs/when" },
+        "origin": { "$ref": "#/$defs/origin" },
+        "runId": { "type": ["string", "null"] },
+        "decisionRef": { "type": ["string", "null"] },
+        "note": { "type": "string" }
+      }
+    }
+  }
+}

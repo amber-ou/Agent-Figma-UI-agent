@@ -3,7 +3,9 @@
   "$id": "https://figma-ui.local/schemas/common.schema.json",
   "title": "figma-ui shared definitions (spec v1.6 §20)",
   "$defs": {
-    "schemaVersion": { "const": "1.2" },
+    "schemaVersion": {
+      "const": "1.2"
+    },
     "runId": {
       "description": "Run identifier; also a directory name under design-runs/.",
       "type": "string",
@@ -20,42 +22,160 @@
       "type": "string",
       "pattern": "^[A-Za-z][A-Za-z0-9._-]*$"
     },
-    "fileKey": { "type": "string", "pattern": "^[0-9A-Za-z]{22,128}$" },
+    "fileKey": {
+      "type": "string",
+      "pattern": "^[0-9A-Za-z]{22,128}$"
+    },
     "nodeId": {
       "description": "Figma node id, including instance-sublayer ids such as I1:2;3:4.",
       "type": "string",
       "pattern": "^I?[0-9]+:[0-9]+(;[0-9]+:[0-9]+)*$"
     },
-    "libraryKey": { "type": "string", "pattern": "^lk-[0-9a-f]{16,}$" },
+    "libraryKey": {
+      "type": "string",
+      "pattern": "^lk-[0-9a-f]{16,}$"
+    },
     "assetKey": {
       "description": "Component, component set, style or variable key.",
       "type": "string",
       "pattern": "^[0-9a-f]{16,64}$"
     },
-    "dateTime": { "type": "string", "format": "date-time" },
-    "nullableDateTime": { "type": ["string", "null"], "format": "date-time" },
-    "taskType": { "enum": ["extend", "modify", "audit"] },
-    "workflow": { "enum": ["native_design", "capture_and_reconcile", "design_to_code"] },
-    "runStatus": { "enum": ["in_progress", "complete", "complete_with_exceptions", "awaiting_user", "blocked", "partial"] },
-    "phase": { "enum": ["intake", "preflight", "discover", "plan", "build", "validate", "handoff", "reconcile"] },
-    "operationStatus": { "enum": ["planned", "dispatched", "applied", "verified", "failed_known", "unknown_outcome", "cancelled"] },
-    "operationMode": { "enum": ["read", "write"] },
-    "gateStatus": { "enum": ["pass", "fail", "not_applicable", "not_verified"] },
-    "capabilityStatus": { "enum": ["available_unverified", "verified", "unavailable", "denied", "unknown"] },
-    "coverage": { "enum": ["complete_for_requested_scope", "partial", "unavailable"] },
-    "decisionSource": { "enum": ["user", "ds", "existing_pattern", "brief"] },
-    "severity": { "enum": ["critical", "major", "minor"] },
-    "findingStatus": { "enum": ["open", "resolved", "accepted"] },
-    "findingOrigin": { "enum": ["introduced", "regression", "inherited_baseline"] },
+    "dateTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "nullableDateTime": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "taskType": {
+      "enum": [
+        "extend",
+        "modify",
+        "audit"
+      ]
+    },
+    "workflow": {
+      "enum": [
+        "native_design",
+        "capture_and_reconcile",
+        "design_to_code"
+      ]
+    },
+    "runStatus": {
+      "enum": [
+        "in_progress",
+        "complete",
+        "complete_with_exceptions",
+        "awaiting_user",
+        "blocked",
+        "partial"
+      ]
+    },
+    "phase": {
+      "enum": [
+        "intake",
+        "preflight",
+        "discover",
+        "plan",
+        "build",
+        "validate",
+        "handoff",
+        "reconcile"
+      ]
+    },
+    "operationStatus": {
+      "enum": [
+        "planned",
+        "dispatched",
+        "applied",
+        "verified",
+        "failed_known",
+        "unknown_outcome",
+        "cancelled"
+      ]
+    },
+    "operationMode": {
+      "enum": [
+        "read",
+        "write"
+      ]
+    },
+    "gateStatus": {
+      "enum": [
+        "pass",
+        "fail",
+        "not_applicable",
+        "not_verified"
+      ]
+    },
+    "capabilityStatus": {
+      "enum": [
+        "available_unverified",
+        "verified",
+        "unavailable",
+        "denied",
+        "unknown"
+      ]
+    },
+    "coverage": {
+      "enum": [
+        "complete_for_requested_scope",
+        "partial",
+        "unavailable"
+      ]
+    },
+    "decisionSource": {
+      "enum": [
+        "user",
+        "ds",
+        "existing_pattern",
+        "brief",
+        "product_policy"
+      ]
+    },
+    "severity": {
+      "enum": [
+        "critical",
+        "major",
+        "minor"
+      ]
+    },
+    "findingStatus": {
+      "enum": [
+        "open",
+        "resolved",
+        "accepted"
+      ]
+    },
+    "findingOrigin": {
+      "enum": [
+        "introduced",
+        "regression",
+        "inherited_baseline"
+      ]
+    },
     "refs": {
       "type": "array",
-      "items": { "$ref": "#/$defs/localId" },
+      "items": {
+        "$ref": "#/$defs/localId"
+      },
       "uniqueItems": true
     },
     "nodeIds": {
       "type": "array",
-      "items": { "$ref": "#/$defs/nodeId" },
+      "items": {
+        "$ref": "#/$defs/nodeId"
+      },
       "uniqueItems": true
+    },
+    "policyRef": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*#(policies/accessibility.contrast|rules/[a-z0-9][a-z0-9-]*)$",
+      "description": "v1.7 §7.5: <productId>#policies/<item> or <productId>#rules/<id>; must resolve in product-policies/<productId>.json"
     }
   }
 }
