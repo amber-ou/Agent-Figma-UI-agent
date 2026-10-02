@@ -1,8 +1,8 @@
 # Figma MCP UI 設計研究紀錄
 
-版本：1.7 · 原研究日期：2026-09-27 · 補充查核／修訂：2026-09-28、2026-09-29（v1.1–v1.6）、2026-10-02（v1.7）。
+版本：1.8 · 原研究日期：2026-09-27 · 補充查核／修訂：2026-09-28、2026-09-29（v1.1–v1.6）、2026-10-02（v1.7）、2026-10-03（v1.8）。
 
-目的：為「Claude Code 讀取指定檔案的 library／variables 並延伸 UI」提供來源與限制。規範以 FIGMA_UI_AGENT_SPEC.md v1.7 為唯一來源；本文件不另定義完成條件。
+目的：為「Claude Code 讀取指定檔案的 library／variables 並延伸 UI」提供來源與限制。規範以 FIGMA_UI_AGENT_SPEC.md v1.8 為唯一來源；本文件不另定義完成條件。
 
 ## 1. 研究方式與可信度
 
@@ -288,3 +288,14 @@ M4 任務 A（run `ui-20260929-002`）是 v1.6 流程的第一次真實驗證；
 | Discover 的字型比對漏掉元件內部的字型（Status Bar 的 SF Pro Text） | E | F-009 | 第 10.3 節：要比對元件內部字型 |
 
 v1.7 的產品政策、記憶分層與預填清單是使用者決定的流程設計（P），沒有新的 Figma 量測。
+
+## 16. v1.8 決策紀錄（v1.7 真實 run 與 skill 盤點，2026-10-03）
+
+| 觀察 | 分級 | 證據 | 主規格處理 |
+|---|---|---|---|
+| 完成判定把使用者明確略過的題目算成未回答（v1.4 規則沿用到 v1.7 的預填清單） | E | run `ui-20261002-001` 的 dd-11、pd-05 | DEC-08 `skippedBy`、INVARIANT-28 |
+| 官方 Figma plugin 最新為 2.2.126（`figma/mcp-server-guide` `.claude-plugin/plugin.json`，commit `aaa0794`，2026-10-01）；本機 `figma@synced` 2.2.118，重開 Claude Code 後不變 | D（官方 repo）／E（本機） | `claude plugin list` | 第 4.2.2 節 |
+| 官方 plugin 的 skill：figma-use、generate-design、generate-library、create-new-file、design-to-code、code-connect、implement-motion、swiftui、generate-diagram、use-figjam、use-slides、use-motion、shaders、generative-plugins；另有 workflow skill | D | 同上 repo 的 `skills/` | 第 4.7 節 |
+| 本機另有 Anthropic `design` plugin 1.2.0（accessibility-review、design-critique、design-handoff、design-system、research-synthesis、user-research、ux-copy），其 `.mcp.json` 含 `mcp.figma.com` | D（`anthropics/knowledge-work-plugins`）／E（本機清單） | `/skills`、plugin 原始檔 | 第 4.7、4.2.3 節 |
+| 本機 `/mcp` 只有一個 Figma 連線（手動加入的 `figma`，40 個工具）；`design` plugin 的 Figma 連線沒有出現 | E（現象）／U（原因） | `/mcp` 截圖 | 第 4.2.3 節記為現況 |
+| 帳號同步的設計類 skill（`ux-design-team` 等）有自行補假設、預設數值、產出 HTML 等內容，與第 7.4 節衝突 | D（skill 原文） | 帳號同步的 SKILL.md | 第 4.7 節排除清單 |
