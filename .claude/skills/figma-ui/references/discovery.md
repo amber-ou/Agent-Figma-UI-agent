@@ -11,6 +11,7 @@
   - `figmaUiPage(items, { cursor, maxBytes })`：依 UTF-8 位元組分頁，回傳 `complete`／`nextCursor`；單筆超過上限時標 `oversizedItem`，要縮小範圍，不採用被切掉的值。
   - `figmaUiInstanceGroups(root, { limit })`：instance 依元件、主元件節點（版本）、variant、屬性值、override 欄位與 explicit mode 分組；掃描上限寫在結果（`limited`）。
   - `figmaUiFontCheck(required)`：在 Figma 端只比對本次需要的字型，不回傳整份清單。
+  - `figmaUiComponentFonts(mainComponentIds)`（v1.7）：從主元件本身收集元件內部用到的字型，交給 `figmaUiFontCheck`。
 
 ## 1. 四種資源集合（§6.1）
 
@@ -48,7 +49,9 @@
 
 ## 4a. 字型（§10.3，v1.4）
 
-- 收集要用到的字型（重用元件內的文字、參考畫面的 text styles），在 Figma 端用 `figmaUiFontCheck` 比對，只回傳需要的結果，寫入 `inventory.fonts`（`family`、`style`、`installed`、`usedBy`）。本機已有兩份清單時，也可以用 `node scripts/quality-metrics.mjs fonts <required.json> <available.json>`。
+- 收集要用到的字型，在 Figma 端用 `figmaUiFontCheck` 比對，只回傳需要的結果，寫入 `inventory.fonts`（`family`、`style`、`installed`、`usedBy`）。來源有兩種，**兩種都要收**：
+  1. 參考畫面與新建文字要用的 text styles；
+  2. **準備使用的元件內部實際使用的字型**（v1.7，§10.3）：對 componentMap 每個主元件 id 呼叫 `figmaUiComponentFonts([...])`，它讀主元件本身的文字節點（含巢狀 instance），**不建立 instance**（唯讀腳本不得建立暫時節點）。M4 只比對了參考畫面，漏掉 Status Bar 主元件內的 SF Pro Text，直到 Validate 才發現。本機已有兩份清單時，也可以用 `node scripts/quality-metrics.mjs fonts <required.json> <available.json>`。
 - 未安裝：**不換字型**，也不在 `loadFontAsync` 失敗後改用其他字型。記 `inherited_baseline`（`baselineRef` 指向 `plan.baseline.observations`），在 Plan 列給使用者並記 `listedToUserRef`。只有使用者決定替換時才可填 `substitutedWith`。
 - 截圖時仍要確認沒有缺字或方框（第一次真實任務：Status Bar 的 SF Pro Text 未安裝，Figma 以替代字型顯示）。
 

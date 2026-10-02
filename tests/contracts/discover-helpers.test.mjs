@@ -7,7 +7,7 @@ import path from 'node:path';
 import { repo } from '../helpers.mjs';
 
 const src = fs.readFileSync(path.join(repo, '.claude', 'skills', 'figma-ui', 'snippets', 'discover-helpers.js'), 'utf8');
-const load = figma => new Function('figma', `${src}\nreturn { figmaUiUtf8Bytes, figmaUiPage, figmaUiFontCheck, figmaUiInstanceGroups };`)(figma); // eslint-disable-line no-new-func
+const load = figma => new Function('figma', `${src}\nreturn { figmaUiUtf8Bytes, figmaUiPage, figmaUiFontCheck, figmaUiInstanceGroups, figmaUiComponentFonts };`)(figma); // eslint-disable-line no-new-func
 
 test('A05: UTF-8 byte length matches Buffer for ASCII, CJK and astral characters', () => {
   const { figmaUiUtf8Bytes } = load({});
@@ -78,4 +78,28 @@ test('A05: instance groups collapse identical usage but keep different overrides
   const limited = await figmaUiInstanceGroups(root, { limit: 2 });
   assert.equal(limited.limited, true);
   assert.equal(limited.scanned, 2);
+});
+
+// v1.7 §10.3 (M4 finding 8): component-internal fonts are checked, read from main components only.
+test('v1.7: component-internal fonts (incl. nested instance text) are collected from main components and checked', async () => {
+  const text = (fonts, chars = 'x') => ({ type: 'TEXT', characters: chars, getStyledTextSegments: () => fonts.map(f => ({ fontName: f })) });
+  const statusBar = { id: '4009:996', type: 'COMPONENT', name: 'Type=Notch', parent: { type: 'COMPONENT_SET', name: 'Status Bar' }, findAllWithCriteria: () => [text([{ family: 'SF Pro Text', style: 'Semibold' }], '9:41')] };
+  const card = { id: '29474:24008', type: 'COMPONENT', name: 'Card', parent: { type: 'PAGE' }, findAllWithCriteria: () => [text([{ family: 'Inter', style: 'Bold' }, { family: 'Inter', style: 'Regular' }]), text([{ family: 'Inter', style: 'Bold' }], '')] };
+  const nodes = new Map([[statusBar.id, statusBar], [card.id, card]]);
+  let created = 0;
+  const figma = {
+    getNodeByIdAsync: async id => nodes.get(id) || null,
+    listAvailableFontsAsync: async () => [{ fontName: { family: 'Inter', style: 'Bold' } }, { fontName: { family: 'Inter', style: 'Regular' } }],
+  };
+  Object.defineProperty(statusBar, 'createInstance', { get() { created++; return () => { throw new Error('read must not create instances'); }; } });
+  const { figmaUiComponentFonts, figmaUiFontCheck } = load(figma);
+  const { required, missingIds } = await figmaUiComponentFonts(['4009:996', '29474:24008', '9:9']);
+  assert.deepEqual(missingIds, ['9:9']);
+  const r = await figmaUiFontCheck(required);
+  assert.deepEqual(r.missing.map(f => `${f.family} ${f.style}`), ['SF Pro Text Semibold']);
+  assert.deepEqual(r.missing[0].usedBy, ['Status Bar{Type=Notch}']);
+  assert.equal(r.checked, 3, 'empty text nodes are skipped; duplicates merged');
+  assert.equal(created, 0);
+  // the helper source never creates nodes (read-only scripts, M4 static check)
+  assert.ok(!/createInstance\s*\(/.test(src.slice(src.indexOf('async function figmaUiComponentFonts'), src.indexOf('async function figmaUiFontCheck'))));
 });

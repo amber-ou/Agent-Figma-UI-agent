@@ -78,7 +78,9 @@ export function intakeBrief(runId, goal) {
     requiredModes: [],
     reviewScope: [],
     decisionRefs: [],
-    openQuestions: ['product / platform', 'reference files', 'component library', 'variables library', 'output file / page', 'new draft or edit existing', 'what to extend'],
+    // v1.7: product first (REQ-05, INVARIANT-25), then libraries the user provides (REQ-06)
+    product: { productId: null },
+    openQuestions: ['product (REQ-05)', 'platform', 'reference files', 'component library', 'variables library', 'output file / page', 'new draft or edit existing', 'what to extend'],
     approvalPolicy: 'ask_on_problem',
     delivery: ['figma', 'audit', 'handoff'],
   };

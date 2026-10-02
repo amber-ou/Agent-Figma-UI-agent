@@ -3,30 +3,107 @@
   "$id": "https://figma-ui.local/schemas/audit.schema.json",
   "title": "audit.json — single source of findings; no run status (spec v1.6 §12, §20)",
   "type": "object",
-  "required": ["schemaVersion", "runId", "taskType", "gates", "coverage", "findings", "evidence", "acceptedExceptions", "completionEvaluation"],
+  "required": [
+    "schemaVersion",
+    "runId",
+    "taskType",
+    "gates",
+    "coverage",
+    "findings",
+    "evidence",
+    "acceptedExceptions",
+    "completionEvaluation"
+  ],
   "properties": {
-    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
-    "runId": { "$ref": "common.schema.json#/$defs/runId" },
-    "taskType": { "$ref": "common.schema.json#/$defs/taskType" },
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion"
+    },
+    "runId": {
+      "$ref": "common.schema.json#/$defs/runId"
+    },
+    "taskType": {
+      "$ref": "common.schema.json#/$defs/taskType"
+    },
     "gates": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "status"],
+        "required": [
+          "id",
+          "status"
+        ],
         "properties": {
-          "id": { "enum": ["G1", "G2", "G3", "G4", "G5", "G6", "G7"] },
-          "status": { "$ref": "common.schema.json#/$defs/gateStatus" },
-          "evidenceRefs": { "type": "array", "items": { "type": "string" } },
-          "planRef": { "type": "string" },
-          "note": { "type": "string" }
+          "id": {
+            "enum": [
+              "G1",
+              "G2",
+              "G3",
+              "G4",
+              "G5",
+              "G6",
+              "G7"
+            ]
+          },
+          "status": {
+            "$ref": "common.schema.json#/$defs/gateStatus"
+          },
+          "evidenceRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "planRef": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "contrast": {
+            "description": "v1.7 §9.5/§12.1 (G5 only): the contrast part of G5. not_applicable only with a policyRef to a product policy whose accessibility.contrast.required is false; the other accessibility items still decide G5.",
+            "type": "object",
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "checked",
+                  "not_applicable"
+                ]
+              },
+              "policyRef": {
+                "$ref": "common.schema.json#/$defs/policyRef"
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "policyRef": {
+            "$ref": "common.schema.json#/$defs/policyRef"
+          }
         },
         "additionalProperties": false
       }
     },
     "coverage": {
       "type": "object",
-      "required": ["applicable", "verified"],
-      "properties": { "applicable": { "type": "integer", "minimum": 0 }, "verified": { "type": "integer", "minimum": 0 } },
+      "required": [
+        "applicable",
+        "verified"
+      ],
+      "properties": {
+        "applicable": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "verified": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
       "additionalProperties": false
     },
     "metrics": {
@@ -37,162 +114,469 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["nodeId", "property", "binding", "origin"],
+            "required": [
+              "nodeId",
+              "property",
+              "binding",
+              "origin"
+            ],
             "properties": {
-              "nodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
-              "property": { "type": "string", "minLength": 1 },
-              "binding": { "enum": ["variable", "style", "raw"] },
-              "styleKind": { "enum": ["paint", "text", "effect", "grid"] },
-              "styleId": { "$ref": "common.schema.json#/$defs/realId" },
-              "variableId": { "$ref": "common.schema.json#/$defs/realId" },
-              "origin": { "enum": ["introduced", "inherited_baseline", "regression"] },
-              "verified": { "type": "boolean" },
-              "eligible": { "type": "boolean" },
-              "exceptionRef": { "$ref": "common.schema.json#/$defs/localId" },
-              "note": { "type": "string" }
+              "nodeId": {
+                "$ref": "common.schema.json#/$defs/nodeId"
+              },
+              "property": {
+                "type": "string",
+                "minLength": 1
+              },
+              "binding": {
+                "enum": [
+                  "variable",
+                  "style",
+                  "raw"
+                ]
+              },
+              "styleKind": {
+                "enum": [
+                  "paint",
+                  "text",
+                  "effect",
+                  "grid"
+                ]
+              },
+              "styleId": {
+                "$ref": "common.schema.json#/$defs/realId"
+              },
+              "variableId": {
+                "$ref": "common.schema.json#/$defs/realId"
+              },
+              "origin": {
+                "enum": [
+                  "introduced",
+                  "inherited_baseline",
+                  "regression"
+                ]
+              },
+              "verified": {
+                "type": "boolean"
+              },
+              "eligible": {
+                "type": "boolean"
+              },
+              "exceptionRef": {
+                "$ref": "common.schema.json#/$defs/localId"
+              },
+              "note": {
+                "type": "string"
+              }
             },
             "additionalProperties": false,
             "allOf": [
-              { "if": { "properties": { "binding": { "const": "style" } } }, "then": { "required": ["styleId", "styleKind"] } },
-              { "if": { "properties": { "binding": { "const": "variable" } } }, "then": { "required": ["variableId"] } }
+              {
+                "if": {
+                  "properties": {
+                    "binding": {
+                      "const": "style"
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "styleId",
+                    "styleKind"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "binding": {
+                      "const": "variable"
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "variableId"
+                  ]
+                }
+              }
             ]
           }
         },
         "tokenBinding": {
           "description": "String (older runs) or the object computed by scripts/quality-metrics.mjs.",
-          "type": ["string", "object"]
+          "type": [
+            "string",
+            "object"
+          ]
         }
       }
     },
-    "score": { "description": "Diagnostic only (§12.3); never part of completionEvaluation.", "type": "object" },
+    "score": {
+      "description": "Diagnostic only (§12.3); never part of completionEvaluation.",
+      "type": "object"
+    },
     "findings": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "severity", "subject", "origin", "status", "observed", "evidenceRefs"],
+        "required": [
+          "id",
+          "severity",
+          "subject",
+          "origin",
+          "status",
+          "observed",
+          "evidenceRefs"
+        ],
         "properties": {
-          "id": { "$ref": "common.schema.json#/$defs/localId" },
-          "severity": { "$ref": "common.schema.json#/$defs/severity" },
-          "subject": { "enum": ["design", "execution"] },
-          "origin": { "$ref": "common.schema.json#/$defs/findingOrigin" },
-          "affectsDelivery": { "type": "boolean" },
+          "id": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "severity": {
+            "$ref": "common.schema.json#/$defs/severity"
+          },
+          "subject": {
+            "enum": [
+              "design",
+              "execution"
+            ]
+          },
+          "origin": {
+            "$ref": "common.schema.json#/$defs/findingOrigin"
+          },
+          "affectsDelivery": {
+            "type": "boolean"
+          },
           "gate": {
             "description": "Gate the finding belongs to. G5 findings are hard (§9.5): never accepted as an exception.",
-            "enum": ["G1", "G2", "G3", "G4", "G5", "G6", "G7"]
+            "enum": [
+              "G1",
+              "G2",
+              "G3",
+              "G4",
+              "G5",
+              "G6",
+              "G7"
+            ]
           },
-          "category": { "type": "string" },
-          "nodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
-          "screenKey": { "type": "string" },
-          "observed": { "type": "string" },
-          "expected": { "type": "string" },
-          "recommendation": { "type": "string" },
-          "probableCause": { "type": "string" },
-          "causeStatus": { "enum": ["hypothesis", "confirmed"] },
-          "resolution": { "type": "string" },
-          "status": { "$ref": "common.schema.json#/$defs/findingStatus" },
-          "decisionRef": { "$ref": "common.schema.json#/$defs/localId" },
-          "acceptedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
-          "evidenceRefs": { "type": "array", "items": { "type": "string" } }
+          "category": {
+            "type": "string"
+          },
+          "nodeId": {
+            "$ref": "common.schema.json#/$defs/nodeId"
+          },
+          "screenKey": {
+            "type": "string"
+          },
+          "observed": {
+            "type": "string"
+          },
+          "expected": {
+            "type": "string"
+          },
+          "recommendation": {
+            "type": "string"
+          },
+          "probableCause": {
+            "type": "string"
+          },
+          "causeStatus": {
+            "enum": [
+              "hypothesis",
+              "confirmed"
+            ]
+          },
+          "resolution": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "common.schema.json#/$defs/findingStatus"
+          },
+          "decisionRef": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "acceptedAt": {
+            "$ref": "common.schema.json#/$defs/dateTime"
+          },
+          "evidenceRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         },
         "additionalProperties": false,
-        "if": { "properties": { "status": { "const": "accepted" } } },
-        "then": { "required": ["decisionRef"] }
+        "if": {
+          "properties": {
+            "status": {
+              "const": "accepted"
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "decisionRef"
+          ]
+        }
       }
     },
-    "baselineObservations": { "type": "array", "items": { "type": "string" } },
+    "baselineObservations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "evidence": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "kind", "screenKey", "reviewSummary", "operationIds", "validity"],
+        "required": [
+          "id",
+          "kind",
+          "screenKey",
+          "reviewSummary",
+          "operationIds",
+          "validity"
+        ],
         "properties": {
-          "id": { "$ref": "common.schema.json#/$defs/localId" },
-          "kind": { "enum": ["structure", "screenshot", "contrast", "check"] },
-          "nodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
-          "screenKey": { "type": "string" },
+          "id": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "kind": {
+            "enum": [
+              "structure",
+              "screenshot",
+              "contrast",
+              "check"
+            ]
+          },
+          "nodeId": {
+            "$ref": "common.schema.json#/$defs/nodeId"
+          },
+          "screenKey": {
+            "type": "string"
+          },
           "cellKeys": {
             "description": "v1.6 (A03): plan.requiredCells keys this evidence covers. Matching is by cell, never by screenKey alone. Legacy evidence without cellKeys only counts when its screen has exactly one applicable cell.",
             "$ref": "common.schema.json#/$defs/refs"
           },
-          "viewport": { "type": ["string", "null"] },
-          "state": { "type": ["string", "null"] },
-          "mode": { "type": ["string", "null"] },
+          "viewport": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "subject": {
             "description": "v1.6 (A03): the delivery version and scope this evidence shows. afterOperationId is the last write applied before capture (null when none); scope/ancestor ids let the validator invalidate evidence when a later write touches the composition, its parent layout or modes.",
             "type": "object",
-            "required": ["rootNodeId", "afterOperationId"],
+            "required": [
+              "rootNodeId",
+              "afterOperationId"
+            ],
             "properties": {
-              "rootNodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
-              "scopeNodeIds": { "$ref": "common.schema.json#/$defs/nodeIds" },
-              "ancestorNodeIds": { "$ref": "common.schema.json#/$defs/nodeIds" },
-              "afterOperationId": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/localId" }] },
-              "fingerprint": { "type": "string", "pattern": "^fp[0-9]+:[0-9a-f]{8}$" }
+              "rootNodeId": {
+                "$ref": "common.schema.json#/$defs/nodeId"
+              },
+              "scopeNodeIds": {
+                "$ref": "common.schema.json#/$defs/nodeIds"
+              },
+              "ancestorNodeIds": {
+                "$ref": "common.schema.json#/$defs/nodeIds"
+              },
+              "afterOperationId": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "common.schema.json#/$defs/localId"
+                  }
+                ]
+              },
+              "fingerprint": {
+                "type": "string",
+                "pattern": "^fp[0-9]+:[0-9a-f]{8}$"
+              }
             },
             "additionalProperties": false
           },
           "toolRef": {
             "oneOf": [
-              { "type": "null" },
+              {
+                "type": "null"
+              },
               {
                 "type": "object",
-                "required": ["tool", "capturedAt"],
+                "required": [
+                  "tool",
+                  "capturedAt"
+                ],
                 "properties": {
-                  "tool": { "type": "string", "pattern": "^mcp__" },
-                  "operation": { "type": "string" },
-                  "capturedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+                  "tool": {
+                    "type": "string",
+                    "pattern": "^mcp__"
+                  },
+                  "operation": {
+                    "type": "string"
+                  },
+                  "capturedAt": {
+                    "$ref": "common.schema.json#/$defs/dateTime"
+                  }
                 },
                 "additionalProperties": false
               }
             ]
           },
-          "artifactRef": { "type": ["string", "null"] },
-          "reviewSummary": { "type": "string", "minLength": 1 },
-          "operationIds": { "type": "array", "items": { "type": "string" } },
-          "validity": { "enum": ["current", "superseded"] }
+          "artifactRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewSummary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operationIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "validity": {
+            "enum": [
+              "current",
+              "superseded"
+            ]
+          }
         },
         "additionalProperties": false,
         "anyOf": [
-          { "required": ["toolRef"], "properties": { "toolRef": { "type": "object" } } },
-          { "required": ["artifactRef"], "properties": { "artifactRef": { "type": "string" } } }
+          {
+            "required": [
+              "toolRef"
+            ],
+            "properties": {
+              "toolRef": {
+                "type": "object"
+              }
+            }
+          },
+          {
+            "required": [
+              "artifactRef"
+            ],
+            "properties": {
+              "artifactRef": {
+                "type": "string"
+              }
+            }
+          }
         ]
       }
     },
-    "implementationVerificationRequired": { "type": "array", "items": { "type": "string" } },
+    "implementationVerificationRequired": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "acceptedExceptions": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "decisionRef", "hard", "scope"],
+        "required": [
+          "id",
+          "decisionRef",
+          "hard",
+          "scope"
+        ],
         "properties": {
-          "id": { "$ref": "common.schema.json#/$defs/localId" },
-          "findingId": { "$ref": "common.schema.json#/$defs/localId" },
-          "decisionRef": { "$ref": "common.schema.json#/$defs/localId" },
-          "hard": { "const": false },
-          "scope": { "type": "string" },
-          "reason": { "type": "string" },
-          "acceptedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+          "id": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "findingId": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "decisionRef": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "hard": {
+            "const": false
+          },
+          "scope": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "acceptedAt": {
+            "$ref": "common.schema.json#/$defs/dateTime"
+          }
         },
         "additionalProperties": false
       }
     },
     "completionEvaluation": {
       "oneOf": [
-        { "type": "null" },
+        {
+          "type": "null"
+        },
         {
           "type": "object",
-          "required": ["ruleVersion", "eligible", "result", "reasons", "evaluatedAt"],
+          "required": [
+            "ruleVersion",
+            "eligible",
+            "result",
+            "reasons",
+            "evaluatedAt"
+          ],
           "properties": {
-            "ruleVersion": { "type": "string" },
-            "eligible": { "type": "boolean" },
-            "result": { "enum": ["complete", "complete_with_exceptions", "awaiting_user", "blocked", "partial"] },
-            "coverage": { "type": "object" },
-            "reasons": { "type": "array", "items": { "type": "string" } },
+            "ruleVersion": {
+              "type": "string"
+            },
+            "eligible": {
+              "type": "boolean"
+            },
+            "result": {
+              "enum": [
+                "complete",
+                "complete_with_exceptions",
+                "awaiting_user",
+                "blocked",
+                "partial"
+              ]
+            },
+            "coverage": {
+              "type": "object"
+            },
+            "reasons": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "inputDigest": {
               "description": "v1.6 (A02): sha256 of the artifacts and journal the evaluation was computed from; a different digest means the data changed and the run must be evaluated again.",
               "type": "string",
               "pattern": "^sha256:[0-9a-f]{64}$"
             },
-            "evaluatedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+            "evaluatedAt": {
+              "$ref": "common.schema.json#/$defs/dateTime"
+            }
           },
           "additionalProperties": false
         }

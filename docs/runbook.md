@@ -12,7 +12,7 @@ Spec v1.6 · 適用於本機 Claude Code（Windows 實測）· 最後更新 2026
 
 | 要做什麼 | 指令 | agent 會怎麼做 |
 |---|---|---|
-| 新任務 | `/figma-ui <需求>` | 建立新 run，重新做 Intake；不沿用先前 run 的平台、品牌、DS 或「採用建議」授權 |
+| 新任務 | `/figma-ui <需求>` | 建立新 run，重新做 Intake；不沿用先前 run 的平台、品牌、DS 或「採用建議」授權。需求寫了產品就自動套用該產品政策，並在摘要列一行「已套用產品政策：…」；沒寫就先問產品 |
 | 在同一個 run 上調整 | `/figma-ui continue <run-id> <調整>` | 跑 `run-context.mjs <run-id> continue`，已確認的內容不重問，只問新增的差異 |
 | 中斷後恢復 | `/figma-ui resume <run-id>` | 先照 `run-context.mjs <run-id> resume` 的 `next` 對帳，再繼續 |
 
@@ -20,7 +20,11 @@ Spec v1.6 · 適用於本機 Claude Code（Windows 實測）· 最後更新 2026
 
 `INTAKE → PREFLIGHT → DISCOVER → PLAN → BUILD → VALIDATE → HANDOFF`
 
-- **Plan 結束前不會寫入 Figma。** 設計決策會集中列成一張表給你確認；表裡沒填答案的題目，要等你回覆才會寫入受影響的部分。
+- **Plan 結束前不會寫入 Figma。** 待決的項目會一次列成**預填清單**（v1.7 DEC-09）：
+  - agent 有建議的列，答案欄已填好並標「建議，請確認」；需要你決定的列留空。
+  - 你可以一次確認全部，也可以逐列修改或填寫。留空的列 agent 不會自己填，你說略過就略過。
+  - 確認前不會寫入受影響的部分。
+  - 產品還沒有對比政策時，政策題排在第一列。
 - **寫入只在 brief 授權的範圍**，而且放在本 run 的 Section（`figma-ui / <run-id>`）。
 - **每個寫入都會另外讀回驗證**，不以寫入時的回應為準。
 - **完成與否只看 `evaluate-completion.mjs` 的結果。** 你把未完成的 run「接受為測試成功」時，只會記錄 `userAcceptance`，run 的狀態不會變成 complete。
@@ -35,6 +39,8 @@ node scripts/evaluate-completion.mjs design-runs/<run-id> --write               
 node scripts/run-report.mjs handoff <run-id> --write         # 從 artifacts 產生 handoff.md
 node scripts/run-report.mjs metrics <run-id>                 # 階段時間、工具次數、提問與決策統計
 node scripts/state-store.mjs release <run-id>                # 釋放鎖（每個 run 結束一定要做）
+node scripts/product-policy.mjs show <productId>             # 看產品政策（v1.7）
+node scripts/product-policy.mjs validate --against-git       # 檢查政策檔（不含網址／fileKey、history 只附加）
 node --test "tests/**/*.test.mjs"                            # 全部測試（不要用 node --test tests/）
 ```
 
@@ -48,6 +54,20 @@ Windows PowerShell 如果擋下 `npm`，改用 `npm.cmd install`，或先執行 
 4. 程式碼的修改推到功能分支，不直接推 main。
 
 ---
+
+### 1.5 產品政策（v1.7）
+
+- **怎麼看**：`node scripts/product-policy.mjs show <productId>`。handoff 第 11 項也會列出本 run 套用了哪些政策，依政策沒檢查對比時會註明。
+- **怎麼改**：只有你能決定。途徑有三種：
+  - 回答政策題；
+  - 在 handoff 勾選政策建議（`- [ ] ps-N：…`）；
+  - 明確說「把某規則寫進某產品政策」。
+
+  agent 會先給你看將寫入的內容，再寫入並附加 history。沒勾選的建議只留在那個 run，政策檔不變。
+- **新增產品**：需求寫新產品名稱，agent 會問你是否建立政策檔；細節見 `docs/setup.md` 的「產品政策」。
+- **換電腦**：政策檔在 git 裡；只需補本機的 `.figma-ui/products/<productId>.local.json`（檔案與 library 網址，預填候選用）。
+- **政策在 run 期間被改過**：`validate-artifacts` 和 `run-context` 會提示 digest 不同；請 agent 重新套用並確認。
+- **不會寫進 Claude Code 記憶**：run 決策和產品政策都不寫入 `~/.claude/projects/…/memory/` 或 `CLAUDE.md`（INVARIANT-26）。如果你發現有，請刪除並告訴 agent。
 
 ## 2. 帳號與權限恢復
 

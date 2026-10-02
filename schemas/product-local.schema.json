@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://figma-ui.local/schemas/product-local.schema.json",
+  "title": "Local product file (spec v1.7 §7.5 POL-01): .figma-ui/products/<productId>.local.json",
+  "description": "Machine-local, never in git. Known Figma files and libraries for a product. Only prefill candidates for intake (REQ-06): using any of them still needs this run's confirmation and authorisation.",
+  "type": "object",
+  "required": ["schemaVersion", "productId"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "productId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role", "fileUrl"],
+        "properties": {
+          "role": { "enum": ["reference", "output", "design_system", "other"] },
+          "name": { "type": "string" },
+          "fileUrl": { "type": "string", "pattern": "^https://(www\\.)?figma\\.com/" },
+          "fileKey": { "type": "string", "pattern": "^[0-9A-Za-z]{22,128}$" },
+          "note": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "libraries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "provides": { "type": "array", "items": { "enum": ["components", "variables", "styles"] } },
+          "libraryKey": { "type": "string" },
+          "fileUrl": { "type": "string", "pattern": "^https://(www\\.)?figma\\.com/" },
+          "fileKey": { "type": "string", "pattern": "^[0-9A-Za-z]{22,128}$" },
+          "note": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "note": { "type": "string" }
+  },
+  "additionalProperties": false
+}

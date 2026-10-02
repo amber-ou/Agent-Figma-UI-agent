@@ -3,26 +3,68 @@
   "$id": "https://figma-ui.local/schemas/ledger.schema.json",
   "title": "ledger.json — single source of run.status (spec §11, §12.4, §20)",
   "type": "object",
-  "required": ["schemaVersion", "runId", "phase", "status", "entities", "lastVerifiedOperationId", "pendingOperations", "pendingQuestions"],
+  "required": [
+    "schemaVersion",
+    "runId",
+    "phase",
+    "status",
+    "entities",
+    "lastVerifiedOperationId",
+    "pendingOperations",
+    "pendingQuestions"
+  ],
   "properties": {
-    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
-    "runId": { "$ref": "common.schema.json#/$defs/runId" },
-    "phase": { "$ref": "common.schema.json#/$defs/phase" },
-    "status": { "$ref": "common.schema.json#/$defs/runStatus" },
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion"
+    },
+    "runId": {
+      "$ref": "common.schema.json#/$defs/runId"
+    },
+    "phase": {
+      "$ref": "common.schema.json#/$defs/phase"
+    },
+    "status": {
+      "$ref": "common.schema.json#/$defs/runStatus"
+    },
     "entities": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["logicalKey", "nodeId", "type", "fileKey", "active", "lastOperationId"],
+        "required": [
+          "logicalKey",
+          "nodeId",
+          "type",
+          "fileKey",
+          "active",
+          "lastOperationId"
+        ],
         "properties": {
-          "logicalKey": { "type": "string", "minLength": 1 },
-          "nodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
-          "type": { "type": "string" },
-          "fileKey": { "$ref": "common.schema.json#/$defs/fileKey" },
-          "active": { "type": "boolean" },
-          "childNodeIds": { "$ref": "common.schema.json#/$defs/nodeIds" },
-          "agentFingerprint": { "type": "string", "pattern": "^fp[0-9]+:[0-9a-f]{8}$" },
-          "lastOperationId": { "$ref": "common.schema.json#/$defs/localId" },
+          "logicalKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nodeId": {
+            "$ref": "common.schema.json#/$defs/nodeId"
+          },
+          "type": {
+            "type": "string"
+          },
+          "fileKey": {
+            "$ref": "common.schema.json#/$defs/fileKey"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "childNodeIds": {
+            "$ref": "common.schema.json#/$defs/nodeIds"
+          },
+          "agentFingerprint": {
+            "type": "string",
+            "pattern": "^fp[0-9]+:[0-9a-f]{8}$"
+          },
+          "lastOperationId": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
           "userChangeDetectedAt": {
             "description": "v1.6 (A03): when a precondition guard or read-back found a user change on this entity; evidence captured before it is no longer current.",
             "$ref": "common.schema.json#/$defs/dateTime"
@@ -31,16 +73,34 @@
         "additionalProperties": false
       }
     },
-    "importedRemoteNodeIds": { "$ref": "common.schema.json#/$defs/nodeIds" },
-    "lastVerifiedOperationId": { "oneOf": [{ "type": "null" }, { "$ref": "common.schema.json#/$defs/localId" }] },
+    "importedRemoteNodeIds": {
+      "$ref": "common.schema.json#/$defs/nodeIds"
+    },
+    "lastVerifiedOperationId": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "common.schema.json#/$defs/localId"
+        }
+      ]
+    },
     "pendingOperations": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["operationId", "status"],
+        "required": [
+          "operationId",
+          "status"
+        ],
         "properties": {
-          "operationId": { "$ref": "common.schema.json#/$defs/localId" },
-          "status": { "$ref": "common.schema.json#/$defs/operationStatus" }
+          "operationId": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "status": {
+            "$ref": "common.schema.json#/$defs/operationStatus"
+          }
         },
         "additionalProperties": false
       }
@@ -49,52 +109,103 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "question"],
+        "required": [
+          "id",
+          "question"
+        ],
         "properties": {
-          "id": { "$ref": "common.schema.json#/$defs/localId" },
-          "question": { "type": "string" },
-          "blocking": { "type": "boolean" }
+          "id": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "question": {
+            "type": "string"
+          },
+          "blocking": {
+            "type": "boolean"
+          }
         },
         "additionalProperties": false
       }
     },
-    "gaps": { "type": "array", "items": { "type": "string" } },
+    "gaps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "lock": {
       "type": "object",
       "properties": {
-        "released": { "type": "boolean" },
-        "acquiredAt": { "$ref": "common.schema.json#/$defs/dateTime" },
-        "releasedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
-        "by": { "type": "string" }
+        "released": {
+          "type": "boolean"
+        },
+        "acquiredAt": {
+          "$ref": "common.schema.json#/$defs/dateTime"
+        },
+        "releasedAt": {
+          "$ref": "common.schema.json#/$defs/dateTime"
+        },
+        "by": {
+          "type": "string"
+        }
       },
       "additionalProperties": false
     },
     "userAcceptance": {
       "description": "v1.4 §2.3: the user accepted a run that did not pass §12.1 as a test success. Never changes status or completionEvaluation (INVARIANT-17).",
       "type": "object",
-      "required": ["kind", "decisionRef", "note", "acceptedAt"],
+      "required": [
+        "kind",
+        "decisionRef",
+        "note",
+        "acceptedAt"
+      ],
       "properties": {
-        "kind": { "const": "test_run" },
-        "decisionRef": { "$ref": "common.schema.json#/$defs/localId" },
-        "note": { "type": "string", "minLength": 1 },
-        "acceptedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "kind": {
+          "const": "test_run"
+        },
+        "decisionRef": {
+          "$ref": "common.schema.json#/$defs/localId"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "acceptedAt": {
+          "$ref": "common.schema.json#/$defs/dateTime"
+        },
         "evaluationResult": {
           "description": "completionEvaluation.result at the time of acceptance, kept for the record.",
-          "enum": ["complete", "complete_with_exceptions", "awaiting_user", "blocked", "partial"]
+          "enum": [
+            "complete",
+            "complete_with_exceptions",
+            "awaiting_user",
+            "blocked",
+            "partial"
+          ]
         }
       },
       "additionalProperties": false
     },
-    "completionEvaluatedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "completionEvaluatedAt": {
+      "$ref": "common.schema.json#/$defs/dateTime"
+    },
     "phaseHistory": {
       "description": "v1.6 (A07): phase changes written by state-store.mjs phase; used for per-phase timing.",
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["phase", "enteredAt"],
+        "required": [
+          "phase",
+          "enteredAt"
+        ],
         "properties": {
-          "phase": { "$ref": "common.schema.json#/$defs/phase" },
-          "enteredAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+          "phase": {
+            "$ref": "common.schema.json#/$defs/phase"
+          },
+          "enteredAt": {
+            "$ref": "common.schema.json#/$defs/dateTime"
+          }
         },
         "additionalProperties": false
       }
@@ -104,18 +215,45 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "askedAt", "questionCount"],
+        "required": [
+          "id",
+          "askedAt",
+          "questionCount"
+        ],
         "properties": {
-          "id": { "$ref": "common.schema.json#/$defs/localId" },
-          "phase": { "$ref": "common.schema.json#/$defs/phase" },
-          "askedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
-          "answeredAt": { "$ref": "common.schema.json#/$defs/nullableDateTime" },
-          "questionCount": { "type": "integer", "minimum": 1 }
+          "id": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "phase": {
+            "$ref": "common.schema.json#/$defs/phase"
+          },
+          "askedAt": {
+            "$ref": "common.schema.json#/$defs/dateTime"
+          },
+          "answeredAt": {
+            "$ref": "common.schema.json#/$defs/nullableDateTime"
+          },
+          "questionCount": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "prefilledRows": {
+            "description": "v1.7 DEC-09: rows sent with a prefilled answer",
+            "type": "integer",
+            "minimum": 0
+          },
+          "blankRows": {
+            "description": "v1.7 DEC-09: rows sent with an empty answer for the user",
+            "type": "integer",
+            "minimum": 0
+          }
         },
         "additionalProperties": false
       }
     },
-    "updatedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+    "updatedAt": {
+      "$ref": "common.schema.json#/$defs/dateTime"
+    }
   },
   "additionalProperties": false
 }

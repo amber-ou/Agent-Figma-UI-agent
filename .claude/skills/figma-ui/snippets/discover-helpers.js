@@ -39,6 +39,25 @@ function figmaUiPage(items, { cursor = 0, maxBytes = 15000 } = {}) {
 
 // Compare only the fonts this run needs with the installed list; never return the whole list
 // (M0: 8,927 fonts). required: [{ family, style, usedBy? }].
+// v1.7 §10.3 (M4 finding 8): fonts used INSIDE the components a plan will instance, read from the
+// main components themselves (getNodeByIdAsync on the main component id; never createInstance — read
+// scripts must not create temporary nodes). Text nodes inside nested instances count too, because the
+// instance will render them. Returns the `required` list for figmaUiFontCheck.
+async function figmaUiComponentFonts(mainComponentIds) {
+  const required = [];
+  const missingIds = [];
+  for (const id of mainComponentIds) {
+    const comp = await figma.getNodeByIdAsync(id);
+    if (!comp || (comp.type !== 'COMPONENT' && comp.type !== 'COMPONENT_SET')) { missingIds.push(id); continue; }
+    const label = comp.type === 'COMPONENT' && comp.parent && comp.parent.type === 'COMPONENT_SET' ? `${comp.parent.name}{${comp.name}}` : comp.name;
+    for (const t of comp.findAllWithCriteria({ types: ['TEXT'] })) {
+      if (t.characters.length === 0) continue;
+      for (const seg of t.getStyledTextSegments(['fontName'])) required.push({ family: seg.fontName.family, style: seg.fontName.style, usedBy: [label] });
+    }
+  }
+  return { required, missingIds };
+}
+
 async function figmaUiFontCheck(required) {
   const available = await figma.listAvailableFontsAsync();
   const have = new Set(available.map(f => `${f.fontName.family}\u0000${f.fontName.style}`));

@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { validateRun, validateSchema, decisionStatus, evidenceCoversCell, inputDigest, evaluationIsCurrent } from './validate-artifacts.mjs';
 import { atomicWriteJson, nowIso } from './state-store.mjs';
 
-export const RULE_VERSION = '12.1@1.6';
+export const RULE_VERSION = '12.1@1.7';
 const GATES = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7'];
 const ALWAYS_PASS = new Set(['G1', 'G2', 'G6', 'G7']);
 const UNRESOLVED_OPS = new Set(['dispatched', 'unknown_outcome']);
@@ -46,13 +46,15 @@ export function evaluateCompletion(plan, audit, ledger, now = new Date().toISOSt
     } else verifiedCells++;
   }
 
-  // 2. G1–G7 exactly once each; G1/G2/G6/G7 must pass; G3–G5 pass or not_applicable
+  // 2. G1–G7 exactly once each; G1/G2/G6/G7 must pass; G3–G5 pass or not_applicable with a plan basis.
+  //    v1.7: G5 may also be not_applicable with a policyRef (product contrast policy, §9.5); the
+  //    validator checks that the policyRef really makes contrast not applicable for this product.
   const gates = audit.gates || [];
   for (const id of GATES) {
     const found = gates.filter(g => g.id === id);
     if (found.length !== 1) { flag(`${id}: expected exactly one gate result, found ${found.length}`, 'partial'); continue; }
     const g = found[0];
-    const ok = g.status === 'pass' || (!ALWAYS_PASS.has(id) && g.status === 'not_applicable' && g.planRef);
+    const ok = g.status === 'pass' || (!ALWAYS_PASS.has(id) && g.status === 'not_applicable' && (g.planRef || (id === 'G5' && g.policyRef)));
     if (!ok) flag(`${id} ${g.status}${g.note ? `: ${g.note}` : ''}`, id === 'G7' ? 'awaiting_user' : 'partial');
   }
   for (const g of gates) for (const ref of g.evidenceRefs || []) if (!evidence.has(ref)) flag(`${g.id}: dangling evidenceRef ${ref}`, 'partial');

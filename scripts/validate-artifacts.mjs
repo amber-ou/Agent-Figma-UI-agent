@@ -14,6 +14,7 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import { readJsonl, operationStates } from './hooks/lib.mjs';
 import { precheckContrast } from './quality-metrics.mjs';
+import { loadPolicy, resolvePolicyRef, contrastPolicy } from './product-policy.mjs';
 
 const schemaDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'schemas');
 export const CONTRACTS = ['brief', 'plan', 'inventory', 'capabilities', 'ledger', 'audit'];
@@ -60,12 +61,13 @@ export function validateSchema(name, doc) {
   return ok ? [] : validate.errors.map(e => `${name}${e.instancePath || ''} ${e.message}${e.params && e.params.allowedValues ? ` (${e.params.allowedValues.join('|')})` : ''}${e.params && e.params.additionalProperty ? ` (${e.params.additionalProperty})` : ''}`);
 }
 
-export function loadRun(dir) {
+export function loadRun(dir, { root } = {}) {
   const read = f => {
     const file = path.join(dir, f);
     return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
   };
-  const run = { dir };
+  // project root for product-policies/ (§7.5): design-runs/<run-id> lives two levels below it
+  const run = { dir, root: root || path.resolve(dir, '..', '..') };
   for (const c of CONTRACTS) run[c] = read(`${c}.json`);
   const journal = readJsonl(path.join(dir, 'operations.jsonl'));
   run.journalRecords = journal.records;
@@ -513,12 +515,68 @@ export function buildReadiness(run, { isDecision } = {}) {
   return errors;
 }
 
+// ---- v1.7 product policies (§4.6, §7.5, §9.5, §12.1, §20) ----
+// Errors block; notices are hints (runs created before v1.7, policy changed during the run).
+const CONTRAST_PRECHECK = new Set(['text_contrast', 'non_text_contrast']);
+const isContrastFinding = f => /contrast/i.test(f.category || '');
+
+export function validateProductPolicy(run, { stage = 'final', root } = {}) {
+  const errors = [];
+  const notices = [];
+  const { brief, plan, audit } = run;
+  if (!brief) return { errors, notices };
+  const policyRoot = root || run.root;
+  const cache = new Map();
+  const resolve = ref => resolvePolicyRef(ref, { root: policyRoot, cache });
+  const product = brief.product;
+  if (!product) notices.push('brief.product missing: run created before v1.7; product policies were not applied (REQ-05 hint only)');
+  else if (product.productId === null) {
+    if (brief.stage === 'confirmed') errors.push('brief.product.productId is not determined: ask the user which product this is before confirming intake (REQ-05, INVARIANT-25)');
+  } else {
+    const loaded = loadPolicy(product.productId, { root: policyRoot });
+    if (!loaded.exists && !product.newProduct) notices.push(`product-policies/${product.productId}.json not found: new product? ask the user whether to create it (POL-02)`);
+    if (loaded.exists && product.policyDigest && loaded.digest !== product.policyDigest) notices.push(`product policy ${product.productId} changed after it was applied to this run (digest differs): re-confirm the applied policies`);
+    for (const a of product.appliedPolicies || []) { const r = resolve(a.policyRef); if (!r.ok) notices.push(`brief.product.appliedPolicies: ${r.reason}`); }
+  }
+  const productId = product?.productId || null;
+  for (const d of plan?.designDecisions || []) {
+    if (!d.policyRef) continue;
+    const r = resolve(d.policyRef);
+    if (!r.ok) errors.push(`designDecision ${d.id}: ${r.reason}`);
+    else if (productId && r.productId !== productId) errors.push(`designDecision ${d.id}: policyRef ${d.policyRef} belongs to ${r.productId}, not to this run's product ${productId}`);
+  }
+  for (const d of plan?.decisions || []) {
+    if (d.policyRef) { const r = resolve(d.policyRef); if (!r.ok) notices.push(`decision ${d.id}: ${r.reason}`); }
+    if (d.policySuggestion?.conflictsWith) { const r = resolve(d.policySuggestion.conflictsWith); if (!r.ok) errors.push(`decision ${d.id}: policySuggestion.conflictsWith ${r.reason}`); }
+  }
+  // contrast policy (§9.5): required=false → no contrast checks, findings or questions; G5 records it
+  const contrast = productId ? contrastPolicy(productId, { root: policyRoot }) : { decided: false };
+  const g5 = (audit?.gates || []).find(g => g.id === 'G5');
+  const g5Refs = [g5?.contrast?.status === 'not_applicable' ? g5.contrast.policyRef : null, g5?.status === 'not_applicable' ? g5.policyRef : null].filter(Boolean);
+  if (g5?.contrast?.status === 'not_applicable' && !g5.contrast.policyRef) errors.push('gate G5: contrast not_applicable needs a policyRef to the product contrast policy (§12.1)');
+  for (const ref of g5Refs) {
+    const r = resolve(ref);
+    if (!r.ok) errors.push(`gate G5: ${r.reason}`);
+    else if (r.key !== 'accessibility.contrast' || r.item.value.required !== false) errors.push(`gate G5: ${ref} does not make contrast not applicable (needs accessibility.contrast.required = false)`);
+    else if (productId && r.productId !== productId) errors.push(`gate G5: ${ref} belongs to ${r.productId}, not to this run's product ${productId}`);
+  }
+  if (contrast.decided && contrast.required === false) {
+    for (const c of plan?.accessibilityPrecheck || []) if (CONTRAST_PRECHECK.has(c.kind)) errors.push(`accessibilityPrecheck ${c.id}: product policy ${contrast.policyRef} says contrast is not checked; remove contrast items (other accessibility items stay)`);
+    for (const f of audit?.findings || []) if (isContrastFinding(f)) errors.push(`finding ${f.id}: product policy ${contrast.policyRef} says contrast is not checked; no contrast findings (§9.5)`);
+    if (audit && stage === 'final' && g5 && !g5Refs.includes(contrast.policyRef)) errors.push(`gate G5: record contrast as not_applicable with policyRef ${contrast.policyRef} (other accessibility items still decide G5)`);
+  }
+  if (g5Refs.length && (!contrast.decided || contrast.required !== false)) errors.push('gate G5: contrast is not_applicable by policy, but this run\'s product has no policy accessibility.contrast.required = false');
+  return { errors, notices };
+}
+
 export function validateRun(dir, opts = {}) {
   const stage = checkStage(opts.stage || 'final');
-  const run = loadRun(dir);
+  const run = loadRun(dir, opts);
   const schemaErrors = validateRunSchemas(run, { ...opts, stage });
   const { errors: semanticErrors, deferred } = validateRunSemantics(run, { stage });
-  return { ok: schemaErrors.length === 0 && semanticErrors.length === 0, stage, schemaErrors, semanticErrors, deferred, run };
+  const policy = validateProductPolicy(run, { stage, root: opts.root });
+  semanticErrors.push(...policy.errors);
+  return { ok: schemaErrors.length === 0 && semanticErrors.length === 0, stage, schemaErrors, semanticErrors, deferred, notices: policy.notices, run };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -527,7 +585,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const stage = at >= 0 ? args[at + 1] : 'final';
   const dir = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--stage');
   if (!dir || !STAGES.includes(stage)) { console.error(`usage: validate-artifacts.mjs <runDir> [--stage ${STAGES.join('|')}]  (default final = every check)`); process.exit(2); }
-  const { ok, schemaErrors, semanticErrors, deferred } = validateRun(dir, { stage });
-  console.log(JSON.stringify({ ok, stage, schemaErrors, semanticErrors, deferred }, null, 2));
+  const { ok, schemaErrors, semanticErrors, deferred, notices } = validateRun(dir, { stage });
+  console.log(JSON.stringify({ ok, stage, schemaErrors, semanticErrors, deferred, notices }, null, 2));
   process.exit(ok ? 0 : 1);
 }
