@@ -10,7 +10,7 @@
 
 | 項目 | 狀態 | 修改位置 | 驗證 | 剩餘 |
 |---|---|---|---|---|
-| **A01** 同步現況與規範 | `done` | `FIGMA_UI_AGENT_SPEC.md`（v1.6：0.1、4.5、5.1 CAP-06、6.6、7.2 ASK-06／07、8.2、8.3、12.1、13.2 T52–T60、14、15、16.3、17、20、INVARIANT-20–23、20.3 變更紀錄）；`FIGMA_MCP_RESEARCH.md`（位元組更正、§14）；`CC_BUILD_PROMPT.md`（M4 改 v1.6）；`README.md`、`CLAUDE.md`、`docs/setup.md`；`SKILL.md` 與 references | 回傳上限在規範與 skill 皆寫為 20,480 **UTF-8 位元組**、批次約 15,000 **位元組**；歷史文件（m2-summary、m3-first-run-summary）保留原始時點的寫法 | — |
+| **A01** 同步現況與規範 | `done` | `FIGMA_UI_AGENT_SPEC.md`（v1.6：0.1、4.5、5.1 CAP-06、6.6、7.2 ASK-06／07、8.2、8.3、12.1、13.2 T52–T60、14、15、16.3、17、20、INVARIANT-20–23、20.3 變更紀錄）；`FIGMA_MCP_RESEARCH.md`（位元組更正、§14）；`docs/history/build-prompts-m0-m4.md`（M4 改 v1.6）；`README.md`、`CLAUDE.md`、`docs/setup.md`；`SKILL.md` 與 references | 回傳上限在規範與 skill 皆寫為 20,480 **UTF-8 位元組**、批次約 15,000 **位元組**；歷史文件（m2-summary、m3-first-run-summary）保留原始時點的寫法 | — |
 | **A02** 階段式驗證與單一完成入口 | `done` | `scripts/validate-artifacts.mjs`（`--stage intake\|plan\|build\|final`、deferred、`buildReadiness`、`inputDigest`、`evaluationIsCurrent`）；`scripts/evaluate-completion.mjs`（讀 journal、`writeEvaluation`、判定摘要）；`scripts/operation-journal.mjs`（記 write 前強制 build 邊界）；`schemas/audit.schema.json` | `tests/contracts/v16-workflow.test.mjs` A02 項（9 項） | — |
 | **A03** 證據對應的最低補強 | `done` | `schemas/audit.schema.json`（`cellKeys`、`state`、`subject`）、`schemas/ledger.schema.json`（`userChangeDetectedAt`）；validator（`evidenceCoversCell`、`evidenceValidity`）；evaluator 逐 cell 比對；`references/design-quality.md`、`collaboration.md` | v16-workflow A03 項（7 項） | 真實 run 中 skill 是否確實填寫 `subject`／`scopeRootIds` 待 M4 驗證 |
 | **A04** 減少重問、按需 flow | `done` | `schemas/plan.schema.json`（`flow`、`screens[].copy`）；validator（flow 對應與 Build 邊界）；evaluator（flow 未確認／open unknowns → awaiting_user）；新 `scripts/run-context.mjs`；`SKILL.md` §0、§2、§5；新 `references/flow.md`；`references/design-decisions.md` | v16-workflow A04 項（5 項，含 new／continue／resume 三種代表情境） | 對話行為（模型是否真的少問）只有規則與情境測試，未做模型實測 |
@@ -39,10 +39,10 @@ output 範圍與權限、basisRefs、planned／dispatched／applied／verified �
 
 取消獨立讀回、跨 run 證據快取與依賴圖、評論範例庫、`unbasedProperties` 硬門檻、完整 L0–L13 規則引擎、固定三輪問答與十題政策、多數決處理參考衝突、廣泛 AST lint、平台規則引擎、強制視覺小樣、Storybook、前端實作、Code Connect 整合。
 
-先前研究提案（`docs/adjustment-plan.md`、`docs/extension-spec-research.md`、`docs/backlog.md` 的 S 與 U 項）與本任務書不同的部分不在本次範圍，已在各文件開頭標注。
+先前研究提案（`docs/adjustment-plan.md`（v1.7 已刪除，見 git 歷史）、`docs/research/extension-spec-research.md`、`docs/research/backlog.md` 的 S 與 U 項）與本任務書不同的部分不在本次範圍，已在各文件開頭標注。
 
 ## 尚缺的真實驗證（需使用者本機）
 
-1. 以 v1.6 流程跑 M4 的三組任務（`CC_BUILD_PROMPT.md` 文末），確認階段驗證、flow、證據 `cellKeys`／`subject`、handoff 產生在真實 run 中可用。
+1. 以 v1.6 流程跑 M4 的三組任務（`docs/history/build-prompts-m0-m4.md` 文末），確認階段驗證、flow、證據 `cellKeys`／`subject`、handoff 產生在真實 run 中可用。
 2. 確認 `log-figma-call.mjs` 對所有 Figma 工具觸發，且 `session.json` 能讓同一 session 的第二個 run 沿用診斷。
 3. 效能比較：局部樣式修改、既有 pattern 延伸一頁、含分支／狀態的新流程，各記錄 `run-report.mjs metrics`（提問成本、工具時間、返工與缺陷）。

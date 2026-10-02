@@ -1,8 +1,8 @@
 # Figma MCP UI 設計研究紀錄
 
-版本：1.6 · 原研究日期：2026-09-27 · 補充查核／修訂：2026-09-28、2026-09-29（v1.1–v1.6）。
+版本：1.7 · 原研究日期：2026-09-27 · 補充查核／修訂：2026-09-28、2026-09-29（v1.1–v1.6）、2026-10-02（v1.7）。
 
-目的：為「Claude Code 讀取指定檔案的 library／variables 並延伸 UI」提供來源與限制。規範以 FIGMA_UI_AGENT_SPEC.md v1.6 為唯一來源；本文件不另定義完成條件。
+目的：為「Claude Code 讀取指定檔案的 library／variables 並延伸 UI」提供來源與限制。規範以 FIGMA_UI_AGENT_SPEC.md v1.7 為唯一來源；本文件不另定義完成條件。
 
 ## 1. 研究方式與可信度
 
@@ -171,7 +171,7 @@ Claude Code 提供 project agents 和 skills；agent 可使用 frontmatter 配�
 9. （v1.2）Aiwow Library 是否已發佈並在測試檔啟用，元件與 variables 能否以 key 匯入。
 10. （v1.2）使用者在 `use_figma` 腳本執行期間編輯時的實際行為（T35）。
 
-**v1.3 狀態（依 M0–M1 實測）：**第 1、2 項已由第 10 節與 `docs/m1-summary.md` 記錄；第 3 項已確認（需 Full seat 帳號，見主規格第 4.2.1 節）；第 7 項 sharedPluginData 已驗證，回傳上限只知道整頁讀取會超限；第 8 項已驗證（Pre／Post；PostToolUseFailure 未驗證）；第 9 項元件已驗證，variables 的來源 library 未識別；第 4 項 variables 部分、第 5、6、10 項仍未驗證。
+**v1.3 狀態（依 M0–M1 實測）：**第 1、2 項已由第 10 節與 `docs/history/m1-summary.md` 記錄；第 3 項已確認（需 Full seat 帳號，見主規格第 4.2.1 節）；第 7 項 sharedPluginData 已驗證，回傳上限只知道整頁讀取會超限；第 8 項已驗證（Pre／Post；PostToolUseFailure 未驗證）；第 9 項元件已驗證，variables 的來源 library 未識別；第 4 項 variables 部分、第 5、6、10 項仍未驗證。
 
 以上項目不能在本次研究階段勾選通過。`CC_BUILD_PROMPT.md` 要求實作者在離線測試與真實整合之間清楚區分結果。
 
@@ -223,7 +223,7 @@ Claude Code 提供 project agents 和 skills；agent 可使用 frontmatter 配�
 
 ## 11. v1.3 決策紀錄（M1 結束，2026-09-28）
 
-M1 在使用者授權的測試檔跑通真實垂直流程，run `ui-20260928-m1` 的完成判定為 `complete_with_exceptions`（例外 ex-001：按鈕寬 131／129，dec-010）。完整紀錄見 `docs/m1-summary.md`。主規格 v1.3 依此修訂的重點：
+M1 在使用者授權的測試檔跑通真實垂直流程，run `ui-20260928-m1` 的完成判定為 `complete_with_exceptions`（例外 ex-001：按鈕寬 131／129，dec-010）。完整紀錄見 `docs/history/m1-summary.md`。主規格 v1.3 依此修訂的重點：
 
 | 實測發現 | 主規格處理 |
 |---|---|
@@ -250,7 +250,7 @@ M1 在使用者授權的測試檔跑通真實垂直流程，run `ui-20260928-m1`
 | 參考畫面帶有其他品牌 logo（AileCard） | 第一次真實任務 Plan | REQ-04 |
 | 使用者為測試授權採用建議；未通過判定的 run 接受為測試成功 | 使用者指示 | DEC-07、DEC-08、第 2.3 節 userAcceptance |
 
-使用者決定不做收尾調整、接受為測試成功。run `ui-20260928-001` 的完成判定維持 `awaiting_user`，見 `docs/m3-first-run-summary.md`。
+使用者決定不做收尾調整、接受為測試成功。run `ui-20260928-001` 的完成判定維持 `awaiting_user`，見 `docs/history/m3-first-run-summary.md`。
 ## 13. v1.5 決策紀錄（M3 真實整合，2026-09-29）
 
 | 觀察（E） | 證據（run `ui-20260929-001`） | 主規格處理 |
@@ -269,6 +269,22 @@ v1.6 是流程優化，依使用者接受的評估與任務書修訂，**沒有�
 | 觀察 | 分級 | 主規格處理 |
 |---|---|---|
 | 官方 figma-use skill 2.2.123（`figma/mcp-server-guide` commit `38308b7`）的 Rule 5 改為「依可安全重試決定批次，寫入回傳的 IDs／數量／bounds 即算結構驗證，組合後截一張圖、修正後再一張」；本機仍是 2.2.118 | D（官方 skill 內容）；本機未升級 | 採用批次與截圖節奏（第 8.3 節），但**保留每次寫入後的獨立讀回**：本專案有協作衝突與 unknown_outcome 對帳需求，本次任務書也明定不以寫入回傳代替驗證 |
-| 研究時檢視的 LLM 設計評論與提問相關研究（`docs/design-quality-research.md`、`docs/extension-spec-research.md`）只讀到搜尋摘要 | U | 不作為規範數據；v1.6 只採用「先找候選、每輪 1–3 題、按需 flow」這類流程規則 |
+| 研究時檢視的 LLM 設計評論與提問相關研究（`docs/research/design-quality-research.md`、`docs/research/extension-spec-research.md`）只讀到搜尋摘要 | U | 不作為規範數據；v1.6 只採用「先找候選、每輪 1–3 題、按需 flow」這類流程規則 |
 
 v1.6 新增的診斷沿用、量測與 handoff 產生只有離線測試（offline_fixture）；第一次真實驗證排在 M4。
+
+## 15. v1.7 決策紀錄（M4 任務 A，2026-09-29；修訂 2026-10-02）
+
+M4 任務 A（run `ui-20260929-002`）是 v1.6 流程的第一次真實驗證；任務 B、C 由使用者決定略過。詳見 `docs/history/m4-summary.md`。
+
+| 觀察 | 分級 | 證據 | 主規格處理 |
+|---|---|---|---|
+| v1.6 的 Build 邊界要求 nativeWrite 為本 run verified，但只有寫入能驗證它，新 run 無法規劃第一個 write | E | M4 發現 1 | 第 20 節：第一個 write 兼作探測（M4 已修） |
+| guard 擋下的 write（created／mutated 皆空）讓更早的證據被判為無法確定 | E | M4 發現 2 | 第 12.1 節：`noChange` 標記（M4 已修） |
+| 標為 `mode=read` 的腳本在範圍外頁面建立再刪除 6 個暫時 instance；只看標頭的 hook 攔不到 | E | rd-0009、rd-0010 | 第 4.5 節：啟發式靜態檢查與其限制 |
+| `fp1` 不涵蓋文字截斷設定：改成單行截斷後 fingerprint 不變 | E | op-0005 | 第 11.2 節：已知限制，fp2 待訂 |
+| 8 次工具呼叫沒有耗時；次數等於截圖次數 | E（現象）／U（原因） | metrics | 第 14 節：推測與 `get_screenshot` 不在 hook 範圍有關，未驗證 |
+| 重開 Claude Code 後環境診斷顯示 `session unknown` | E（現象）／U（原因） | diagnosis | 第 14 節：待查 |
+| Discover 的字型比對漏掉元件內部的字型（Status Bar 的 SF Pro Text） | E | F-009 | 第 10.3 節：要比對元件內部字型 |
+
+v1.7 的產品政策、記憶分層與預填清單是使用者決定的流程設計（P），沒有新的 Figma 量測。

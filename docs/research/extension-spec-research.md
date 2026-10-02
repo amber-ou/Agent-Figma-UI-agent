@@ -2,7 +2,7 @@
 
 日期：2026-09-29 · 對應 spec v1.4 · 狀態：研究建議，**尚未實作、尚未實測** · backlog：S-01～S-07
 
-> **v1.6 狀態（2026-09-29）：**研究紀錄。v1.6 只採用其中「先找候選、每輪 1–3 題、按需處理、不偽造來源」的原則；獨立 `spec.json` 規則引擎、L0–L13 完整抽取、固定三輪與十題政策、`unbasedProperties` 硬門檻**不採用**（見 `docs/workflow-simplification-record.md` 階段 C）。
+> **v1.6 狀態（2026-09-29）：**研究紀錄。v1.6 只採用其中「先找候選、每輪 1–3 題、按需處理、不偽造來源」的原則；獨立 `spec.json` 規則引擎、L0–L13 完整抽取、固定三輪與十題政策、`unbasedProperties` 硬門檻**不採用**（見 `docs/history/workflow-simplification-record.md` 階段 C）。
 
 
 情境：拿到一個 Figma 檔，要延伸既有畫面。目標是讓 AI 在 Build 時**幾乎沒有自己決定的空間**：每個看得到的值都來自「從檔案抽出、使用者確認過的規格」或「使用者的回答」。
@@ -227,7 +227,7 @@ spec 已經有這些規則：
 
 ## 9. 來源
 
-- 本專案：`FIGMA_UI_AGENT_SPEC.md` v1.4 §6.2、§6.6、§7.1–7.4、§9.5、§10.3；`docs/m3-first-run-summary.md`；`tests/fixtures/m1-run/inventory.json`（pattern 記錄格式）
+- 本專案：`FIGMA_UI_AGENT_SPEC.md` v1.4 §6.2、§6.6、§7.1–7.4、§9.5、§10.3；`docs/history/m3-first-run-summary.md`；`tests/fixtures/m1-run/inventory.json`（pattern 記錄格式）
 - [Learning to Ask: When LLM Agents Meet Unclear Instruction](https://aclanthology.org/2025.emnlp-main.1104/)（EMNLP 2025）
 - [Knowing but Not Showing: LLMs Recognize Ambiguity but Rarely Ask Clarifying Questions](https://arxiv.org/html/2605.25284v1)
 - [Modeling Future Conversation Turns to Teach LLMs to Ask Clarifying Questions](https://arxiv.org/pdf/2410.13788)（ICLR 2025）

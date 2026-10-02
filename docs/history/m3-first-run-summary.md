@@ -58,4 +58,4 @@ Spec：FIGMA_UI_AGENT_SPEC.md v1.4 · Run ID：`ui-20260928-001` · 日期：202
 7. 品牌與產品名稱由使用者確認（REQ-04）。
 8. `use_figma` 回傳上限 20,480 字元與靜默截斷（M2 量測）。
 
-skill、schema 與 validator 的對應修改列在 `CC_BUILD_PROMPT.md` 的「M3 建置指令」。
+skill、schema 與 validator 的對應修改列在 `docs/history/build-prompts-m0-m4.md` 的「M3 建置指令」。

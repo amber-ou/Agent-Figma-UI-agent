@@ -2,16 +2,16 @@
 
 更新：2026-09-29（加入 S-xx 與研究問題紀錄） · 對應 spec v1.4
 
-> **v1.6 狀態（2026-09-29）：**本清單是研究提案。已實作的是 spec v1.6 流程精簡（`docs/workflow-simplification-record.md`），與本清單不同；S-01～S-07、U-04（廣泛 lint）、U-11（以寫入回傳代替讀回）、D-09 屬 v1.6 階段 C「本次不做」。其餘項目仍是未排程的提案。
+> **v1.6 狀態（2026-09-29）：**本清單是研究提案。已實作的是 spec v1.6 流程精簡（`docs/history/workflow-simplification-record.md`），與本清單不同；S-01～S-07、U-04（廣泛 lint）、U-11（以寫入回傳代替讀回）、D-09 屬 v1.6 階段 C「本次不做」。其餘項目仍是未排程的提案。
 
 
-研究後**記下、尚未排入實作**的調整。全部項目的執行計畫與待確認決策整理在 `docs/adjustment-plan.md`。M3 已排定的項目（v1.4 規則、T35–T37 協作實測、PostToolUseFailure、中文回傳上限）在 `CC_BUILD_PROMPT.md` 的「M3 建置指令」，不重複列在這裡。
+研究後**記下、尚未排入實作**的調整。全部項目的執行計畫與待確認決策整理在 `docs/adjustment-plan.md`（v1.7 已刪除，見 git 歷史）。M3 已排定的項目（v1.4 規則、T35–T37 協作實測、PostToolUseFailure、中文回傳上限）在 `docs/history/build-prompts-m0-m4.md` 的「M3 建置指令」，不重複列在這裡。
 
 採用某一項時：先做需要的決策 → 寫回 `FIGMA_UI_AGENT_SPEC.md`（spec 是唯一規範來源）→ 實作與測試 → 在這裡把狀態改為 `done` 並附上 commit 或文件。
 
 狀態：`todo` 未開始 · `needs_decision` 需要使用者先決定 · `needs_probe` 需要先在 sandbox 實測 · `done`
 
-## A. `use_figma` 精準度（來源：`docs/use-figma-quality-research.md`）
+## A. `use_figma` 精準度（來源：`docs/research/use-figma-quality-research.md`）
 
 | ID | 項目 | 內容摘要 | 狀態 | 依賴 |
 |---|---|---|---|---|
@@ -27,7 +27,7 @@
 | U-10 | 效能寫法 | `Promise.all` 批次 import、`findAllWithCriteria`／`query` 取代全樹 `findAll` | todo | — |
 | U-11 | 驗證頻率 | 新建 owned 節點以寫入腳本內讀回為證據；修改既有節點仍另開 read | needs_decision（5.1：建議選項 2） | U-01 |
 
-## B. 設計品質（來源：`docs/design-quality-research.md`）
+## B. 設計品質（來源：`docs/research/design-quality-research.md`）
 
 | ID | 項目 | 內容摘要 | 狀態 | 依賴 |
 |---|---|---|---|---|
@@ -41,7 +41,7 @@
 | D-08 | 使用者在 Figma 的修改轉成決策 | 偵測到使用者改動後，詢問是否套用到同類區塊，確認後記為決策 | todo | M3 T35–T37 |
 | D-09 | 跨 run 評論範例庫 | 累積使用者確認過的 findings 作 few-shot 範例；與 INVARIANT-01 有張力 | needs_decision | D-03 |
 
-## B2. 延伸規格表與提問（來源：`docs/extension-spec-research.md`）
+## B2. 延伸規格表與提問（來源：`docs/research/extension-spec-research.md`）
 
 | ID | 項目 | 內容摘要 | 狀態 | 依賴 |
 |---|---|---|---|---|
@@ -71,9 +71,9 @@
 
 | 日期 | 題目 | 結果文件 | 產出項目 |
 |---|---|---|---|
-| 2026-09-28 | 讓 `use_figma` 品質更好、更精準的方法 | `docs/use-figma-quality-research.md` | U-01～U-11 |
-| 2026-09-29 | 如何提升設計品質 | `docs/design-quality-research.md` | D-01～D-09 |
-| 2026-09-29 | 延伸既有畫面時，要問哪些問題、從檔案抽哪些規格讓使用者確認，以縮小 AI 的規則範圍 | `docs/extension-spec-research.md` | S-01～S-07、政策題 P-1～P-10 |
+| 2026-09-28 | 讓 `use_figma` 品質更好、更精準的方法 | `docs/research/use-figma-quality-research.md` | U-01～U-11 |
+| 2026-09-29 | 如何提升設計品質 | `docs/research/design-quality-research.md` | D-01～D-09 |
+| 2026-09-29 | 延伸既有畫面時，要問哪些問題、從檔案抽哪些規格讓使用者確認，以縮小 AI 的規則範圍 | `docs/research/extension-spec-research.md` | S-01～S-07、政策題 P-1～P-10 |
 
 研究過程中發現、尚未解答的問題：
 

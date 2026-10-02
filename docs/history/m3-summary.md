@@ -40,7 +40,7 @@ M3 分兩部分：
 | `.claude/skills/figma-ui/SKILL.md` | 回傳上限改為以 UTF-8 位元組表述 |
 | `tests/hooks/figma-hooks.test.mjs` | 失敗事件的欄位值記錄（字串、物件、成功事件不變） |
 | `tests/contracts/snippets.test.mjs` | fingerprint 處理會丟例外的 TEXT／葉子節點 |
-| `docs/m3-summary.md` | 本文件 |
+| `docs/history/m3-summary.md` | 本文件 |
 
 ## 3. 測試
 

@@ -2,7 +2,7 @@
 
 Spec v1.6 · schemaVersion 1.2 · 日期 2026-09-29 · 分支 `feat/m4`
 
-M4 依 `CC_BUILD_PROMPT.md` 的「M4 建置指令」進行。使用者決定**任務 B、C 略過，以任務 A 的結果收尾**。逐項驗收結果見 `docs/acceptance-results.md`，操作與故障處理見 `docs/runbook.md`。
+M4 依 `docs/history/build-prompts-m0-m4.md` 的「M4 建置指令」進行。使用者決定**任務 B、C 略過，以任務 A 的結果收尾**。逐項驗收結果見 `docs/acceptance-results.md`，操作與故障處理見 `docs/runbook.md`。
 
 ## 1. 狀態
 
@@ -83,7 +83,7 @@ M4 依 `CC_BUILD_PROMPT.md` 的「M4 建置指令」進行。使用者決定**�
 | `scripts/run-report.mjs` | `formatTokenBinding()` |
 | `tests/contracts/v16-workflow.test.mjs`、`no-change-writes.test.mjs`、`run-report.test.mjs`、`tests/hooks/figma-hooks.test.mjs` | 新增 9 個測試 |
 | `.claude/skills/figma-ui/references/runtime-probes.md` | 唯讀檢查的限制、fingerprint 涵蓋範圍 |
-| `docs/acceptance-results.md`、`docs/runbook.md`、`docs/m4-summary.md` | 本輪交付文件 |
+| `docs/acceptance-results.md`、`docs/runbook.md`、`docs/history/m4-summary.md` | 本輪交付文件 |
 
 ## 5. 未完成
 
