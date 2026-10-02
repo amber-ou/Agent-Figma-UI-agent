@@ -62,6 +62,45 @@ export function parseOpHeader(code) {
   return m ? { runId: m[1], operationId: m[2], mode: m[3] } : null;
 }
 
+// M4: heuristic static check for scripts declared mode=read. Found after ui-20260929-002 rd-0009, a
+// "read" that created and removed temporary instances on a page outside the output scope.
+// LIMITS (heuristic, not a guarantee): it only sees the literal source text. It misses mutations
+// reached indirectly (computed property names such as node['fi' + 'lls'], aliases like
+// const f = figma; f['create' + 'Frame'](), eval / new Function, helper objects defined elsewhere) and
+// it can flag harmless code (a local object whose property is named `name` or `x`). Comments and
+// string literals are stripped first, so text that merely mentions an API is not flagged. A pass
+// therefore does not prove a script is read-only; the read-back discipline and ownership markers
+// stay the real protection.
+const READ_MUTATION_PATTERNS = [
+  [/\bfigma\s*\.\s*create[A-Za-z]*\s*\(/, 'figma.create*()'],
+  [/\.\s*createInstance\s*\(/, 'createInstance()'],
+  [/\.\s*clone\s*\(/, 'clone()'],
+  [/\.\s*remove\s*\(\s*\)/, '.remove()'],
+  [/\.\s*(appendChild|insertChild)\s*\(/, 'appendChild/insertChild()'],
+  [/\.\s*(importComponentByKeyAsync|importComponentSetByKeyAsync|importStyleByKeyAsync|importVariableByKeyAsync)\s*\(/, 'import*ByKeyAsync()'],
+  [/\.\s*(setSharedPluginData|setPluginData|setRelaunchData)\s*\(/, 'set*PluginData()'],
+  [/\.\s*(setProperties|swapComponent|detachInstance|resetOverrides|resize|resizeWithoutConstraints|rescale|setBoundVariable|setExplicitVariableModeForCollection|setRangeFills|setRangeTextStyleIdAsync|insertCharacters|deleteCharacters)\s*\(/, 'node mutation method'],
+  [/\.\s*set(Fill|Stroke|Text|Effect|Grid)StyleIdAsync\s*\(/, 'set*StyleIdAsync()'],
+  [/\bfigma\s*\.\s*(group|ungroup|flatten|union|subtract|intersect|exclude|combineAsVariants)\s*\(/, 'figma.<structure op>()'],
+  [/\.\s*(characters|fills|strokes|effects|name|visible|opacity|x|y|rotation|cornerRadius|layoutMode|itemSpacing|padding(Top|Right|Bottom|Left)|layoutSizing(Horizontal|Vertical)|layoutPositioning|textStyleId|fillStyleId|strokeStyleId|placeholder|locked|clipsContent|fontName|fontSize|textTruncation|maxLines)\s*(=(?![=>])|\+=|-=)/, 'property assignment'],
+];
+
+function stripCommentsAndStrings(code) {
+  // strings first, so a "//" inside a URL string does not hide the rest of the line
+  return code
+    .replace(/`(?:\\[\s\S]|[^`\\])*`/g, '""')
+    .replace(/'(?:\\.|[^'\\\n])*'/g, '""')
+    .replace(/"(?:\\.|[^"\\\n])*"/g, '""')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/[^\n]*/g, ' ');
+}
+
+export function readScriptMutations(code) {
+  if (typeof code !== 'string') return [];
+  const src = stripCommentsAndStrings(code);
+  return READ_MUTATION_PATTERNS.filter(([re]) => re.test(src)).map(([, label]) => label);
+}
+
 export function sha256(text) {
   return crypto.createHash('sha256').update(text || '').digest('hex');
 }

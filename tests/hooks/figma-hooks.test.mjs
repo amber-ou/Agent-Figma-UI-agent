@@ -234,3 +234,33 @@ test('log hook records the session and non-write-path Figma calls (duration, cat
   const p = events().at(-1);
   assert.deepEqual([p.durationMs, p.sessionId, p.truncatedResponse], [50, 'sess-7', true]);
 });
+
+// ---- M4: heuristic static check of mode=read scripts (after ui-20260929-002 rd-0009) ----
+const readCall = (op, body) => ({ tool_input: { fileKey: OUT_KEY, code: `// figma-ui run=${RUN} op=${op} mode=read\n${body}` } });
+
+test('read script that creates (and removes) instances is denied with the reason', () => {
+  ready();
+  const rd0009 = "const c = await figma.getNodeByIdAsync('1:2');\nconst i = c.createInstance();\nconst t = i.findAllWithCriteria({ types: ['TEXT'] }).map(x => x.characters);\ni.remove();\nreturn t;";
+  const r = pre(readCall('rd-1', rd0009));
+  assert.equal(r.decision, 'deny');
+  assert.match(r.reason, /declared mode=read/);
+  assert.match(r.reason, /createInstance\(\)/);
+  assert.match(r.reason, /\.remove\(\)/);
+  for (const body of ["const f = figma.createFrame();", "n.appendChild(m);", "await figma.importComponentSetByKeyAsync(k);", "n.setSharedPluginData('figma_ui', 'x', '1');", "t.characters = 'x';", "n.fills = [];", "n.x += 10;", "await n.setFillStyleIdAsync(id);"]) {
+    assert.equal(pre(readCall('rd-2', body)).decision, 'deny', body);
+  }
+});
+
+test('pure read script passes, including strings/comments that only mention mutating APIs', () => {
+  ready();
+  const pure = [
+    "// reads only; never call createInstance() or .remove() here",
+    "const page = await figma.getNodeByIdAsync('34014:8');",
+    "await figma.setCurrentPageAsync(page);",
+    "const note = 'createInstance and n.fills = [] appear only in this string';",
+    "const url = 'https://www.web'; const ok = page.name === 'x' || page.x >= 0 || page.y !== 1;",
+    "const out = {}; out.count = page.children.length;",
+    "return page.children.map(c => ({ id: c.id, name: c.name, fills: c.fills.length }));",
+  ].join('\n');
+  assert.deepEqual(pre(readCall('rd-3', pure)), { decision: 'pass' });
+});

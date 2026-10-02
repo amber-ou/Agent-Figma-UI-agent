@@ -82,6 +82,9 @@ export function validateRunSchemas(run, { stage = 'final', required = STAGE_REQU
   }
   for (const op of run.operations || []) {
     errors.push(...validateSchema('operation', op).map(e => e.replace(/^operation/, `operation ${op.operationId}`)));
+    if (op.effectSummary?.noChange === true && [...(op.createdNodeIds || []), ...(op.mutatedNodeIds || [])].length) {
+      errors.push(`operation ${op.operationId}: effectSummary.noChange contradicts its created/mutated node IDs`);
+    }
   }
   if (run.journalTruncated) errors.push('operations.jsonl has a truncated last line (reconcile before continuing)');
   return errors;
@@ -114,6 +117,11 @@ export function evidenceCoversCell(e, cell, cells) {
 // child the ledger knows about makes it stale; a later write whose effect or target is unknown makes
 // it undeterminable (never guessed valid). A user change recorded on a ledger entity in scope after
 // capture also makes it stale.
+export function isConfirmedNoChange(op) {
+  return op.status === 'verified' && op.effectSummary?.noChange === true && (op.evidenceRefs || []).length > 0
+    && !(op.createdNodeIds || []).length && !(op.mutatedNodeIds || []).length;
+}
+
 export function evidenceValidity(e, ops = [], ledger) {
   const capturedAt = e.toolRef?.capturedAt || null;
   const sub = e.subject || {};
@@ -126,6 +134,9 @@ export function evidenceValidity(e, ops = [], ledger) {
     if (capturedAt && at <= capturedAt) continue;
     const label = capturedAt ? `after capture (${capturedAt})` : '(capture time unknown)';
     if (UNRESOLVED_WRITE.has(op.status)) return { status: 'undeterminable', reason: `${op.operationId} is ${op.status}; its effect ${label} is unknown` };
+    // M4: a verified write whose read-back confirmed it changed nothing (e.g. a guard conflict) has no
+    // effect on earlier evidence. Without that confirmation, an empty ID list still means "unknown".
+    if (isConfirmedNoChange(op)) continue;
     const touched = [...(op.createdNodeIds || []), ...(op.mutatedNodeIds || []), ...(op.scopeRootIds || [])];
     if (!touched.length) return { status: 'undeterminable', reason: `${op.operationId} changed unknown nodes ${label}` };
     const hit = touched.find(id => scope.has(id) || ancestors.has(id));
@@ -445,8 +456,7 @@ export function validateRunSemantics(run, { stage = 'final' } = {}) {
 
   // capabilities: unknown cannot be a write precondition
   if (capabilities && brief?.output?.writeAllowed) {
-    const write = capabilities.features?.nativeWrite;
-    if (!write || write.status !== 'verified') errors.push('capabilities.features.nativeWrite must be verified before writes are allowed');
+    if (!nativeWriteReady(run)) errors.push('capabilities.features.nativeWrite must be verified before writes are allowed (only the first write of a run may probe it, with basis "history")');
     if (capabilities.account && capabilities.account.status !== 'ok') errors.push('capabilities.account is blocked; writes are not allowed (§4.2.1)');
   }
 
@@ -454,6 +464,17 @@ export function validateRunSemantics(run, { stage = 'final' } = {}) {
   if (stage === 'build') errors.push(...buildReadiness(run, { isDecision }));
 
   return { errors, deferred };
+}
+
+// M4: a new run cannot verify nativeWrite before its first write, yet the Build boundary blocked that
+// first write. The first write of a run may therefore act as the probe, but only when nativeWrite is
+// available_unverified with basis "history" (verified in an earlier run) and this run has not dispatched
+// any write yet. Once a write exists, nativeWrite must be verified in this run.
+export function nativeWriteReady(run) {
+  const w = run?.capabilities?.features?.nativeWrite;
+  if (w?.status === 'verified') return true;
+  const anyWrite = (run?.operations || []).some(o => o.mode === 'write' && !['planned', 'cancelled'].includes(o.status));
+  return !anyWrite && w?.status === 'available_unverified' && w?.basis === 'history';
 }
 
 export function buildReadiness(run, { isDecision } = {}) {
@@ -483,7 +504,7 @@ export function buildReadiness(run, { isDecision } = {}) {
   }
   if (!capabilities) errors.push('build: capabilities.json is required');
   else {
-    if (capabilities.features?.nativeWrite?.status !== 'verified') errors.push('build: capabilities.features.nativeWrite must be verified in this run');
+    if (!nativeWriteReady(run)) errors.push('build: capabilities.features.nativeWrite must be verified in this run (only the first write may probe it, with basis "history")');
     if (!capabilities.account || capabilities.account.status !== 'ok') errors.push('build: capabilities.account must be ok for this run (§4.2.1)');
   }
   if (run.journalTruncated) errors.push('build: operations.jsonl has a truncated last line; reconcile first');

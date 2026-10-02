@@ -26,6 +26,8 @@ API 用法以已安裝的官方 Figma skills 為準（`figma:figma-use` 等）�
 | 腳本中途 throw 的副作用 | op-0001 在建立 Section 與 frame 之後 throw；對帳時畫布**沒有任何殘留**（變更被整批還原） | M3 op-0001、rd-0006 | **hypothesis**：只觀察到 1 次，不能當成保證；仍一律唯讀對帳後才記 `failed_known` |
 | 節點屬性存取 | 讀取節點不支援的屬性會**丟例外**（`no such property 'findAllWithCriteria' on TEXT node`），不是回傳 undefined；`x.prop ? … : …` 不能當防護 | M3 op-0001 | 依 `node.type` 分流（`snippets/fingerprint.js` 已修正） |
 | 協作偵測 T35–T37 | 使用者手動改文字、在 Section 新增方塊、刪除 frame 後，precondition guard 分別回傳 `user_modified`、`user_added_nodes`（同時列出缺少的 child）、`deleted`；三次都沒有修改或重建 | M3 op-0003～op-0005、rd-0008、ev-002 | 照 `collaboration.md` 回報並詢問 |
+| 唯讀腳本的畫布改動 | hook 只看 op 標頭無法得知腳本內容：M4 ui-20260929-002 rd-0009（mode=read）在 COVER 頁建立並刪除 6 個暫時 instance（淨結果為零，rd-0010 確認）。M4 起 PreToolUse 對 mode=read 做**啟發式靜態檢查**（`readScriptMutations`）：出現 figma.create*、createInstance、clone、.remove()、appendChild／insertChild、import*ByKeyAsync、set*PluginData、setProperties／swapComponent／resize 等方法、set*StyleIdAsync，或對 characters／fills／name／x／y 等屬性賦值時 deny | M4 rd-0009、rd-0010；`tests/hooks/figma-hooks.test.mjs` | **限制**：只看原始碼文字，會漏掉間接呼叫（計算出的屬性名、別名、eval／new Function、外部 helper），也可能誤擋名為 name／x 的本地物件屬性；先移除字串與註解，只提到 API 名稱不會被擋。通過檢查**不代表**腳本唯讀；讀取預設值改讀主元件本身 |
+| fingerprint 涵蓋範圍 | fp1 只含 type、name、尺寸、auto layout、fill 數與子節點文字；**不含** textTruncation／maxLines 等文字屬性，M4 op-0005 修改截斷後 fingerprint 不變 | M4 op-0005、rd-0014 | guard 偵測不到使用者只改這類屬性；需要時再訂 fp2 |
 
 ## 回傳大小規則（依 20 KiB 上限）
 
