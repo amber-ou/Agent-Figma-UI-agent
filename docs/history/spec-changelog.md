@@ -1,6 +1,22 @@
-# 規格變更紀錄（v1.1–v1.6）
+# 規格變更紀錄（v1.1–v1.7）
 
-從 `FIGMA_UI_AGENT_SPEC.md` 第 20.3–20.8 節移出（v1.7）。內容保留原文，章節編號、檔案路徑與「本版」等用語指當時的版本；歷史文件已移到 `docs/history/` 與 `docs/research/`。最新一版的變更紀錄在主規格第 20.3 節。
+從 `FIGMA_UI_AGENT_SPEC.md` 移出：v1.1–v1.6 於 v1.7 移出，v1.7 於 v1.8 移出。內容保留原文，章節編號、檔案路徑與「本版」等用語指當時的版本；歷史文件已移到 `docs/history/` 與 `docs/research/`。最新一版的變更紀錄在主規格第 20.3 節。
+
+## v1.7 變更紀錄
+
+依 M4 結果（`docs/history/m4-summary.md`）與使用者 2026-10-02 的決定修訂。v1.1–v1.6 的變更紀錄移到 `docs/history/spec-changelog.md`。
+
+- 第 4.6 節（新增）：記憶與規則分四層：通用規則、產品政策、每次需求的記憶、本機狀態。隔離規則；不寫 Claude Code 的自動記憶；INVARIANT-26。
+- 第 7.5 節（新增）：產品政策 POL-01–06。政策檔進 git、網址另存本機；自動套用；寫入只經使用者回答或確認；Handoff 列出政策建議。Aiwow 的對比政策為不適用。INVARIANT-24、25。
+- 第 7.1 節：REQ-05 產品由需求指明，沒寫就詢問；REQ-06 library 由使用者提供，找不到就詢問。
+- 第 7.2、7.4 節：DEC-09 預填清單（取代 ASK-07「每輪 1–3 題」的上限）；DEC-10 產品政策題優先、每個產品只問一次；designDecisions 的 `source` 新增 `product_policy`。
+- 第 9.5、12.1 節：產品政策可讓 G5 的對比項不適用，其他可及性項照常。
+- 第 4.5、12.1、20 節：記錄 M4 已實作的修正：唯讀腳本靜態檢查與其限制、第一次寫入兼作 nativeWrite 探測、無改動 write 的 `noChange` 標記。
+- 第 10.3、11.2、14 節：M4 發現：元件內部字型要比對；fp1 不涵蓋截斷設定；工具耗時缺口與重開後 session unknown。
+- 第 13.2 節：T61–T71；第 15 節：handoff 第 11 項；第 17 節：M4 部分完成、v1.7 列、M4 之後的待辦。
+- 第 4.1 節：結構改成和 repo 一致；`decisions.md` 未實作，決策只存在 plan.json。
+- 文件整理：歷史紀錄移到 `docs/history/`，研究提案移到 `docs/research/`，刪除已被取代的 `docs/adjustment-plan.md`；`CC_BUILD_PROMPT.md` 只放目前這一版的指令。
+- 保留不變：所有寫入保護、既有品質門檻、run artifacts 的 schemaVersion `1.2`（只新增選填欄位與 enum 值）。
 
 ## v1.6 變更紀錄
 
