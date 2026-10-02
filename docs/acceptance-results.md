@@ -14,7 +14,7 @@ Spec v1.6 · schemaVersion 1.2 · 日期 2026-09-29 · 分支 `feat/m4`
 
 | 任務 | 狀態 | 說明 |
 |---|---|---|
-| A 新增多狀態畫面 | **已執行** | run `ui-20260929-002`，判定 `complete_with_exceptions`，6/6 cell；詳見 `docs/m4-summary.md` |
+| A 新增多狀態畫面 | **已執行** | run `ui-20260929-002`，判定 `complete_with_exceptions`，6/6 cell；詳見 `docs/history/m4-summary.md` |
 | B 既有畫面局部改版 | **使用者決定略過，未測** | 複製 04-11、長文字、混合語言、不改共享主元件都沒有在 sandbox 驗證 |
 | C 中斷恢復 | **使用者決定略過，未測** | 其中「人工改動偵測」與「未知結果對帳」已在 M3 實測（見 T35、T40）；「寫入回應被截斷後以所有權標記找回節點」**未實測** |
 
@@ -52,7 +52,7 @@ Spec v1.6 · schemaVersion 1.2 · 日期 2026-09-29 · 分支 `feat/m4`
 | T31 | 參考、library、輸出分開 | **pass**（cross-file） | pass（部分） | — | 參考頁 v1.1.2 保持唯讀、只寫 sandbox，但參考和輸出是同一個檔案；另見 F-001（rd-0009 在 COVER 頁的暫時寫入） |
 | T32 | audit 少 gate／懸空證據／過期截圖 | **pass**（cross-file、evaluate-completion） | pass | — | 任務 A 在 Validate 階段被 validator 擋下懸空 evidenceRef 和過期證據，修正後才通過 |
 | T33 | new／continue／resume | **pass**（workflow） | **pass（部分）** | — | 重開 Claude Code 後用 `continue` 接續任務 A，沒有重問已確認的內容；resume 沒有實測 |
-| T35 | 使用者改了 agent 節點 | **pass**（snippets） | **pass**（M3 op-0003） | pass（M3 ev-002） | 引用 M3 實測（T35–T37 皆通過），詳見 `docs/m3-summary.md` §4.4 |
+| T35 | 使用者改了 agent 節點 | **pass**（snippets） | **pass**（M3 op-0003） | pass（M3 ev-002） | 引用 M3 實測（T35–T37 皆通過），詳見 `docs/history/m3-summary.md` §4.4 |
 | T38 | 未決定的裝飾／多種修法 | **pass**（cross-file） | **pass** | — | 任務 A：dec-103 待決時，只有 default 畫面沒有寫入；新發現的 major 缺陷記為 dec-117 |
 | T39 | 缺 op 標頭、fileKey 不符、有 unknown_outcome | **pass**（figma-hooks） | pass | — | M3 op-0001 變成 unknown_outcome 後，下一個寫入被擋到對帳完成；M4 新增唯讀腳本靜態檢查 |
 | T40 | 失敗觸發 PostToolUseFailure | **pass**（figma-hooks、operation-journal） | **pass**（M3 rd-0005、op-0001） | — | 引用 M3：讀取失敗記 failed_known，寫入失敗記 unknown_outcome；對帳後才能再寫 |

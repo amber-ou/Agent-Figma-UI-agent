@@ -30,7 +30,7 @@ M2 把 M1 已證實的路徑整理成 skill、資料契約、validator 與本機
 | `scripts/hooks/lib.mjs`（修改） | journal 合併時 timestamps 深合併 | §11.3 |
 | `tests/fixtures/m1-run/` | M1 真實 run 去識別化並補齊為完整契約（fileKey、library key、元件／變數 key、品牌名已替換） | §20 |
 | `package.json`、`package-lock.json`、`.npmrc` | Ajv 8.20.0、ajv-formats 3.0.1（固定版本） | — |
-| `CLAUDE.md`、`docs/setup.md`、`docs/m2-summary.md` | 入口說明、安裝與使用、本文件 | §17 |
+| `CLAUDE.md`、`docs/setup.md`、`docs/history/m2-summary.md` | 入口說明、安裝與使用、本文件 | §17 |
 
 ## 3. 量測：`use_figma` 回傳上限（CAP-05）
 

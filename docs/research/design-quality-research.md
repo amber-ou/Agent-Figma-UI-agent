@@ -5,11 +5,11 @@
 > **v1.6 狀態（2026-09-29）：**研究紀錄；本文件的建議未排入 v1.6。
 
 
-`docs/use-figma-quality-research.md` 處理的是「做得對不對」（API 用法、DS 選用、版面數值）。本文件處理「做得好不好」：畫面的層級、一致性、文案與可用性。建議項目登記在 `docs/backlog.md`（D-xx）。
+`docs/research/use-figma-quality-research.md` 處理的是「做得對不對」（API 用法、DS 選用、版面數值）。本文件處理「做得好不好」：畫面的層級、一致性、文案與可用性。建議項目登記在 `docs/research/backlog.md`（D-xx）。
 
 ## 1. 來源與限制
 
-- 本專案實測：M1（`docs/m1-summary.md`）與第一次真實任務（`docs/m3-first-run-summary.md`，run `ui-20260928-001`）。
+- 本專案實測：M1（`docs/history/m1-summary.md`）與第一次真實任務（`docs/history/m3-first-run-summary.md`，run `ui-20260928-001`）。
 - 學術研究：以網路搜尋取得摘要。**本次雲端環境擋住 arxiv.org、berkeley.edu、machinelearning.apple.com，未能讀全文**；引用的數字來自搜尋結果中的論文摘要，若要寫進 spec 應先讀原文確認。
 - 分級沿用 `FIGMA_MCP_RESEARCH.md`：D 官方／論文、E 本環境觀察、P 專案設計、U 未驗證。
 
@@ -184,7 +184,7 @@ Validate 時把新畫面與最相近的參考畫面**同比例**截圖並排，�
 
 ## 7. 來源
 
-- 本專案：`docs/m1-summary.md`、`docs/m3-first-run-summary.md`、`FIGMA_UI_AGENT_SPEC.md` v1.4 §6.6、§7.4、§8.2–8.3、§9、§12.3
+- 本專案：`docs/history/m1-summary.md`、`docs/history/m3-first-run-summary.md`、`FIGMA_UI_AGENT_SPEC.md` v1.4 §6.6、§7.4、§8.2–8.3、§9、§12.3
 - Duan, Warner, Li, Hartmann. [Generating Automatic Feedback on UI Mockups with Large Language Models](https://dl.acm.org/doi/10.1145/3613904.3642782). CHI 2024.（[arXiv](https://arxiv.org/abs/2403.13139)）
 - Duan et al. [UICrit: Enhancing Automated Design Evaluation with a UI Critique Dataset](https://dl.acm.org/doi/10.1145/3654777.3676381). UIST 2024.（[arXiv](https://arxiv.org/abs/2407.08850)）
 - [Visual Prompting with Iterative Refinement for Design Critique Generation](https://arxiv.org/abs/2412.16829)

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "productId": "aiwow",
+  "displayName": "Aiwow",
+  "policies": {
+    "accessibility.contrast": {
+      "value": { "required": false },
+      "decidedBy": "user",
+      "decidedAt": "2026-10-02",
+      "origin": "policy_question",
+      "runId": null,
+      "note": "使用者回答產品政策題「Aiwow 的 design system 要遵守對比（WCAG）規則嗎？」為「否」。不檢查、不詢問對比；其他可及性項目照常（spec v1.7 第 9.5 節）。"
+    }
+  },
+  "rules": [],
+  "history": [
+    {
+      "at": "2026-10-02",
+      "action": "add",
+      "target": "policies/accessibility.contrast",
+      "from": null,
+      "to": { "required": false },
+      "origin": "policy_question",
+      "runId": null
+    }
+  ]
+}
