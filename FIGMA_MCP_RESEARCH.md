@@ -1,8 +1,8 @@
 # Figma MCP UI 設計研究紀錄
 
-版本：1.8 · 原研究日期：2026-09-27 · 補充查核／修訂：2026-09-28、2026-09-29（v1.1–v1.6）、2026-10-02（v1.7）、2026-10-03（v1.8）。
+版本：1.9 · 原研究日期：2026-09-27 · 補充查核／修訂：2026-09-28、2026-09-29（v1.1–v1.6）、2026-10-02（v1.7）、2026-10-03（v1.8、v1.9）。
 
-目的：為「Claude Code 讀取指定檔案的 library／variables 並延伸 UI」提供來源與限制。規範以 FIGMA_UI_AGENT_SPEC.md v1.8 為唯一來源；本文件不另定義完成條件。
+目的：為「Claude Code 讀取指定檔案的 library／variables 並延伸 UI」提供來源與限制。規範以 FIGMA_UI_AGENT_SPEC.md v1.9 為唯一來源；本文件不另定義完成條件。
 
 ## 1. 研究方式與可信度
 
@@ -299,3 +299,15 @@ v1.7 的產品政策、記憶分層與預填清單是使用者決定的流程設
 | 本機另有 Anthropic `design` plugin 1.2.0（accessibility-review、design-critique、design-handoff、design-system、research-synthesis、user-research、ux-copy），其 `.mcp.json` 含 `mcp.figma.com` | D（`anthropics/knowledge-work-plugins`）／E（本機清單） | `/skills`、plugin 原始檔 | 第 4.7、4.2.3 節 |
 | 本機 `/mcp` 只有一個 Figma 連線（手動加入的 `figma`，40 個工具）；`design` plugin 的 Figma 連線沒有出現 | E（現象）／U（原因） | `/mcp` 截圖 | 第 4.2.3 節記為現況 |
 | 帳號同步的設計類 skill（`ux-design-team` 等）有自行補假設、預設數值、產出 HTML 等內容，與第 7.4 節衝突 | D（skill 原文） | 帳號同步的 SKILL.md | 第 4.7 節排除清單 |
+
+## 17. v1.9 決策紀錄（第一個正式需求與提問架構研究，2026-10-03）
+
+| 觀察 | 分級 | 證據 | 主規格處理 |
+|---|---|---|---|
+| 第一個正式需求 run `ui-20261003-001`（Aiwow App 首頁）判定 `complete`；2 輪清單共 23 列，Build 中途又問 1 題（dd-11） | E | 使用者轉貼的 run 回報 | 第 17 節 |
+| 以 key 匯入顏色 style 失敗；改用畫面上已在使用的同一份 style | E | op-0002（failed_known） | 第 8.1 節第 6b 步 |
+| 寫入腳本找不到 instance 內被隱藏的圖示子節點 | E（現象）／U（原因：搜尋預設略過隱藏的 instance 子節點） | op-0004（failed_known） | 第 8.1 節第 6b 步；待記入 `runtime-probes.md` |
+| 新建 Status Bar instance 回到主元件的 SF Pro Text（未安裝），參考畫面上的 instance 已 override 成 SF Pro | E | dd-11 | 第 10.3 節 |
+| LINE 官方登入按鈕規範：基本色 #06C755，不得使用其他顏色 | D（外部研究引用官方文件）／本環境未能讀取 `developers.line.biz`（egress 封鎖），未獨立查證 | `docs/research/question-flow-architecture-review.md` 第 5 節 | EXT-01；`ui-20261003-001` 待修 |
+| 外部研究第 9 節依 v1.8（`3c7bdce`）核對：委派機制（DEC-07）已存在、全域 Build 邊界要求所有文案已確認、多項減題建議和現行規則直接衝突 | E（雲端 session 抽查三處一致） | 研究報告第 9.2、9.5 節 | 第一階段寫入 v1.9；第二階段待評估 |
+| 共通設計規則提案（CORE、SYS、UX、ADD、SPACE-001），引用 W3C、NN/g、GOV.UK、Figma、SAP 文件 | D（原作者查核，雲端 session 未逐一重開）／P（優先度與自動修正策略為本專案政策） | `docs/research/common-rules-proposal.md` | 第 9.6 節；調整後放在 `references/common-rules.md` |
