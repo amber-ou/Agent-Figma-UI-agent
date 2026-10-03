@@ -253,6 +253,37 @@
     },
     "updatedAt": {
       "$ref": "common.schema.json#/$defs/dateTime"
+    },
+    "reworkRounds": {
+      "description": "v1.9 §14: changes the user asked for after a handoff (continue on an evaluated run). Counted as 返工次數 in run-report metrics.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "requestedAt",
+          "request"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "requestedAt": {
+            "$ref": "common.schema.json#/$defs/dateTime"
+          },
+          "request": {
+            "type": "string",
+            "minLength": 1
+          },
+          "previousResult": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false

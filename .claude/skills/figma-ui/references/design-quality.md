@@ -11,6 +11,15 @@
 
 - **產品政策（v1.7，§9.5）**：產品政策 `accessibility.contrast.required = false` 時，預檢不放對比項、Validate 不產生對比 finding，G5 記 `contrast: { status: "not_applicable", policyRef }`，其他可及性項照常；見 `references/product-policy.md`。政策為 `true` 或尚未決定時照上面的規則，G5 對比是硬性門檻。
 
+## 共通設計規則（v1.9，§9.6）
+
+Plan 與 Validate 另讀 `references/common-rules.md`（其他階段不讀）：P0 核心可用性、P1 設計系統與布局（含 SPACE-001）、P2 理解與效率、情境規則，以及審閱與修正循環。
+
+- **層級**：共通規則由規格管轄，不一致時以規格為準。**gate（G1–G7）與完成判定（§12.1）不變**：逐條結果記在 `audit.ruleChecks`（`pass | fail | needs_review | not_applicable | not_tested`），不取代 gate 狀態。`fail` 影響交付時轉成 finding，由 G3–G5 判定；`not_tested` 列入 `implementationVerificationRequired`，不算 pass；`needs_review` 未解決時判定為 `awaiting_user`；`not_applicable` 要寫原因。
+- **修正權限**：A（自動修正）只限本 run 委派的類型（DEC-12）或只有一種合理修法（§8.3），且修正後驗證通過；**有多種合理修法、或超出委派類型時不自動修正**，依 §7.4 詢問。S 提出建議；V 列入實作驗證。
+- **對比**不在共通規則：依產品政策（§9.5）。政策為不適用時，任何規則（含 SYS-08 主題與模式）都不產生對比項或對比 finding。
+- **SPACE-001**：只套用在本 run 新建的節點；既有 pattern 值優先，照抄參考畫面不取整；不改既有節點。取值用 `snippets/spacing.js` 的 `figmaUiSpacing`。
+
 ## 結構（G3）
 
 - 重複控制項用既有 COMPONENT／COMPONENT_SET 的 INSTANCE；不 detach；透過公開 properties 改 label／icon／state。

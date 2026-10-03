@@ -21,11 +21,26 @@ export const EXAMPLES = {
     limits: { useFigmaReturnBytes: { status: 'verified', maxObservedOk: 20480, firstFailure: null, evidence: ['rd-0001'] }, searchDesignSystemQueriesPerCall: null },
     features: { nativeWrite: { status: 'available_unverified', basis: 'history', notes: 'verified in an earlier run; the first write of this run probes it' } },
   },
-  audit: { evidenceToolRef: { tool: 'mcp__figma__use_figma', operation: 'rd-0006', capturedAt: '2026-10-03T00:00:00.000Z' } },
+  audit: {
+    evidenceToolRef: { tool: 'mcp__figma__use_figma', operation: 'rd-0006', capturedAt: '2026-10-03T00:00:00.000Z' },
+    // v1.9 §9.6: not_tested is also listed in implementationVerificationRequired
+    ruleCheck: { ruleId: 'CORE-03', status: 'not_tested', reason: 'keyboard order is verified in the implementation', verification: 'Tab / Shift+Tab / Escape' },
+  },
+  inventory: {
+    // v1.9 EXT-01 / §10.3
+    externalRequirement: { id: 'ext-01', subject: 'LINE Login button', url: null, checkedAt: null, appliesWhen: 'the screen offers LINE login', requirement: '…', inference: '…', status: 'unverified', sourceKind: 'none', affectsDelivery: true },
+    componentFontCheck: { componentMapRef: 'cmap-StatusBar', mainComponentNodeId: '1:2', source: 'main_component', fonts: [{ family: 'SF Pro Text', style: 'Semibold' }], evidenceRefs: ['rd-0004'] },
+  },
   plan: {
     designDecisionSkippedByUser: { id: 'dd-01', question: '…', options: ['A', 'B'], recommendation: null, answer: null, source: 'user', evidenceRefs: [], decidedAt: null, status: 'skipped', skippedBy: 'user', confirmation: 'user_skipped' },
     scopeDecision: { id: 'dec-001', decision: 'variables library: none for this run', scope: 'sources', decidedAt: '2026-10-03T00:00:00.000Z', source: 'user', confirmation: 'user_modified' },
     undefinedBehavior: { id: 'ub-01', behavior: 'how long the error toast stays and whether it can be dismissed', kind: 'timing', screenKey: 'share-failed' },
+    // v1.9 DEC-12/13/14, §8.1 6b
+    direction: { id: 'dd-20', kind: 'direction', topic: 'layout', question: 'direction proposal: …', options: ['as proposed', 'alternative'], recommendation: 'as proposed', answer: 'as proposed', source: 'user', evidenceRefs: [], decidedAt: '2026-10-03T00:00:00.000Z', status: 'answered', confirmation: 'prefilled_confirmed' },
+    delegationDecision: { id: 'dec-020', decision: 'sizes, spacing, alignment, component widths and placeholder sizes inside the approved direction are left to the agent', scope: 'run', runOnly: true, decidedAt: '2026-10-03T00:00:00.000Z', source: 'user', confirmation: 'prefilled_confirmed', delegation: { allowedKinds: ['size', 'spacing', 'alignment', 'component_width', 'placeholder_size'], excludedKinds: ['copy', 'brand_asset', 'external_requirement', 'new_token', 'new_component', 'raw_value_exception', 'platform', 'write_scope'] } },
+    delegatedDetail: { id: 'dd-21', kind: 'spacing', topic: 'detail', question: 'card padding', options: ['16', '24'], recommendation: '16', answer: '16', source: 'user', evidenceRefs: [], decidedAt: '2026-10-03T00:00:00.000Z', status: 'answered', directionRef: 'dd-20', delegation: { decisionRef: 'dec-020', scope: 'run', runId: '<run-id>' } },
+    draftCopy: { id: 'cp-04', role: 'terms note', text: '…', status: 'pending', origin: 'draft' },
+    importCheck: { id: 'imp-01', kind: 'component_set', componentMapRef: 'cmap-Button', method: 'import_by_key', status: 'importable', evidenceRefs: ['rd-0005'] },
   },
 };
 

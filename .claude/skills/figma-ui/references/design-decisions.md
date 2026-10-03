@@ -102,7 +102,7 @@ v1.8 起 `skipped` 要記 `skippedBy`（DEC-08、INVARIANT-28）：
 
 ## 授權採用建議（DEC-07，v1.4）
 
-使用者可以對某個 run 說「設計決策一律採用你的建議」（例如測試 run）。
+使用者可以對某個 run 說「設計決策一律採用你的建議」（例如測試 run）。v1.9 起正式使用優先採用下方的**限定範圍委派（DEC-12）**；本節保留給使用者明確要求全面授權的情況（例如測試 run）。
 
 1. 把授權記進 `plan.decisions`（例如 `dec-006`：「本 run 的設計決策採用 agent 建議；沒有建議的題目略過」）。
 2. 每題仍照上面的格式產生選項與建議。
@@ -117,3 +117,91 @@ v1.8 起 `skipped` 要記 `skippedBy`（DEC-08、INVARIANT-28）：
 5. 授權只對這個 run 有效。`continue <run-id>` 沿用；開新 run 必須重新取得（INVARIANT-01、INVARIANT-18）。validator 會拒絕 `delegation.runId` 與 plan 不同、或 `decisionRef` 不在 `plan.decisions` 的紀錄。授權本身記 `runOnly: true`：它和用授權回答的題目都不會列成產品政策建議（POL-05）。
 6. v1.7：授權等同「本 run 的預填清單一律確認」（DEC-09）；**留空的列仍要使用者回答**，否則為 `skipped`。
 7. 硬性門檻不因授權豁免。建議若會造成 G5 對比失敗，Plan 階段就要指出（`references/design-quality.md` 的可及性預檢），不能做完才發現。
+
+## 決策分流順序（DEC-15，v1.9）
+
+每個未知項目依序判斷，前一步能解決就不往下。不以模型自評的信心或「高風險」標籤代替這個順序。
+
+| 步驟 | 問自己 | 能解決時怎麼做 | 例子 |
+|---|---|---|---|
+| 1 | 和本次需求相關嗎？ | 不相關就不列 | 只做登入頁，不問設定頁的 tab 樣式 |
+| 2 | 能用工具或官方文件查明嗎？ | 先查（EXT-01、Discover），不讓使用者猜 | LINE 登入按鈕的官方色與 logo 用法；元件 key 能否匯入；主元件用了什麼字型 |
+| 3 | 已有決定嗎？（指示、brief、產品政策、DS、已確認 pattern） | 只列摘要（DEC-03），記 `source: ds \| existing_pattern \| brief \| product_policy` | Aiwow 不檢查對比；主要按鈕用 DS 的 Button；外距沿用參考畫面的 16 |
+| 4 | 在本 run 的委派範圍內嗎？ | agent 決定並驗證（DEC-12），Plan 摘要列出 | 已核准置中版型後：卡片內距 16、按鈕寬度 Fill、logo 佔位 80×80 |
+| 5 | 會影響本次結果嗎？ | 不影響就記錄、不打斷 | Toast 停留幾秒、轉場動畫（DEC-11，`plan.undefinedBehaviors`） |
+| 6 | 以上都不是 | 才變成問題，見下 | — |
+
+第 6 步依性質選格式：
+
+- **改變目的或主要結構** → 方向方案（DEC-13）。例：「歡迎頁置中版型（照 01-02）／上下分區（照 03-01）」。
+- **缺使用者持有的事實**（品牌、產品名稱、文案、帳號、商業規則）→ 預填清單留空。例：條款文字寫什麼。
+- **來源衝突或超出權限**（新增 token／元件、raw 值例外、改共享主元件、外部規範要求 DS 沒有的資源）→ 阻擋相依工作，另列一題。例：DS 沒有 LINE 官方綠色，要新增 style 還是在本 run 以核准的寫死值例外處理。
+
+## 方向方案（DEC-13，v1.9）
+
+同一個方向的相依選擇合成**一個**方案確認，取代零碎的單題。方案寫出：
+
+1. 畫面目的與主要操作；
+2. 整體版型與主體區塊的組成；
+3. 引用的來源（參考畫面節點連結、pattern ID）、和參考畫面的差異；
+4. 為什麼選這個參考；有其他候選時一併列出。
+
+範例：
+
+| 編號 | 問題 | 答案 |
+|---|---|---|
+| dd-20 | **方向方案**：歡迎頁，主要操作「使用 LINE 帳號登入」。版型照 01-02 置中：上方 logo 佔位與品牌名、中段 slogan、下方登入按鈕與條款。背景沿用 01-02 的淺灰。和 01-02 的差異：沒有 Top bar。另一候選 03-01（上下分區）較適合有插圖的頁面，本案沒有插圖素材 | 照方案（建議，請確認） |
+| dec-020 | **委派授權（只限本 run）**：核准方向內的尺寸、留白、對齊、元件寬度、佔位尺寸交給 agent 決定並驗證 | 同意（建議，請確認） |
+| dd-24 | 條款文字（**擬稿**，請確認或改寫）：「登入即表示同意服務條款」 | |
+
+記錄：
+
+```json
+{"id": "dd-20", "kind": "direction", "topic": "layout", "question": "方向方案：…", "options": ["照方案", "改用 03-01 上下分區"],
+ "recommendation": "照方案", "answer": "照方案", "source": "user", "status": "answered", "confirmation": "prefilled_confirmed", "decidedAt": "<時間>", "evidenceRefs": []}
+{"id": "dd-22", "kind": "other", "topic": "visual", "question": "背景沿用 01-02 的淺灰", "dependsOn": "dd-20", "confirmedWith": "direction",
+ "recommendation": "淺灰", "answer": "淺灰", "source": "user", "status": "answered", "decidedAt": "<同上>", "options": ["淺灰", "白"], "evidenceRefs": []}
+```
+
+- 使用者照方案接受 → 子選擇記 `confirmedWith: "direction"`，不另算一題實質決策。
+- 使用者**換方向**（`confirmation: user_modified`）→ 新方向的子選擇展開成單題，各自確認後記 `confirmedWith: "row"`。validator 會拒絕換方向後仍以 `direction` 確認的子選擇。
+- **不能藏進方案**：平台、寫入範圍、品牌素材、文案內容、外部規範（`topic`：`platform`、`write_scope`、`brand_asset`、`copy`、`external_requirement`）。這些另列；validator 會拒絕。這是 ASK-07「不把大型規格表包成一題」的例外：允許的是同一方向的整合，不是把不同性質的問題合併。
+
+## 限定範圍的細節委派（DEC-12，v1.9；B 模式）
+
+方向由使用者確認，方向內的細節由 agent 決定並驗證。這是 DEC-07 的縮小版，**正式使用優先採用本節**。
+
+1. **每個 run 給一次**：在方向方案下加一行委派授權（上方範例的 dec-020）。使用者確認後記：
+
+   ```json
+   {"id": "dec-020", "decision": "核准方向內的尺寸、留白、對齊、元件寬度、佔位尺寸交給 agent 決定並驗證", "scope": "run", "runOnly": true,
+    "source": "user", "decidedAt": "<時間>", "confirmation": "prefilled_confirmed",
+    "delegation": {"allowedKinds": ["size", "spacing", "alignment", "component_width", "placeholder_size"],
+                   "excludedKinds": ["copy", "brand_asset", "external_requirement", "new_token", "new_component", "raw_value_exception", "platform", "write_scope"]}}
+   ```
+
+   不變成產品政策，也不延續到新 run（INVARIANT-18）；`continue` 同一 run 時沿用。
+2. **委派的決定**：
+
+   ```json
+   {"id": "dd-21", "kind": "spacing", "topic": "detail", "question": "卡片內距", "options": ["16", "24"], "recommendation": "16", "answer": "16",
+    "source": "user", "status": "answered", "decidedAt": "<時間>", "evidenceRefs": [], "directionRef": "dd-20",
+    "delegation": {"decisionRef": "dec-020", "scope": "run", "runId": "<本 run>"}}
+   ```
+
+   必須在 DS 的範圍內（既有 style、間距或元件屬性）並符合已核准的方向。留白依 `snippets/spacing.js`（SPACE-001：既有 pattern 值優先，沒有 token 時用 4px 尺度）。
+3. validator 檢查（INVARIANT-29）：`kind` 在 `allowedKinds` 內、不是 `direction`／`other`；`topic` 不屬於排除類型；`directionRef` 指向**已確認**的 `kind: direction` 決定。只檢查 ID 存在不夠。
+4. 委派的決定**不出現在預填清單**；Plan 確認時以一段摘要列出 agent 選了什麼，handoff 第 13 項同樣列出。
+5. 使用者沒有給委派 → 回到預填清單逐項確認（A 模式）。
+
+## 文案來源（DEC-14，v1.9）
+
+| origin | 什麼 | 必要欄位 | Build 前 |
+|---|---|---|---|
+| `existing` | 既有正式文案 | `sourceRef`（來源畫面或文件） | `status: confirmed` |
+| `user` | 使用者在需求或回答中寫明的文字 | `sourceRef`（需求或決策 ID） | `status: confirmed` |
+| `draft` | agent 擬稿，明標「擬稿」並列入預填清單 | 確認後加 `decisionRef` | 使用者確認後才 `confirmed`；`origin` 仍是 `draft` |
+
+- 「要不要放某段文字」和「寫什麼」是兩題。使用者回答「放」但沒給文字 → 文字另列一題（擬稿或留空），**不把題目裡的舉例當成答案**（run `ui-20261003-001` 的 dd-08）。validator 會拒絕 `origin: user` 但文字只出現在題目或選項、不在使用者回答裡的紀錄。
+- 沒有授權時不新增需求沒提到的文案元素（例如 slogan）；要新增，先問要不要放，再問寫什麼。
+- Build 邊界只接受 confirmed 文案；未確認的擬稿會以「擬稿」名義被擋下（INVARIANT-30）。

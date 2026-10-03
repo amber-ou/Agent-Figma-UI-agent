@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { validateRun, validateSchema, decisionStatus, decisionResolved, evidenceCoversCell, inputDigest, evaluationIsCurrent } from './validate-artifacts.mjs';
 import { atomicWriteJson, nowIso } from './state-store.mjs';
 
-export const RULE_VERSION = '12.1@1.8';
+export const RULE_VERSION = '12.1@1.9';
 const GATES = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7'];
 const ALWAYS_PASS = new Set(['G1', 'G2', 'G6', 'G7']);
 const UNRESOLVED_OPS = new Set(['dispatched', 'unknown_outcome']);
@@ -88,6 +88,12 @@ export function evaluateCompletion(plan, audit, ledger, now = new Date().toISOSt
     return [d.id, s === 'skipped' ? `skipped(by ${d.skippedBy || 'agent'})` : s];
   });
   if (openDecisions.length) flag(`unanswered design decisions: ${openDecisions.map(([id, s]) => `${id}=${s}`).join(', ')}`, 'awaiting_user');
+
+  // v1.9 §9.6: a common-rule check still needing review is an open question, never a pass. Per-rule
+  // statuses do not replace gates: a fail is judged through its finding (G3–G5), not_tested is listed in
+  // implementationVerificationRequired (the validator checks both).
+  const review = (audit.ruleChecks || []).filter(rc => rc.status === 'needs_review');
+  if (review.length) flag(`rule checks needing review: ${review.map(rc => `${rc.ruleId}${rc.nodeIds?.length ? `(${rc.nodeIds.join(',')})` : ''}`).join(', ')}`, 'awaiting_user');
 
   // 4. design tasks: no open critical/major finding affecting delivery
   if (plan.taskType !== 'audit') {

@@ -103,9 +103,66 @@
                 "maxLength": {
                   "type": "integer",
                   "minimum": 1
+                },
+                "origin": {
+                  "description": "v1.9 DEC-14: existing = formal copy from a source screen or document (sourceRef); user = text the user wrote in the request or an answer (sourceRef); draft = agent draft, marked 擬稿 and listed for confirmation. A confirmed draft keeps origin draft.",
+                  "enum": [
+                    "existing",
+                    "user",
+                    "draft"
+                  ]
+                },
+                "decisionRef": {
+                  "description": "v1.9 DEC-14: the decision in which the user confirmed this text (required for a confirmed draft).",
+                  "$ref": "common.schema.json#/$defs/localId"
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "description": "v1.9 DEC-14: existing and user copy name their source",
+                  "if": {
+                    "required": [
+                      "origin"
+                    ],
+                    "properties": {
+                      "origin": {
+                        "enum": [
+                          "existing",
+                          "user"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "sourceRef"
+                    ]
+                  }
+                },
+                {
+                  "description": "v1.9 DEC-14 / INVARIANT-30: a draft is confirmed only through a user decision",
+                  "if": {
+                    "required": [
+                      "origin",
+                      "status"
+                    ],
+                    "properties": {
+                      "origin": {
+                        "const": "draft"
+                      },
+                      "status": {
+                        "const": "confirmed"
+                      }
+                    }
+                  },
+                  "then": {
+                    "required": [
+                      "decisionRef"
+                    ]
+                  }
+                }
+              ]
             }
           }
         },
@@ -602,6 +659,45 @@
               "user",
               "agent"
             ]
+          },
+          "kind": {
+            "$ref": "common.schema.json#/$defs/decisionKind"
+          },
+          "topic": {
+            "description": "v1.9 DEC-12/13: what the decision touches. The validator refuses a delegated decision or a direction sub-choice whose topic is excluded (copy, brand_asset, external_requirement, new_token, new_component, raw_value_exception, platform, write_scope).",
+            "anyOf": [
+              {
+                "$ref": "common.schema.json#/$defs/excludedTopic"
+              },
+              {
+                "enum": [
+                  "layout",
+                  "visual",
+                  "component_choice",
+                  "detail",
+                  "other"
+                ]
+              }
+            ]
+          },
+          "directionRef": {
+            "description": "v1.9 DEC-12 / INVARIANT-29: the confirmed kind:direction decision a delegated detail belongs to.",
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "dependsOn": {
+            "description": "v1.9 DEC-13: the kind:direction decision this sub-choice is bundled with; it is confirmed together with the direction unless the user changes the direction.",
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "requirementRefs": {
+            "description": "v1.9 EXT-01: inventory.externalRequirements this decision is constrained by.",
+            "$ref": "common.schema.json#/$defs/refs"
+          },
+          "confirmedWith": {
+            "description": "v1.9 DEC-13: how a direction sub-choice was confirmed. direction = accepted together with its direction proposal (not a separate substantive decision); row = asked and confirmed as its own row (required when the user changed the direction).",
+            "enum": [
+              "direction",
+              "row"
+            ]
           }
         },
         "additionalProperties": false,
@@ -772,6 +868,53 @@
             "then": {
               "required": [
                 "policyRef"
+              ]
+            }
+          },
+          {
+            "description": "v1.9 DEC-13: a direction is the parent of sub-choices; it is not itself a sub-choice or a delegated detail.",
+            "if": {
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "direction"
+                }
+              }
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "dependsOn"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "directionRef"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "delegation"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "description": "v1.9 DEC-13: confirmedWith only on sub-choices of a direction",
+            "if": {
+              "required": [
+                "confirmedWith"
+              ]
+            },
+            "then": {
+              "required": [
+                "dependsOn"
               ]
             }
           }
@@ -1289,9 +1432,163 @@
               }
             },
             "additionalProperties": false
+          },
+          "delegation": {
+            "description": "v1.9 DEC-12: a scoped delegation, given once per run with the direction confirmation. Delegated design decisions must use an allowed kind, avoid every excluded topic and point at a confirmed direction (INVARIANT-29). scope must be \"run\"; never a product policy.",
+            "type": "object",
+            "required": [
+              "allowedKinds",
+              "excludedKinds"
+            ],
+            "properties": {
+              "allowedKinds": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "common.schema.json#/$defs/delegableKind"
+                }
+              },
+              "excludedKinds": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "common.schema.json#/$defs/excludedTopic"
+                }
+              }
+            },
+            "additionalProperties": false
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "description": "v1.9 DEC-12: a delegation is valid for this run only",
+            "if": {
+              "required": [
+                "delegation"
+              ]
+            },
+            "then": {
+              "properties": {
+                "scope": {
+                  "const": "run"
+                },
+                "runOnly": {
+                  "const": true
+                }
+              },
+              "required": [
+                "runOnly"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "importChecks": {
+      "description": "v1.9 §8.1 step 6b: before Plan, every component and style key the plan imports is checked in the output file. not_importable needs a fallback (the same style or instance already used on screen) listed in the plan.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "kind": {
+            "enum": [
+              "component",
+              "component_set",
+              "style"
+            ]
+          },
+          "componentMapRef": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "styleName": {
+            "type": "string"
+          },
+          "key": {
+            "$ref": "common.schema.json#/$defs/assetKey"
+          },
+          "method": {
+            "enum": [
+              "import_by_key",
+              "existing_instance",
+              "existing_style_on_screen"
+            ]
+          },
+          "status": {
+            "enum": [
+              "importable",
+              "not_importable",
+              "not_checked"
+            ]
+          },
+          "fallback": {
+            "type": "string",
+            "minLength": 1
+          },
+          "listedToUserRef": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "evidenceRefs": {
+            "$ref": "common.schema.json#/$defs/refs"
+          }
+        },
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "not_importable"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "fallback"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "component",
+                    "component_set"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "componentMapRef"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "style"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "styleName"
+              ]
+            }
+          }
+        ]
       }
     }
   },

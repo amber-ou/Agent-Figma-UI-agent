@@ -109,7 +109,7 @@ test('T66: contrast.required=false — no contrast checks or findings, G5 contra
   const g5 = g => ({ ...audit, gates: audit.gates.map(x => x.id === 'G5' ? g : x) });
   assert.equal(evaluateCompletion(plan, g5({ id: 'G5', status: 'not_applicable', policyRef: 'aiwow#policies/accessibility.contrast' }), ledger).reasons.filter(x => /^G5/.test(x)).length, 0);
   assert.ok(evaluateCompletion(plan, g5({ id: 'G5', status: 'not_applicable' }), ledger).reasons.some(x => /^G5 not_applicable/.test(x)));
-  assert.equal(evaluateRun(m1In(root, base)).evaluation.ruleVersion, '12.1@1.8');
+  assert.equal(evaluateRun(m1In(root, base)).evaluation.ruleVersion, '12.1@1.9');
 
   // a policyRef that does not make contrast not applicable is refused
   const strict = structuredClone(AIWOW); strict.productId = 'strict'; strict.displayName = 'Strict'; strict.policies['accessibility.contrast'].value.required = true; strict.history[0].to = { required: true };
@@ -123,7 +123,7 @@ test('T66: contrast.required=false — no contrast checks or findings, G5 contra
   const text = renderHandoff(dir, { root });
   assert.match(text, /## 產品政策/);
   assert.match(text, /依產品政策未檢查對比.*aiwow#policies\/accessibility\.contrast/);
-  assert.match(text, /spec v1\.8/);
+  assert.match(text, /spec v1\.9/);
 });
 
 // ---------------- T67 ----------------

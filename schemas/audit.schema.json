@@ -581,6 +581,95 @@
           "additionalProperties": false
         }
       ]
+    },
+    "ruleChecks": {
+      "description": "v1.9 §9.6: per-rule results of references/common-rules.md. They never replace gate statuses or the completion rule: not_applicable needs a reason; a fail that affects delivery needs a finding; not_tested is listed in implementationVerificationRequired; an unresolved needs_review keeps the run awaiting_user.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "ruleId",
+          "status"
+        ],
+        "properties": {
+          "ruleId": {
+            "type": "string",
+            "pattern": "^(CORE-0[1-7]|SYS-0[1-8]|SPACE-001|UX-0[1-6]|ADD-0[1-6])$"
+          },
+          "nodeIds": {
+            "$ref": "common.schema.json#/$defs/nodeIds"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "fail",
+              "needs_review",
+              "not_applicable",
+              "not_tested"
+            ]
+          },
+          "before": {},
+          "after": {},
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "exceptionRef": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "findingRef": {
+            "$ref": "common.schema.json#/$defs/localId"
+          },
+          "affectsDelivery": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string"
+          },
+          "verification": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "description": "not_applicable needs a reason",
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "not_applicable"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "reason"
+              ]
+            }
+          },
+          {
+            "description": "a fail that affects delivery becomes a finding (G3–G5 decide)",
+            "if": {
+              "required": [
+                "affectsDelivery"
+              ],
+              "properties": {
+                "status": {
+                  "const": "fail"
+                },
+                "affectsDelivery": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "findingRef"
+              ]
+            }
+          }
+        ]
+      }
     }
   },
   "additionalProperties": false

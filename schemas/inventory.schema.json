@@ -157,6 +157,52 @@
         "additionalProperties": false
       }
     },
+    "componentFontChecks": {
+      "description": "v1.9 §10.3: fonts read from the MAIN component of every instance the plan will create (never from the reference instance, whose text may be overridden). Each font must also be in inventory.fonts.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["componentMapRef", "source", "fonts"],
+        "properties": {
+          "componentMapRef": { "$ref": "common.schema.json#/$defs/localId" },
+          "mainComponentNodeId": { "$ref": "common.schema.json#/$defs/nodeId" },
+          "source": { "enum": ["main_component", "reference_instance"] },
+          "fonts": {
+            "type": "array",
+            "items": { "type": "object", "required": ["family", "style"], "properties": { "family": { "type": "string", "minLength": 1 }, "style": { "type": "string", "minLength": 1 } }, "additionalProperties": false }
+          },
+          "evidenceRefs": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": false
+      }
+    },
+    "externalRequirements": {
+      "description": "v1.9 §8.1 step 6a (EXT-01): third-party brand, platform or legal requirements the task touches. verified = the official document was actually read (url, checkedAt); unverified = unreadable or second-hand only, never written as fact (INVARIANT-16).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "subject", "url", "checkedAt", "appliesWhen", "requirement", "inference", "status"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/localId" },
+          "subject": { "type": "string", "minLength": 1 },
+          "url": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^https?://" }] },
+          "checkedAt": { "$ref": "common.schema.json#/$defs/nullableDateTime" },
+          "appliesWhen": { "type": "string", "minLength": 1 },
+          "requirement": { "type": "string", "minLength": 1 },
+          "inference": { "type": "string" },
+          "status": { "enum": ["verified", "unverified"] },
+          "sourceKind": { "enum": ["official", "secondary", "none"] },
+          "affectsDelivery": { "description": "true when this delivery depends on it; an unverified requirement that affects delivery needs the user's decision (decisionRef) before Build", "type": "boolean" },
+          "decisionRef": { "$ref": "common.schema.json#/$defs/localId" },
+          "evidenceRefs": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": false,
+        "if": { "properties": { "status": { "const": "verified" } } },
+        "then": {
+          "properties": { "url": { "type": "string" }, "checkedAt": { "$ref": "common.schema.json#/$defs/dateTime" }, "sourceKind": { "const": "official" } }
+        }
+      }
+    },
     "baseline": { "type": "array", "items": { "type": "string" } },
     "evidenceRefs": { "type": "array", "items": { "type": "string" } }
   },

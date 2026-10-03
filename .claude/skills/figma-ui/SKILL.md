@@ -8,7 +8,7 @@ argument-hint: "<需求> | continue <run-id> <調整> | resume <run-id>"
 
 # /figma-ui 工作流程
 
-規範唯一來源是專案根目錄的 `FIGMA_UI_AGENT_SPEC.md`（v1.8）。本檔只列流程、階段出口與不可違反的規則；細節在 `references/`，需要時才讀。一般設計 run **不需要**讀研究紀錄、建置里程碑或 `docs/` 的歷史總結。Figma runtime API（字型、Auto Layout、頁面載入、helpers）一律依已安裝的官方 skill：呼叫任何 `use_figma` 前先載入 `figma:figma-use`，組畫面時再載入 `figma:figma-generate-design`。本專案不另寫 API 教學。
+規範唯一來源是專案根目錄的 `FIGMA_UI_AGENT_SPEC.md`（v1.9）。本檔只列流程、階段出口與不可違反的規則；細節在 `references/`，需要時才讀。一般設計 run **不需要**讀研究紀錄、建置里程碑或 `docs/` 的歷史總結。Figma runtime API（字型、Auto Layout、頁面載入、helpers）一律依已安裝的官方 skill：呼叫任何 `use_figma` 前先載入 `figma:figma-use`，組畫面時再載入 `figma:figma-generate-design`。本專案不另寫 API 教學。
 
 交付只有原生、可編輯的 Figma；程式實作由前端工程師負責。
 
@@ -49,7 +49,7 @@ argument-hint: "<需求> | continue <run-id> <調整> | resume <run-id>"
 | Intake | 見第 2 節 | brief `stage=confirmed`、`openQuestions` 為空；`validate-artifacts.mjs design-runs/<run-id> --stage intake` 通過 |
 | Preflight | 見第 3 節 | `capabilities.json`；帳號 `ok`（寫入任務需目標 plan 的 Full seat） |
 | Discover | `references/discovery.md`（範圍化，只盤點本次需要的） | `inventory.json`；缺口列入 `brief.gaps` |
-| Plan | screens（含已確認文案）、requiredCells、flow 判斷、componentMap、variableMap、patternRefs、設計決策、可及性預檢 | `plan.json` `status=confirmed`；設計任務 `validate-artifacts.mjs … --stage build` 通過（寫入授權、flow、決策、能力都齊全）；audit 任務用 `--stage plan` |
+| Plan | screens（含已確認文案與 `origin`）、requiredCells、flow 判斷、componentMap、variableMap、patternRefs、**方向方案加一行委派授權**（第 5 節）、其餘設計決策、可及性預檢、本次適用的共通規則（`references/common-rules.md`） | `plan.json` `status=confirmed`；設計任務 `validate-artifacts.mjs … --stage build` 通過（寫入授權、flow、決策、能力都齊全）；audit 任務用 `--stage plan` |
 | Build | 以可恢復的 composition 為批次，見第 4 節 | 每個 write 都 `verified`（以獨立讀回驗證，不以寫入回應代替） |
 | Validate | 結構、截圖實際看圖、狀態、可及性，`references/design-quality.md` | `audit.json`；每個適用 requiredCell 都有**指名該 cell** 且在最後一次相關修改之後的證據 |
 | Handoff | `references/handoff.md` | `evaluate-completion.mjs design-runs/<run-id> --write` → `run-report.mjs handoff <run-id> --write`；**釋放鎖** |
@@ -59,6 +59,8 @@ argument-hint: "<需求> | continue <run-id> <調整> | resume <run-id>"
 - 完成與否只看 `evaluate-completion.mjs`（§12.1）。它已包含完整驗證，Handoff 不必再另外跑 validator；資料有任何變動就要重跑（判定帶 `inputDigest`，過期時 handoff 與使用者接受都會拒絕）。它直接讀 journal：有 applied 但未 verified 的 write、留著沒送也沒取消的 planned write、dispatched／unknown_outcome，都不能完成。不要自己判定 complete，也不要用分數代替 gates。使用者把未通過的 run「接受為測試成功」時，只記 `ledger.userAcceptance`（`--accept-test-run`），**不改 `ledger.status` 與 `completionEvaluation`，也不能稱為 complete**（INVARIANT-17）。
 
 ## 2. Intake（新任務）
+
+**v1.9 順序：先唯讀探索，再一次問完。**需求已給出來源（參考檔、library、輸出位置）時，先做唯讀探索（Preflight 的唯讀部分與 Discover：讀參考畫面、元件、styles、外部規範），把找到的候選與已能決定的事填進清單，**一次**問完剩下的；不要先丟一輪「請提供…」再去讀檔。只有**缺來源**（沒有參考檔、讀不到 library、不知道產品）而無法探索時，才先問那幾項，問到能開始探索就停。探索期間不寫入畫布。
 
 先把使用者已提供的內容整理成摘要讓他確認，只問缺的部分。能先找到候選（檔案、頁面、library、元件）就先找，讓問題變成選擇題。待答的項目一次列成**預填清單**（DEC-09，格式見第 5 節）。送出清單時記 `node scripts/run-report.mjs ask <run-id> <列數> --prefilled <預填列數> --blank <留空列數>`，收到回覆後記 `run-report.mjs answered <run-id>`。
 
@@ -114,6 +116,18 @@ hook 擋下時照原因處理（補標頭、先對帳、取得授權）；**不�
 
 ## 5. 什麼時候問、怎麼問
 
+- **決策分流順序**（DEC-15，v1.9）：每個未知項目依序判斷，前一步能解決就不往下；不以自評的信心或「高風險」標籤代替這個順序。
+  1. **和本次需求相關嗎？**不相關不列。例：只做登入頁，不問設定頁的 tab 樣式。
+  2. **能用工具或官方文件查明嗎？**能就先查，不讓使用者猜（EXT-01）。例：LINE 登入按鈕的官方顏色與 logo 規範、元件 key 能不能匯入、主元件用了什麼字型。
+  3. **已有決定嗎？**指示、brief、產品政策、DS、已確認 pattern 已決定的，只列摘要（DEC-03）。例：Aiwow 不檢查對比（產品政策）、按鈕用 DS 的 Button。
+  4. **在本 run 的委派範圍內嗎？**是就由 agent 決定並驗證（DEC-12）。例：已核准置中版型後，卡片內距取 16、按鈕寬度 Fill。
+  5. **會影響本次結果嗎？**不影響就記錄、不打斷。例：Toast 停留幾秒（DEC-11，記 `plan.undefinedBehaviors`）。
+  6. **以上都不是才變成問題**：改變目的或主要結構的，用**方向方案**（DEC-13）；缺使用者持有的事實（品牌、文案、帳號）的，留空詢問；來源衝突或超出權限的，阻擋相依工作並詢問。例：版型要置中還是上下分區（方向方案）；條款文字寫什麼（留空，DEC-14）；DS 沒有 LINE 官方色要不要新增（超出權限，另列一題）。
+- **方向方案與委派**（DEC-13、DEC-12，v1.9）：Plan 不再把版型、背景、主體組成拆成零碎單題，而是提出**方向方案**：畫面目的、主要操作、整體版型、引用的來源（參考畫面、pattern）、和參考畫面的差異、為什麼選這個參考（有其他候選一併列）。方案記成一筆 `kind: direction` 的 designDecision，同方向的子選擇以 `dependsOn` 指向它；使用者照方案接受時子選擇記 `confirmedWith: direction`，**換方向時**才把子選擇展開成單題（`confirmedWith: row`）。方案下面加**一行委派授權**：「核准方向內的尺寸、留白、對齊、元件寬度、佔位尺寸交給 agent 決定並驗證」。使用者確認後記成 `plan.decisions` 的一筆（`scope: run`、`runOnly: true`、`delegation: { allowedKinds, excludedKinds }`），**每個 run 給一次、不延續到新 run、不寫成產品政策**。委派的決定記 `source: user`、`delegation`、`kind`、`directionRef`，不放進預填清單；Plan 確認時用一段摘要列出 agent 選了什麼（handoff 第 13 項也列出），使用者要改用 `continue`。使用者沒給委派 → 細節回到預填清單逐項確認（A 模式）。
+  - **一律不能委派、也不能藏進方案**：文案內容、品牌素材、外部規範合規、新增 token 或元件、寫死數值的例外、平台、寫入範圍與權限（`topic`：`copy | brand_asset | external_requirement | new_token | new_component | raw_value_exception | platform | write_scope`）。這些另列成預填清單的列；validator 會拒絕委派或方案子選擇碰到它們。
+- **文案來源**（DEC-14，v1.9）：每段畫面文字記 `screens[].copy[].origin`：`existing`（既有正式文案，`sourceRef` 指向來源）、`user`（使用者寫明的文字，`sourceRef` 指向需求或回答）、`draft`（agent 擬稿，明標「擬稿」列入預填清單，確認後 `status: confirmed`、`decisionRef` 指向確認的決策，`origin` 仍保留 `draft`）。「要不要放」和「寫什麼」是兩題：使用者回答「放」但沒給文字時，文字另外確認，**不把題目裡的舉例當答案**（INVARIANT-30）。沒有授權時不新增需求沒提到的文案元素。
+- **外部規範**（EXT-01，v1.9）：需求涉及第三方登入、平台規範、支付時，Discover 先查官方文件（`references/discovery.md` 第 4c 節）。`verified` 的要求直接成為設計約束：不符合的樣式不列為平等候選；是否新增資源或突破 DS 是另一題。讀不到官方文件 → `unverified`，清單上標「未驗證」，由使用者決定。
+- **第二階段的規則不變**（§20.3）：產品確認（REQ-05）、library 每次確認（REQ-06）、plugin 版本每次問（§4.2.2）、全域 Build 邊界照舊；這些未經使用者重新確認不改。
 - **已決定的不重問**（DEC-03）：DS、已確認 pattern、使用者指示、brief 或**產品政策**已決定的內容，在 Plan 確認時用一段摘要列出（記為 `source: ds | existing_pattern | brief | product_policy` 的 designDecision；`product_policy` 必須帶可解析的 `policyRef`，例如 `aiwow#policies/accessibility.contrast`），不建成待答問題。
 - **預填清單**（DEC-09，v1.7）：同一階段所有待決的設計決策，以及要使用者回答的範圍與授權問題，**一次**列成一份清單（取代「每輪 1–3 題」）。每列：編號、問題（含情境與選項摘要）、答案欄。
   - 有建議 → 答案欄填建議並標「建議，請確認」。沒有建議、或屬品牌、產品方向、文案內容、個資等只有使用者能判斷的 → 答案欄留空。
@@ -131,7 +145,7 @@ hook 擋下時照原因處理（補標頭、先對帳、取得授權）；**不�
 - 新匯入元件與既有畫面使用的版本外觀不同（§6.2）：列給使用者、記為 `inherited_baseline`；不在目標檔接受 library 更新，也不用 override 模仿舊版，除非使用者決定。
 - variables 來源 library 未識別：記為 gap，需要顏色 token 的驗證標 `not_verified`，**不得用 raw value 冒充綁定**。既有 paint／text／effect styles 屬於 DS token，可沿用並計入 tokenBinding。
 - **可及性預檢不合格**（§9.5）：照抄參考畫面不算合格理由；Plan 階段記入 `plan.accessibilityPrecheck`，並以設計決策列出替代方案。新畫面沿用不合格 style 是 `introduced`，G5 fail，**不能以例外豁免**。**例外只有產品政策**：`accessibility.contrast.required = false` 時，不檢查、不詢問、不記對比（預檢與 finding 都不能有對比項），G5 記 `contrast: { status: "not_applicable", policyRef }`，點擊區等其他可及性項照常決定 G5；handoff 會註明「依產品政策未檢查對比」。政策尚未決定時先問政策題。
-- **字型未安裝**（§10.3）：不換字型；記入 `inventory.fonts` 並在 Plan 列給使用者。比對範圍要包含準備使用的**元件內部**實際使用的字型：用 `snippets/discover-helpers.js` 的 `figmaUiComponentFonts(<主元件 id>)` 讀主元件本身（不建立 instance），再交給 `figmaUiFontCheck`（M4 漏掉了 Status Bar 內的 SF Pro Text）。
+- **字型未安裝**（§10.3）：不換字型；記入 `inventory.fonts` 並在 Plan 列給使用者。比對範圍要包含準備使用的**元件內部**實際使用的字型：用 `snippets/discover-helpers.js` 的 `figmaUiComponentFonts(<主元件 id>)` 讀主元件本身（不建立 instance），再交給 `figmaUiFontCheck`（M4 漏掉了 Status Bar 內的 SF Pro Text）。v1.9：**每個準備新建的 instance** 都讀其主元件的字型，記入 `inventory.componentFontChecks`（`source: main_component`）；參考畫面上的 instance 可能已 override 成已安裝的字型，不能代替（run `ui-20261003-001` 的 Status Bar）。
 - **品牌名稱或 logo** 與使用者指定不同（REQ-04）。
 
 沒有回覆不代表同意；可以繼續不相依的唯讀工作。
@@ -148,8 +162,10 @@ hook 擋下時照原因處理（補標頭、先對帳、取得授權）；**不�
 ## 7. Validate 與收尾
 
 - 截圖以完成的 composition 或一個修正批次為單位；高風險的版面或文字修正後**立即**截該局部看圖。最後仍要覆蓋每個適用 requiredCell。
+- **共通規則檢查**（v1.9，§9.6）：Validate 依 `references/common-rules.md` 逐條檢查本次適用的規則，結果記 `audit.ruleChecks`（`ruleId`、`nodeIds`、`status`、`before`／`after`、`reason`、`findingRef`、`verification`）。`not_applicable` 要寫原因；`fail` 要寫 `affectsDelivery`，影響交付的轉成 finding（由 G3–G5 判定）；`not_tested` 同時列入 `implementationVerificationRequired`；`needs_review` 沒解決時判定為 `awaiting_user`。逐條結果**不取代** gate。A 級自動修正只限委派類型或只有一種合理修法，其他依第 5 節詢問。新建節點的間距用 `snippets/spacing.js` 的 `figmaUiSpacing` 取值（既有 pattern 值優先，照抄參考畫面不取整，不改既有節點）。
 - 每筆 evidence 寫 `cellKeys`（它證明的 requiredCell）、`state`，以及 `subject`（`rootNodeId`、`scopeNodeIds`、`ancestorNodeIds`、`afterOperationId`）。default 的截圖不能拿來證明 error 或另一個 viewport。後來的寫入動到範圍、父層布局或 mode，或偵測到使用者改動，舊證據改 `superseded` 並重讀；無法判定時也重讀，不猜有效。
-- Handoff：`evaluate-completion.mjs … --write`，再 `run-report.mjs handoff <run-id> --write`（從 artifacts 組出簡短 handoff，不手寫重複事實）。handoff 第 11 項會列出本 run 套用的產品政策和**政策建議**（`product-policy.mjs suggest <run-id>`；測試回合規則、DEC-07 授權這類只限本次的設定不會列入；沒有建議時寫「無」）。使用者勾選的建議，先記成 plan.decisions 的一筆，再用 `product-policy.mjs write` 寫入；沒勾選的只留在本 run，政策檔不變。handoff 第 12 項（v1.8）列出 `plan.undefinedBehaviors`（未定義，交由實作決定）與使用者明確略過的決策；`ledger.entities` 由 verify 自動寫入，handoff 會列出建立與修改的節點。收尾時重複進入 handoff 階段不會重複記錄。最後 `node scripts/state-store.mjs release <run-id>`（owner token 相符才刪除鎖與 `active-run.json`）。**不釋放會讓 hook 持續阻擋本專案所有未帶 op 標頭的 Figma 呼叫。**
+- Handoff：`evaluate-completion.mjs … --write`，再 `run-report.mjs handoff <run-id> --write`（從 artifacts 組出簡短 handoff，不手寫重複事實）。handoff 第 11 項會列出本 run 套用的產品政策和**政策建議**（`product-policy.mjs suggest <run-id>`；測試回合規則、DEC-07 授權這類只限本次的設定不會列入；沒有建議時寫「無」）。使用者勾選的建議，先記成 plan.decisions 的一筆，再用 `product-policy.mjs write` 寫入；沒勾選的只留在本 run，政策檔不變。handoff 第 13 項（v1.9）列出委派的細節、擬稿文案、外部規範查核結果與未驗證項目、共通規則中 fail／needs_review／not_tested 的項目；第 12 項（v1.8）列出 `plan.undefinedBehaviors`（未定義，交由實作決定）與使用者明確略過的決策；`ledger.entities` 由 verify 自動寫入，handoff 會列出建立與修改的節點。收尾時重複進入 handoff 階段不會重複記錄。最後 `node scripts/state-store.mjs release <run-id>`（owner token 相符才刪除鎖與 `active-run.json`）。**不釋放會讓 hook 持續阻擋本專案所有未帶 op 標頭的 Figma 呼叫。**
+- 使用者在 handoff 之後用 `continue` 要求修改時，先記 `node scripts/run-report.mjs rework <run-id> <修改摘要>`（返工次數，§14；`run-context.mjs` 會提醒）。
 - 回報時（繁體中文）分開列 implementation 與 integration 狀態、未驗證項與下一步；有 `skippedBy: agent` 的設計決策時一次列出，請使用者回答或確認略過。使用者表示「接受為測試成功」：先把使用者的決定記入 `plan.decisions`，再 `evaluate-completion.mjs … --accept-test-run <decisionRef> <說明>`。
 - Design QA agent 尚未接入（`docs/qa-integration-contract.md`）：UI agent 維持目前全部適用驗證，不把交付改成「待 QA」。
 
@@ -157,14 +173,15 @@ hook 擋下時照原因處理（補標頭、先對帳、取得授權）；**不�
 
 | 檔案 | 何時讀 |
 |---|---|
-| `references/discovery.md` | Discover：範圍、元件版本、variables 來源、字型 |
+| `references/discovery.md` | Discover：範圍、元件版本、variables 來源、字型、外部規範（EXT-01）、可匯入性與隱藏子節點（第 6b 步） |
 | `references/design-decisions.md` | 任何可能是設計決策的時候；預填清單的格式 |
 | `references/product-policy.md` | Intake 確定產品、套用或寫入產品政策、Handoff 政策建議 |
 | `references/flow.md` | Plan：判斷要不要整理任務流程 |
 | `references/design-quality.md` | Plan 與 Validate：品質契約、gates、evidence |
+| `references/common-rules.md` | **只在 Plan 與 Validate 讀**（v1.9，§9.6）：共通設計規則、SPACE-001、`audit.ruleChecks`；由規格管轄，不改 gate 與完成判定 |
 | `references/collaboration.md` | 寫入前後、使用者可能同時編輯時 |
 | `references/runtime-probes.md` | 需要某項 runtime 能力、或 plugin／Claude Code 版本變了 |
 | `references/recovery.md` | resume、hook 阻擋、unknown_outcome |
 | `references/handoff.md` | Handoff |
-| `snippets/*.js` | use_figma 腳本（寫入、guard、Discover helpers） |
+| `snippets/*.js` | use_figma 腳本（寫入、guard、Discover helpers、`spacing.js` 的 SPACE-001 取值） |
 | `tests/fixtures/m1-run/` | 各種 artifact 的完整範例（已去識別化） |

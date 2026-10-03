@@ -103,3 +103,33 @@ async function figmaUiInstanceGroups(root, { limit = 1500, samples = 3 } = {}) {
   }
   return { scanned: list.length, totalInstances: all.length, limited: all.length > limit, groups: [...groups.values()] };
 }
+
+// v1.9 §8.1 step 6b: can this read see the hidden children of an instance? Run ui-20261003-001 op-0004
+// failed because a hidden icon slot inside a Button instance was not found. Hypothesis (to be probed,
+// references/runtime-probes.md): the runtime skips invisible instance children
+// (figma.skipInvisibleInstanceChildren). The probe reads the instance twice — with the current setting
+// and with hidden children included — then restores the setting. It changes no node, so it stays a
+// read operation. Only INSTANCE nodes are walked (INVARIANT-19).
+function figmaUiHiddenChildren(instance, { includeNames = 20 } = {}) {
+  if (!instance || instance.type !== 'INSTANCE') return { error: `expected INSTANCE, got ${instance ? instance.type : 'nothing'}` };
+  const describe = n => ({ id: n.id, name: n.name, type: n.type, visible: n.visible });
+  const before = figma.skipInvisibleInstanceChildren;
+  const current = instance.findAll(() => true);
+  let all = current;
+  try {
+    figma.skipInvisibleInstanceChildren = false;
+    all = instance.findAll(() => true);
+  } finally {
+    figma.skipInvisibleInstanceChildren = before;
+  }
+  const seen = new Set(current.map(n => n.id));
+  const hiddenOnly = all.filter(n => !seen.has(n.id));
+  return {
+    skipInvisibleInstanceChildren: before,
+    countWithCurrentSetting: current.length,
+    countIncludingHidden: all.length,
+    hiddenNotFoundByDefault: hiddenOnly.length,
+    hidden: hiddenOnly.slice(0, includeNames).map(describe),
+    restored: figma.skipInvisibleInstanceChildren === before,
+  };
+}
