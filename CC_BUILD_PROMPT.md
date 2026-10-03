@@ -4,17 +4,18 @@
 
 本檔只放**目前這一版**的建置指令。已執行完畢的舊指令在 `docs/history/`：M0–M4 在 `build-prompts-m0-m4.md`，v1.7、v1.8 各在 `build-prompt-v1.7.md`、`build-prompt-v1.8.md`。
 
-## v1.9 建置指令：提問架構第一階段
+## v1.9 建置指令：提問架構第一階段與共通設計規則
 
 把下方兩條分隔線之間的內容貼給本機 Claude Code。
 
 ---
 
-請依 `FIGMA_UI_AGENT_SPEC.md` v1.9 實作提問架構第一階段。先讀第 20.3 節（v1.9 變更紀錄），再讀：
+請依 `FIGMA_UI_AGENT_SPEC.md` v1.9 實作提問架構第一階段與共通設計規則。先讀第 20.3 節（v1.9 變更紀錄），再讀：
 - 第 7.4 節的 DEC-12 到 DEC-15；
 - 第 8.1 節的第 6a、6b 步；
+- 第 9.6 節與 `.claude/skills/figma-ui/references/common-rules.md`（已寫好，內容不要改，只負責接進流程）；
 - 第 10.3 節、第 14、15、20 節；
-- 第 13.2 節的 T82–T90；
+- 第 13.2 節的 T82–T94；
 - 背景研究：`docs/research/question-flow-architecture-review.md` 第 9 節。
 
 全程用繁體中文回報。
@@ -43,7 +44,11 @@
     - 先唯讀探索，再一次問完；缺來源時才先問。
     - Plan 用方向方案加一行委派授權，取代零碎的單題。
     - 第二階段的規則（產品確認、library 每次確認、plugin 版本每次問、全域 Build 邊界）**不改**。
-11. **測試**：T82–T90 的離線測試；既有 146 個測試維持通過。
+11. **共通設計規則**（第 9.6 節）：
+    - `SKILL.md` 的參考檔表加上 `references/common-rules.md`，標明只在 Plan 與 Validate 讀；`references/design-quality.md` 加一段指向它，並說明 gate 與完成判定不變。
+    - schema：`audit.ruleChecks[]`；validator 檢查 `not_applicable` 有原因、影響交付的 `fail` 有對應 finding；`not_tested` 列入 `implementationVerificationRequired`；`needs_review` 未解決時完成判定為 `awaiting_user`。
+    - SPACE-001 取值寫成純函式（例如 `.claude/skills/figma-ui/snippets/spacing.js`）並附測試，涵蓋：有 token 時用 token、既有 pattern 值保留、新建節點取最近值、等距取大、布局失效時改用下一個候選、不取整的項目。
+12. **測試**：T82–T94 的離線測試；既有 146 個測試維持通過。
 
 **然後處理既有 run 的 LINE 按鈕**（使用者已同意修改）
 
@@ -74,5 +79,7 @@
 - LINE 按鈕修改的結果；
 - 未做項目與原因；
 - 總結寫進 `docs/history/v1.9-summary.md`。
+
+這版不另排測試回合；LINE 按鈕的修改就是 v1.9 的第一次實際使用。
 
 ---

@@ -310,3 +310,4 @@ v1.7 的產品政策、記憶分層與預填清單是使用者決定的流程設
 | 新建 Status Bar instance 回到主元件的 SF Pro Text（未安裝），參考畫面上的 instance 已 override 成 SF Pro | E | dd-11 | 第 10.3 節 |
 | LINE 官方登入按鈕規範：基本色 #06C755，不得使用其他顏色 | D（外部研究引用官方文件）／本環境未能讀取 `developers.line.biz`（egress 封鎖），未獨立查證 | `docs/research/question-flow-architecture-review.md` 第 5 節 | EXT-01；`ui-20261003-001` 待修 |
 | 外部研究第 9 節依 v1.8（`3c7bdce`）核對：委派機制（DEC-07）已存在、全域 Build 邊界要求所有文案已確認、多項減題建議和現行規則直接衝突 | E（雲端 session 抽查三處一致） | 研究報告第 9.2、9.5 節 | 第一階段寫入 v1.9；第二階段待評估 |
+| 共通設計規則提案（CORE、SYS、UX、ADD、SPACE-001），引用 W3C、NN/g、GOV.UK、Figma、SAP 文件 | D（原作者查核，雲端 session 未逐一重開）／P（優先度與自動修正策略為本專案政策） | `docs/research/common-rules-proposal.md` | 第 9.6 節；調整後放在 `references/common-rules.md` |

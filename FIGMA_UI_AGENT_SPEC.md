@@ -27,6 +27,7 @@
 | 溝通語言（v1.8，使用者已確認） | 提問、回報、交接一律用繁體中文；技術名詞、ID、指令保留原文 | 第 7.2 節 ASK-08 |
 | 動態行為（v1.8，使用者已確認） | 只影響動態行為的問題不問，handoff 列為「未定義，交由實作決定」 | 第 7.4 節 DEC-11 |
 | Skill 使用（v1.8，使用者已確認） | 必用、有條件、只當參考、排除四類 | 第 4.7 節 |
+| 共通設計規則（v1.9，使用者已確認） | P0／P1／P2 規則、A／S／V 修正權限、SPACE-001 間距；對比仍依產品政策 | 第 9.6 節、`references/common-rules.md` |
 | 設計系統缺口 | 先報告並詢問，再決定 wrap／新增／調整需求 | 預設不自行建立另一套 tokens 或元件庫 |
 | 互動原則 | 發生阻礙、設計來源衝突或需改變範圍時先問使用者 | 不用靜默降級掩蓋失敗 |
 | 設計決策，已確認（v1.2，v1.9 修訂） | DS、既有 pattern 或使用者指示未決定的設計選擇（例如是否使用漸層）**一律詢問**，agent 不自行決定。v1.9：使用者確認方向後，可把方向內的尺寸、留白、對齊等細節交給 agent（每個 run 給一次）；文案、品牌、外部規範、新增資源、例外、平台與權限仍要問 | 第 7.4 節 DEC-12–15；plan 的 designDecisions 不得有 agent 自訂來源 |
@@ -164,6 +165,7 @@ CC_BUILD_PROMPT.md                     # 只放目前這一版的建置指令
       discovery.md                     # 含第 6.6 節 pattern 盤點方法
       design-decisions.md              # 第 7.4 節：何時必須問、問題格式（v1.7：預填清單）
       design-quality.md
+      common-rules.md                  # v1.9：第 9.6 節共通設計規則（只在 Plan 與 Validate 載入）
       flow.md                          # 第 8.2 節：按需 flow 判斷
       collaboration.md                 # 第 11.2 節：人機協作與衝突處理
       runtime-probes.md                # 只記錄本專案 probe 結果與差異；API 細節以官方 Figma skills 為準
@@ -962,6 +964,21 @@ BUILD/VALIDATE → RECONCILE → 局部修正 → VALIDATE
   - Handoff 註明「依產品政策未檢查對比」，讓實作端知道這項沒有驗證。
   - 政策為 `true` 或尚未決定時，依上面的規則檢查，G5 對比為硬性門檻；尚未決定時先問政策題。
 
+### 9.6 共通設計規則（P0，v1.9 新增）
+
+使用者已確認（2026-10-03）：採用外部提案的共通規則（`docs/research/common-rules-proposal.md`），調整後放在 `.claude/skills/figma-ui/references/common-rules.md`，只在 Plan 與 Validate 載入。
+
+- **層級**：共通規則由本規格管轄，兩者不一致時以本規格為準；gate（G1–G7）與完成判定（§12.1）不因共通規則改變。原提案「本文件優先於規格」的條款已刪除。
+- **內容**：P0 核心可用性（CORE-01–07）、P1 設計系統與布局（SYS-01–08、SPACE-001）、P2 理解與效率（UX-01–06）、情境規則（ADD-01–06），以及審閱與修正循環。每條規則標明依據類型（標準、指引、政策）與修正權限：
+  - A（可自動修正）只限本 run 委派的類型（DEC-12）或只有一種合理修法（§8.3），且修正後驗證通過；
+  - S（提出建議）依第 7.4 節詢問；
+  - V（需實作驗證）列入 `implementationVerificationRequired`。
+- **對比**：不放在共通規則，依產品政策處理（§9.5、DEC-10）。使用者決定維持「每個產品各自決定」，不全域移除；產品政策為不適用時，共通規則任何條目都不重新加入對比門檻。「不只靠顏色傳達資訊」（CORE-04）照常適用。
+- **SPACE-001 間距**：只套用在 agent 本 run 新建的節點；既有 pattern 的數值優先（照抄參考畫面時沿用原值，不取整）；不修改既有節點、參考畫面或共享元件。沒有 spacing token 也沒有適用 pattern 時，採 0、4、8、12、16、20、24、32、40、48、64 的尺度；這不代表已核准新增 variables。Aiwow 目前沒有 spacing variables，委派留白（DEC-12）時以此為依據。
+- **逐條規則的結果**：`pass | fail | needs_review | not_applicable | not_tested`，記在 `audit.ruleChecks`；**不取代** gate 與完成判定的狀態。`not_tested` 列入實作驗證，不算 pass；`fail` 依影響轉成 finding，由 G3–G5 判定；`needs_review` 交付前要解決或列為待決，不能當作通過；`not_applicable` 要寫原因。
+- **動態與實作行為**：ADD 類與標 V 的規則中，只影響動態行為的部分不提問（DEC-11），列入 handoff 給實作端驗證。
+- **證據限制**：共通規則目前只完成文件與來源審閱，尚未以真實任務驗證誤報率與自動修正效果；來源由原提案作者查核，雲端 session 未逐一重新開啟。之後可作為 Design QA agent（§16.3）檢查清單的共用基礎。
+
 ## 10. Figma 結構與設計系統契約
 
 ### 10.1 Tokens
@@ -1362,8 +1379,12 @@ finding.status 為 `open | resolved | accepted`，origin 為 `introduced | regre
 | T88 | 需求涉及第三方品牌規範（例如 LINE 登入） | Discover 記 externalRequirements（url、checkedAt、status）；verified 時不把不符合的樣式列為平等候選；unverified 時標明未驗證 | 8.1 EXT-01 |
 | T89 | componentMap 或 style 的 key 在目標檔匯入不到 | Plan 前發現並列出替代方式，不在 Build 中途失敗 | 8.1 第 6b 步 |
 | T90 | 新建 instance 的主元件用了未安裝的字型，參考畫面上的 instance 已 override | Discover 依主元件字型發現並在 Plan 列出 | 10.3 |
+| T91 | SPACE-001：agent 新建節點的留白 14；照參考畫面建立、原值 13；既有節點 15 | 新建節點取 16（16 造成布局失效時取 12 並記錄）；照參考畫面的保留 13；既有節點不改 | 9.6、common-rules 第 6 節 |
+| T92 | 規則檢查結果 `not_tested`、`needs_review`、`not_applicable` 沒有原因 | `not_tested` 列入實作驗證、不算 pass；`needs_review` 未解決時不能交付為通過；沒有原因的 `not_applicable` 被拒絕；gate 狀態集合不變 | 9.6、20 |
+| T93 | A 級自動修正超出委派類型，或有多種合理修法 | 不自動修正，改為依 §7.4 詢問 | 9.6、DEC-12、8.3 |
+| T94 | 產品政策對比為不適用，共通規則 SYS-08 檢查各 mode | 不產生任何對比項或對比 finding | 9.6、9.5 |
 
-**v1.2 優先級：**P0 必測為 T02–T08、T10、T11、T13、T15、T16、T21–T27、T29、T31–T33、T35、T38–T41；v1.3 新增 T43–T46 與 v1.4 新增 T47–T51 與 v1.6 新增 T52–T60 與 v1.7 新增 T61–T71 與 v1.8 新增 T72–T81 與 v1.9 新增 T82–T90 皆為 P0（T61–T63 已在 M4 實作並有離線測試；T81 為行為規則，以 skill 文字與真實 run 檢查，不寫離線測試）。其餘（T01、T09、T12、T14、T17–T20、T28、T30、T34、T36、T37、T42）為 P1，仍保留在 fixture 層逐步補齊；不得因為列 P1 就在交付報告中省略其狀態。
+**v1.2 優先級：**P0 必測為 T02–T08、T10、T11、T13、T15、T16、T21–T27、T29、T31–T33、T35、T38–T41；v1.3 新增 T43–T46 與 v1.4 新增 T47–T51 與 v1.6 新增 T52–T60 與 v1.7 新增 T61–T71 與 v1.8 新增 T72–T81 與 v1.9 新增 T82–T94 皆為 P0（T61–T63 已在 M4 實作並有離線測試；T81 為行為規則，以 skill 文字與真實 run 檢查，不寫離線測試）。其餘（T01、T09、T12、T14、T17–T20、T28、T30、T34、T36、T37、T42）為 P1，仍保留在 fixture 層逐步補齊；不得因為列 P1 就在交付報告中省略其狀態。
 
 ### 13.3 基準任務
 
@@ -1407,7 +1428,7 @@ finding.status 為 `open | resolved | accepted`，origin 為 `introduced | regre
 10. 恢復方式與下一步必要操作。
 11. （v1.7）本 run 套用的產品政策，以及產品政策建議（POL-05）；沒有建議時寫「無」。
 12. （v1.8）「未定義，交由實作決定」的動態行為項目（DEC-11），以及使用者明確略過的決策與其影響（DEC-08）。
-13. （v1.9）agent 依委派決定的細節（DEC-12）、標為擬稿的文案（DEC-14）、外部規範的查核結果與未驗證項目（EXT-01）。
+13. （v1.9）agent 依委派決定的細節（DEC-12）、標為擬稿的文案（DEC-14）、外部規範的查核結果與未驗證項目（EXT-01），以及共通規則檢查中 `fail`、`needs_review`、`not_tested` 的項目（§9.6）。
 
 完成回覆保持簡潔，但不能省略阻礙。若使用者只要 Figma UI，不額外輸出無關的前端專案。
 
@@ -1442,7 +1463,7 @@ finding.status 為 `open | resolved | accepted`，origin 為 `introduced | regre
 | v1.6 流程精簡 | 階段式驗證、證據對應、按需 flow、範圍化 Discover、按需環境診斷、精簡 handoff 與最低量測 | 離線測試通過（`docs/history/workflow-simplification-record.md`）；M4 任務 A 是第一次真實驗證，並修正了第一次寫入死結與無改動寫入的問題 |
 | v1.7 產品政策與記憶分層 | 第 4.6 節四層存放、第 7.5 節產品政策、DEC-09 預填清單、DEC-10 政策題優先、T64–T71 | **已完成（2026-10-03）：**135 個離線測試通過；真實 run `ui-20261002-001` 確認政策套用、預填清單與 Handoff 政策建議，判定 `awaiting_user`（略過題目的規格缺口，v1.8 修正）。見 `docs/history/v1.7-summary.md` |
 | v1.8 流程修正與 skill 規則 | 略過題目的判定、動態行為不問、溝通語言、skill 使用規則、plugin 版本檢查、固定 Figma 連線、v1.7 run 的自動化問題、T72–T81 | **已完成（2026-10-03）：**146 個離線測試通過；第一個正式需求 run `ui-20261003-001`（Aiwow App 首頁）判定 `complete` |
-| v1.9 提問架構第一階段 | DEC-12 限定範圍的細節委派、DEC-13 方向打包、DEC-14 文案來源、DEC-15 分流順序、EXT-01 外部規範檢查、可匯入性探測、字型比對範圍、T82–T90 | 離線測試通過；下一個正式需求確認實質決策數下降且品質不變。指令見 `CC_BUILD_PROMPT.md` |
+| v1.9 提問架構第一階段與共通規則 | DEC-12 限定範圍的細節委派、DEC-13 方向打包、DEC-14 文案來源、DEC-15 分流順序、EXT-01 外部規範檢查、可匯入性探測、字型比對範圍、第 9.6 節共通設計規則、T82–T94 | 離線測試通過；下一個正式需求確認實質決策數下降且品質不變。指令見 `CC_BUILD_PROMPT.md` |
 
 CC 完成建置時必須提供：已建立檔案、安裝／使用方式、已跑測試與結果、未跑項目及原因、已知限制、第一個真實任務的啟動範例。不得僅交一份 prompt 然後宣稱整個 agent 已完成。
 
@@ -1549,6 +1570,7 @@ brief 依 `stage=intake | confirmed` 驗證；intake 可有 null／問題，conf
 - validator 檢查：委派決定的 `kind` 在 `allowedKinds` 內、不在排除清單；`directionRef` 指向已確認的 `kind: direction` 決定；`kind: direction` 的子選擇不能涉及平台、寫入範圍、品牌素材、文案。
 - `screens[].copy[]` 新增 `origin`（`existing | user | draft`）；`draft` 在確認前不能過 Build 邊界。
 - `inventory` 新增 `externalRequirements[]`（id、subject、url、checkedAt、appliesWhen、requirement、inference、status）。
+- `audit` 新增選填的 `ruleChecks[]`（ruleId、nodeIds、status `pass | fail | needs_review | not_applicable | not_tested`、before、after、reason、exceptionRef、source、verification）；`not_applicable` 必須有 reason；`fail` 影響交付時必須有對應 finding。
 - 舊 run 沒有這些欄位時只提示，不拒絕；schemaVersion 維持 `1.2`。
 
 **產品政策契約（v1.7）：**`product-policy.schema.json`，schemaVersion `1.0`，獨立於 run artifacts 的 `1.2`。Required：schemaVersion、productId、displayName、policies、rules、history。檢查：`productId` 與檔名一致；每個政策項目與規則都有 `decidedBy: "user"`、`decidedAt`、`origin`；規則 ID 不重複；不含 `figma.com` 網址或 `fileKey`／`fileUrl` 欄位；`history` 只能附加。本機檔 `.figma-ui/products/<productId>.local.json` 只驗證格式，不進 git。run 的 `policyRef` 必須解析到政策檔中存在的項目；`brief.product.policyDigest` 和目前政策檔不同時，validator 提示政策在 run 期間改過，需要重新確認套用結果。
@@ -1604,12 +1626,13 @@ INVARIANT-01 和第 7.5 節的關係（v1.7）：產品政策是使用者對整�
 
 ### 20.3 v1.9 變更紀錄
 
-依第一個正式需求 run `ui-20261003-001`（Aiwow App 首頁，判定 `complete`）、外部研究 `docs/research/question-flow-architecture-review.md`（第 9 節依 v1.8 核對），以及使用者 2026-10-03 的決定修訂。這是提問架構改版的第一階段；第二階段待試用後評估。v1.1–v1.8 的變更紀錄在 `docs/history/spec-changelog.md`。
+依第一個正式需求 run `ui-20261003-001`（Aiwow App 首頁，判定 `complete`）、外部研究 `docs/research/question-flow-architecture-review.md`（第 9 節依 v1.8 核對）、共通規則提案 `docs/research/common-rules-proposal.md`，以及使用者 2026-10-03 的決定修訂。這是提問架構改版的第一階段；第二階段待試用後評估。v1.1–v1.8 的變更紀錄在 `docs/history/spec-changelog.md`。
 
 - 第 7.4 節：DEC-12 限定範圍的細節委派（B 模式，每個 run 給一次，INVARIANT-29）；DEC-13 方向打包確認；DEC-14 文案來源分類（INVARIANT-30）；DEC-15 決策分流順序；DEC-01、DEC-07 加註。
 - 第 8.1 節：EXT-01 外部規範檢查；第 6b 步可匯入性與隱藏子節點探測。
 - 第 10.3 節：字型比對包含所有會新建 instance 的主元件字型。
+- 第 9.6 節（新增）：共通設計規則，由規格管轄，放在 `references/common-rules.md`；對比維持依產品政策；SPACE-001 只套用在新建節點、既有 pattern 優先；逐條規則狀態不取代 gate；`audit.ruleChecks`。原提案存於 `docs/research/common-rules-proposal.md`。使用者決定不另跑測試、直接併入 v1.9。
 - 第 14、15 節：實質決策數、委派數、返工次數；handoff 第 13 項。
-- 第 13.2 節：T82–T90；第 17 節：v1.8 完成、v1.9 列、第二階段與 LINE 按鈕修正列入待辦。
-- 第 20 節：`kind`、`directionRef`、`dependsOn`、委派的允許與排除類型、`copy.origin`、`inventory.externalRequirements`。
+- 第 13.2 節：T82–T94；第 17 節：v1.8 完成、v1.9 列、第二階段與 LINE 按鈕修正列入待辦。
+- 第 20 節：`kind`、`directionRef`、`dependsOn`、委派的允許與排除類型、`copy.origin`、`inventory.externalRequirements`、`audit.ruleChecks`。
 - 保留不變：寫入保護、產品確認、library 每次確認、plugin 版本每次問、全域 Build 邊界。這些屬第二階段，未經使用者重新確認不改。
