@@ -8,11 +8,29 @@ argument-hint: "<需求> | continue <run-id> <調整> | resume <run-id>"
 
 # /figma-ui 工作流程
 
-規範唯一來源是專案根目錄的 `FIGMA_UI_AGENT_SPEC.md`（v1.7）。本檔只列流程、階段出口與不可違反的規則；細節在 `references/`，需要時才讀。一般設計 run **不需要**讀研究紀錄、建置里程碑或 `docs/` 的歷史總結。Figma runtime API（字型、Auto Layout、頁面載入、helpers）一律依已安裝的官方 skill：呼叫任何 `use_figma` 前先載入 `figma:figma-use`，組畫面時再載入 `figma:figma-generate-design`。本專案不另寫 API 教學。
+規範唯一來源是專案根目錄的 `FIGMA_UI_AGENT_SPEC.md`（v1.8）。本檔只列流程、階段出口與不可違反的規則；細節在 `references/`，需要時才讀。一般設計 run **不需要**讀研究紀錄、建置里程碑或 `docs/` 的歷史總結。Figma runtime API（字型、Auto Layout、頁面載入、helpers）一律依已安裝的官方 skill：呼叫任何 `use_figma` 前先載入 `figma:figma-use`，組畫面時再載入 `figma:figma-generate-design`。本專案不另寫 API 教學。
 
 交付只有原生、可編輯的 Figma；程式實作由前端工程師負責。
 
+**溝通語言（ASK-08）**：提問、進度回報、預填清單、交接一律用**繁體中文**；技術名詞、檔名、ID、指令與工具名稱保留原文（例如 `plan.json`、`dd-03`、`use_figma`）。這是通用規則，不是產品政策，不列入政策建議。
+
 使用者的引數：`$ARGUMENTS`
+
+## Skill 使用規則（§4.7）
+
+`/figma-ui` 執行期間只依下表使用 skill。規則屬模型自律（能否用 Claude Code 設定硬性阻擋尚未驗證）。
+
+| 類別 | Skill | 規則 |
+|---|---|---|
+| 必用 | `figma-ui`（本檔）、`figma:figma-use`（每次 `use_figma` 前）、`figma:figma-generate-design`（組畫面時） | 照本檔與該 skill 說明 |
+| 有條件 | `figma:figma-generate-library` | 只在使用者核准新增元件或 token（`allowNewComponents`／`allowNewTokens`）時載入；它「先建變數基礎」的主張不能凌駕 strict reuse |
+| 只當參考 | `ux-knowledge-base`、`design:ux-copy` | 只作預填建議與檢查的參考（錯誤訊息結構、文案長度、啟發式檢查），不是門檻；可及性數值（WCAG 2.1、對比、44pt）和本規格（WCAG 2.2，§9.5）或產品政策衝突時，以本規格與產品政策為準 |
+| 排除 | `ux-design-team`、`visual-ui-production-department`、`frontend-design`、`aile-ui-skill`、`figma:figma-swiftui`、`design:accessibility-review`、`design:design-handoff`、`design:design-system` | 不載入、不套用（會自行補假設或預設數值、產出 HTML、屬於別的產品、數值和 WCAG 2.2／產品政策衝突、和自動產生的 handoff 重複、會設計新元件） |
+| 保留給 Design QA | `design:design-critique` | 不在 `/figma-ui` 內使用（§16.3） |
+| 不使用 | `figma:figma-create-new-file`、官方程式端 skill（design-to-code、code-connect、implement-motion）、FigJam／Slides／圖表／動態／shader 類 skill | 本 agent 只寫既有檔案的原生設計；active run 期間 hook 會阻擋 `create_new_file` |
+
+- 排除的 skill 若仍被載入（例如因任務提到 Figma 而自動載入）：**不採用**其中和本規格衝突的內容，並記入 `plan.excludedSkillsLoaded`（`skill`、`notAdopted`：哪條內容沒有採用、為什麼），handoff 的「待決與未驗證」會列出。
+- 新出現的設計類 skill（帳號同步會增減）未評估前，一律視同排除。
 
 ## 0. 入口判斷
 
@@ -44,8 +62,9 @@ argument-hint: "<需求> | continue <run-id> <調整> | resume <run-id>"
 
 先把使用者已提供的內容整理成摘要讓他確認，只問缺的部分。能先找到候選（檔案、頁面、library、元件）就先找，讓問題變成選擇題。待答的項目一次列成**預填清單**（DEC-09，格式見第 5 節）。送出清單時記 `node scripts/run-report.mjs ask <run-id> <列數> --prefilled <預填列數> --blank <留空列數>`，收到回覆後記 `run-report.mjs answered <run-id>`。
 
-**Intake 順序（v1.7，REQ-05／06、POL-03）**：
+**Intake 順序（v1.7，REQ-05／06、POL-03；v1.8 加第 0 步）**：
 
+0. **Figma plugin 版本**（§4.2.2）：`run-context.mjs` 的 `ask` 最前面出現 `kind: plugin_version` 時，把它放在預填清單**第一列**：一般 plugin 問「先升級，還是這次照舊版跑」；`synced: true`（由 claude.ai 帳號同步）時註明本機不一定能自行升級，選項是「等帳號同步更新」或「這次照舊版跑」，不要求使用者在本機另裝一份。答案寫入 `brief.pluginVersionChoice`（`installed`、`latest`、`choice: upgrade_first | use_current | wait_for_sync`、`confirmation`、`decidedAt`），**只限本 run**，下次 run 仍會再問。`notices` 出現「無法確認 Figma plugin 是否為最新版」時只在 intake 摘要列一行，不建成題目、不擋 run。
 1. **確定產品**：需求寫了產品就採用；沒寫就先問（`run-context.mjs` 會把它列在最前面）。**不從上次 run、目標檔案或參考畫面推定**（INVARIANT-25）。
 2. **載入產品政策**：`node scripts/product-policy.mjs apply <run-id> <productId>`，把結果記入 `brief.product`。在 intake 摘要列一行它回傳的「已套用產品政策：…」。政策已決定的項目不再問，也不放進預填清單。沒有政策檔 → 問是否建立新產品（POL-02），確認後 `product-policy.mjs init <run-id> <productId> <名稱> --decision <decisionRef>`。政策缺對比政策 → 政策題排在預填清單最前面（DEC-10，見第 5 節）。
 3. **確認 library**：使用者提供的 library 直接用於 Discover；沒提供、找不到、讀不到或沒在目標檔啟用時就問，不改用其他 library，也不以 raw value 代替（REQ-06）。`.figma-ui/products/<productId>.local.json` 的 library 和檔案只能當預填候選（`product-policy.mjs local <productId>`），要本次確認才能用。
@@ -72,9 +91,12 @@ brief 確認時寫入 `stage=confirmed`、`output.writeAllowed`、`output.decisi
 
 ## 3. Preflight
 
-1. **每個 run 都做**：呼叫 `whoami`，把結果存成暫存檔後執行 `node scripts/preflight.mjs diagnose <file> [targetPlanRef]`。`blocked` 時停下，照輸出的 `recoverySteps` 告訴使用者，**不要重試讀取檔案**（配額）。email 與 handle 不寫入任何檔案（CAP-03）。也要確認目標檔案讀得到、需要的工具在本 session 可用。
-2. **按需**：`node scripts/verify-installation.mjs`。它自己判斷：同一 session 且環境（Claude Code／Node／OS 版本、Figma plugin 與 MCP 設定、專案 settings／lockfile／skill）沒變，就沿用上次的安裝診斷（`diagnosis.mode=reused`）；首次 session、有變更、上次有問題或紀錄損毀就完整重跑。懷疑環境有問題時加 `--force`。沿用診斷**不代表**本 run 的權限已確認。
-3. 寫入 `capabilities.json`（`node scripts/preflight.mjs write-capabilities <run-id> <facts.json>`），把第 2 步的 `diagnosis` 放在 `environmentDiagnosis`。只有**這次 run** 實際成功呼叫過的工具與功能才能標 `verified`（`basis: this_run`）；沿用 `references/runtime-probes.md` 或先前 run 的結果標 `basis: history`、`available_unverified`。需要用到、但版本變了或還沒驗證過的能力，才在本 run 做最小 probe。
+1. **固定一個 Figma 連線**（§4.2.3，INVARIANT-27）：把本 session 看得到的 MCP 工具名稱（ToolSearch）交給 `node scripts/preflight.mjs connections <tool-names.json | a,b,…>`，它列出所有 Figma 連線前綴。只有一個 → 用它；有多個 → 在預填清單列一題讓使用者選（預填已通過 `whoami` 的那個）。選定的前綴寫入 `capabilities.server.toolPrefix`，其餘寫 `otherFigmaPrefixes`。本 run 所有 Figma 呼叫都走這個前綴；active run 期間 hook 會**阻擋**其他前綴的寫入，`toolPrefix` 還沒記錄時任何寫入都會被擋；讀取只記錄。
+2. **每個 run 都做**：用上一步的連線呼叫 `whoami`，把回應**原樣**存成暫存檔後執行 `node scripts/preflight.mjs diagnose <file> [targetPlanRef]`（原始回應、外層包裝或扁平 `{plans:[…]}` 都接受）。`blocked` 時停下，照輸出的 `recoverySteps` 告訴使用者，**不要重試讀取檔案**（配額）。`unrecognized_format`（exit 3）是格式問題，不是帳號問題：檢查存檔內容後重跑，不要照帳號恢復步驟處理。email 與 handle 不寫入任何檔案（CAP-03）。也要確認目標檔案讀得到、需要的工具在本 session 可用。帳號檢查只對這個連線有效。
+3. **按需**：`node scripts/verify-installation.mjs`。它自己判斷：同一 session 且環境（Claude Code／Node／OS 版本、Figma plugin 與 MCP 設定、專案 settings／lockfile／skill）沒變，就沿用上次的安裝診斷（`diagnosis.mode=reused`）；首次 session、有變更、上次有問題或紀錄損毀就完整重跑。懷疑環境有問題時加 `--force`。沿用診斷**不代表**本 run 的權限已確認。v1.8 起它每次都會比對 Figma plugin 版本（`pluginVersion`：installed、latest、status、synced）並檢查 hooks matcher 是否涵蓋所有 Figma 前綴（`hookMatcherCoverage`）；查不到最新版只提示、不擋。
+4. 寫入 `capabilities.json`（`node scripts/preflight.mjs write-capabilities <run-id> <facts.json>`），把第 3 步的 `diagnosis` 放在 `environmentDiagnosis`；`server.pluginVersion` 沒給時會自動取上次診斷的結果。它寫入前會先驗證 schema，錯誤訊息會附正確格式。只有**這次 run** 實際成功呼叫過的工具與功能才能標 `verified`（`basis: this_run`）；沿用 `references/runtime-probes.md` 或先前 run 的結果標 `basis: history`、`available_unverified`。需要用到、但版本變了或還沒驗證過的能力，才在本 run 做最小 probe。
+
+**不確定 artifact 格式時**：`node scripts/artifact-skeleton.mjs <brief|plan|inventory|capabilities|ledger|audit> <run-id>` 印出一份通過 schema 的骨架與常見欄位的範例（`--write` 只在檔案不存在時寫入）。不要逐欄試錯。
 
 ## 4. Build（寫入規則）
 
@@ -84,7 +106,7 @@ brief 確認時寫入 `stage=confirmed`、`output.writeAllowed`、`output.decisi
 2. 第一次寫入前取得本機鎖：`node scripts/state-store.mjs activate <run-id> <output fileKey>`。鎖被別的 run 持有 → 不搶，先看該 run 的 journal 並詢問使用者。本機鎖擋不住 Figma 裡的人，協作衝突仍靠第 4 步的 guard。
 3. 記 planned：`node scripts/operation-journal.mjs plan <run-id> '<json>'`（含 `operationId`、`logicalKey`、`kind`、`mode:"write"`、`fileKey`、`basisRefs`、**`scopeRootIds`（這個 write 影響的 composition 根節點）**、`preconditions`：父節點、既有 child IDs、預期新增數量與類型、預期 fingerprint）。它會先跑 Build 邊界驗證。
 4. 呼叫 `use_figma`：第一行是 op 標頭（`snippets/op-header.js`）。建立新根節點的同一腳本內立刻寫所有權標記（`snippets/mark-owned.js`）。修改既有 agent 節點時，腳本開頭先跑 `snippets/precondition-guard.js`；不一致就回傳 conflict、不改任何東西。腳本回傳所有 created／mutated IDs 與必要短摘要（遠低於 20,480 位元組）。
-5. 用**另一個** read operationId（`rd-0001`…）讀回驗證，再 `node scripts/operation-journal.mjs verify <run-id> '{"operationId":…,"evidenceRefs":[…],"fingerprint":…}'`。同一個 composition 的多個 write 可以用**一次**獨立讀回一起確認，同時收集結構檢查需要的資料：`verify <run-id> '{"operationIds":["op-0003","op-0004"],"evidenceRefs":["rd-0005"]}'`。
+5. 用**另一個** read operationId（`rd-0001`…）讀回驗證，再 `node scripts/operation-journal.mjs verify <run-id> '{"operationId":…,"evidenceRefs":[…],"fingerprint":…}'`。同一個 composition 的多個 write 可以用**一次**獨立讀回一起確認，同時收集結構檢查需要的資料：`verify <run-id> '{"operationIds":["op-0003","op-0004"],"evidenceRefs":["rd-0005"]}'`。v1.8：verify 會自動寫入 `ledger.entities`（每個 logicalKey 一筆：根節點、childNodeIds、fingerprint），單一 write 驗證時可加 `"entity":{"nodeId":"…","type":"FRAME"}` 指定讀回確認的根節點與類型（沒給類型就記 `UNKNOWN`，不猜）；第一個以 `basis: history` 探測的寫入驗證成功後，`capabilities.features.nativeWrite` 會自動升級為本 run 的 `verified`。不需要手動改這兩個檔案。
 
 批次大小：以一個可界定、失敗時可對帳的 composition（例如一個畫面區塊或一個狀態 frame）為一次 write；不為每個屬性各打一次遠端呼叫，也不把整頁硬塞成一個巨大 operation。**同一檔案的 mutation 不平行送出**。
 
@@ -97,11 +119,13 @@ hook 擋下時照原因處理（補標頭、先對帳、取得授權）；**不�
   - 有建議 → 答案欄填建議並標「建議，請確認」。沒有建議、或屬品牌、產品方向、文案內容、個資等只有使用者能判斷的 → 答案欄留空。
   - 使用者確認前全部是 `pending`（預填值只存在 `recommendation`，`answer` 為 null），不能被 write 引用。
   - 確認後 `answer` 為最後的值、`source: user`、`status: answered`，並記 `confirmation`：照預填確認 `prefilled_confirmed`、改了預填 `user_modified`、填了留空的列 `user_filled`。
-  - 留空的列 agent **不得自行填入**；使用者表示略過 → `skipped`。產品政策已決定的項目不出現在清單。
+  - 留空的列 agent **不得自行填入**。使用者看過該列並明確表示略過 → `status: skipped`、`skippedBy: user`、`confirmation: user_skipped`：這是使用者的回答，**算已解決**，不擋完成判定，對應元素不建立，handoff 第 12 項列出。使用者還沒看過就被標成略過（例如 DEC-07 授權下沒有建議的題目）→ `skippedBy: agent`，**仍是待答**，handoff 列給使用者；使用者確認略過後才改成 `user`。沒有 `skippedBy` 的舊紀錄當 `agent`（INVARIANT-28）。產品政策已決定的項目不出現在清單。
+  - **範圍與授權類的列**（產品、平台、library、輸出位置、修改邊界、確認計畫等，記在 `plan.decisions`）也要記 `confirmation`（v1.8），metrics 和設計決策一起計算。例如使用者把「variables library」那列改了 → 該筆 `plan.decisions` 記 `confirmation: user_modified`。
+- **動態行為不問**（DEC-11，v1.8）：本 agent 只交付靜態畫面。只影響動態行為、不影響靜態畫面的問題**不提問，也不建 designDecision**，例如 Toast 停留幾秒、能否手動關閉、動畫與轉場、手勢。改記在 `plan.undefinedBehaviors`（`id`、`behavior`：需要決定的是什麼、`kind`、`screenKey`），handoff 第 12 項列為「未定義，交由實作決定」。動態行為會改變靜態畫面時（例如要不要畫出關閉按鈕），只就畫面上看得到的部分提問。
 - **產品政策題優先**（DEC-10，v1.7）：產品政策檔還沒有 `accessibility.contrast` 時，在第一個需要它的 run，把政策題排在清單最前面並標「產品政策」（例如「<產品> 的 design system 要遵守對比（WCAG）規則嗎？」）。回答「是」或「否」都用 `product-policy.mjs write` 寫入政策檔（先把使用者的回答記成 plan.decisions 的一筆，再以它作 `decisionRef`），之後該產品的 run 不再問。測試回合「只限本輪」的回答（`runOnly: true`）是本 run 的決策，不是政策題的回答。細節見 `references/product-policy.md`。
 - **設計決策**（`references/design-decisions.md`）：DS、已確認 pattern、產品政策或使用者指示沒有決定的外觀／層級／體驗選擇，先找候選，再給 2–3 個選項，放進預填清單，記入 `plan.designDecisions`（帶 `status`）；未回答的決策所影響的 section 不得寫入。不確定算不算設計決策時，當作是。優先在 Build 前問完會影響方向的題目。
 - **Flow 判斷**（`references/flow.md`）：依操作歧義與變更影響決定 `unchanged`／`partial`／`task_flow`，不看畫面數。局部樣式修改記 `unchanged` 加理由即可，不做流程訪談；新按鈕去哪裡不清楚，就只問那一題（flow unknown）。不自行補業務規則。
-- **授權採用建議**（DEC-07）：使用者可以對**這個 run** 授權「一律採用你的建議」。仍要逐題產生選項與建議；有建議的題目 `answer`＝建議、`source: user`、`status: answered`，並加 `delegation`（指向 plan.decisions 中的授權、`scope: run`、本 run ID）。**沒有建議的題目不得自己決定**：`status: skipped`、相關元素不建立、run 結束時列給使用者。授權不延續到新 run。硬性門檻（例如 G5 對比）不因授權豁免。
+- **授權採用建議**（DEC-07）：使用者可以對**這個 run** 授權「一律採用你的建議」。仍要逐題產生選項與建議；有建議的題目 `answer`＝建議、`source: user`、`status: answered`，並加 `delegation`（指向 plan.decisions 中的授權、`scope: run`、本 run ID）。**沒有建議的題目不得自己決定**：`status: skipped`、`skippedBy: agent`、相關元素不建立、run 結束時列給使用者（仍是待答）。授權不延續到新 run。硬性門檻（例如 G5 對比）不因授權豁免。
 - 新增 token／元件、wrap、改共享主元件、替換字型、改範圍、缺權限、資產或字型不可用。
 - 發現使用者改了 agent 的節點、在 Section 內新增或刪除節點（`references/collaboration.md`）：不覆寫、不重建，回報差異並詢問；在 ledger entity 記 `userChangeDetectedAt`（相關證據因此失效）。
 - 新匯入元件與既有畫面使用的版本外觀不同（§6.2）：列給使用者、記為 `inherited_baseline`；不在目標檔接受 library 更新，也不用 override 模仿舊版，除非使用者決定。
@@ -125,8 +149,8 @@ hook 擋下時照原因處理（補標頭、先對帳、取得授權）；**不�
 
 - 截圖以完成的 composition 或一個修正批次為單位；高風險的版面或文字修正後**立即**截該局部看圖。最後仍要覆蓋每個適用 requiredCell。
 - 每筆 evidence 寫 `cellKeys`（它證明的 requiredCell）、`state`，以及 `subject`（`rootNodeId`、`scopeNodeIds`、`ancestorNodeIds`、`afterOperationId`）。default 的截圖不能拿來證明 error 或另一個 viewport。後來的寫入動到範圍、父層布局或 mode，或偵測到使用者改動，舊證據改 `superseded` 並重讀；無法判定時也重讀，不猜有效。
-- Handoff：`evaluate-completion.mjs … --write`，再 `run-report.mjs handoff <run-id> --write`（從 artifacts 組出簡短 handoff，不手寫重複事實）。handoff 第 11 項會列出本 run 套用的產品政策和**政策建議**（`product-policy.mjs suggest <run-id>`；測試回合規則、DEC-07 授權這類只限本次的設定不會列入；沒有建議時寫「無」）。使用者勾選的建議，先記成 plan.decisions 的一筆，再用 `product-policy.mjs write` 寫入；沒勾選的只留在本 run，政策檔不變。最後 `node scripts/state-store.mjs release <run-id>`（owner token 相符才刪除鎖與 `active-run.json`）。**不釋放會讓 hook 持續阻擋本專案所有未帶 op 標頭的 Figma 呼叫。**
-- 回報時分開列 implementation 與 integration 狀態、未驗證項與下一步；有 `skipped` 的設計決策時一次列出。使用者表示「接受為測試成功」：先把使用者的決定記入 `plan.decisions`，再 `evaluate-completion.mjs … --accept-test-run <decisionRef> <說明>`。
+- Handoff：`evaluate-completion.mjs … --write`，再 `run-report.mjs handoff <run-id> --write`（從 artifacts 組出簡短 handoff，不手寫重複事實）。handoff 第 11 項會列出本 run 套用的產品政策和**政策建議**（`product-policy.mjs suggest <run-id>`；測試回合規則、DEC-07 授權這類只限本次的設定不會列入；沒有建議時寫「無」）。使用者勾選的建議，先記成 plan.decisions 的一筆，再用 `product-policy.mjs write` 寫入；沒勾選的只留在本 run，政策檔不變。handoff 第 12 項（v1.8）列出 `plan.undefinedBehaviors`（未定義，交由實作決定）與使用者明確略過的決策；`ledger.entities` 由 verify 自動寫入，handoff 會列出建立與修改的節點。收尾時重複進入 handoff 階段不會重複記錄。最後 `node scripts/state-store.mjs release <run-id>`（owner token 相符才刪除鎖與 `active-run.json`）。**不釋放會讓 hook 持續阻擋本專案所有未帶 op 標頭的 Figma 呼叫。**
+- 回報時（繁體中文）分開列 implementation 與 integration 狀態、未驗證項與下一步；有 `skippedBy: agent` 的設計決策時一次列出，請使用者回答或確認略過。使用者表示「接受為測試成功」：先把使用者的決定記入 `plan.decisions`，再 `evaluate-completion.mjs … --accept-test-run <decisionRef> <說明>`。
 - Design QA agent 尚未接入（`docs/qa-integration-contract.md`）：UI agent 維持目前全部適用驗證，不把交付改成「待 QA」。
 
 ## 參考檔

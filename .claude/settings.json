@@ -2,7 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "mcp__.*figma.*__(use_figma|create_new_file|upload_assets)",
+        "matcher": "mcp__.*[Ff]igma.*__(use_figma|create_new_file|upload_assets)|mcp__.+__use_figma",
         "hooks": [
           {
             "type": "command",
@@ -14,7 +14,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "mcp__.*figma.*__(use_figma|create_new_file|upload_assets)",
+        "matcher": "mcp__.*[Ff]igma.*__(use_figma|create_new_file|upload_assets)|mcp__.+__use_figma",
         "hooks": [
           {
             "type": "command",
@@ -24,7 +24,7 @@
         ]
       },
       {
-        "matcher": "mcp__.*figma.*__.*",
+        "matcher": "mcp__.*[Ff]igma.*__.*|mcp__.+__use_figma",
         "hooks": [
           {
             "type": "command",
@@ -36,7 +36,7 @@
     ],
     "PostToolUseFailure": [
       {
-        "matcher": "mcp__.*figma.*__(use_figma|create_new_file|upload_assets)",
+        "matcher": "mcp__.*[Ff]igma.*__(use_figma|create_new_file|upload_assets)|mcp__.+__use_figma",
         "hooks": [
           {
             "type": "command",
@@ -46,7 +46,7 @@
         ]
       },
       {
-        "matcher": "mcp__.*figma.*__.*",
+        "matcher": "mcp__.*[Ff]igma.*__.*|mcp__.+__use_figma",
         "hooks": [
           {
             "type": "command",

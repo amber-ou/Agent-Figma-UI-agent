@@ -12,7 +12,11 @@
 // A reused diagnosis never replaces this run's own checks (whoami, target file access, tool
 // availability, write authorisation) — those are done for every run.
 //
-// Usage: node scripts/verify-installation.mjs [--force]
+// v1.8: the Figma plugin version is compared with the latest official one (§4.2.2; never blocks), the
+// Figma connections are listed with their tool prefixes and the hook matchers are checked against
+// every prefix (§4.2.3).
+//
+// Usage: node scripts/verify-installation.mjs [--force] [--offline]
 import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -34,8 +38,10 @@ function run(cmd, args) {
   }
 }
 
+// v1.8: server names may contain ":" and spaces (plugin:figma:figma, claude.ai Figma); the name ends at
+// the first ": " followed by the URL.
 export function parseMcpList(text) {
-  return text.split(/\r?\n/).map(l => l.match(/^(\S[^:]*):\s+(\S+)(?:\s+\((\w+)\))?\s+-\s+(.*)$/)).filter(Boolean)
+  return text.split(/\r?\n/).map(l => l.match(/^(\S.*?):\s+(\S+)(?:\s+\((\w+)\))?\s+-\s+(.*)$/)).filter(Boolean)
     .map(m => ({ name: m[1].trim(), url: m[2], transport: m[3] || null, health: m[4].trim() }));
 }
 
@@ -49,6 +55,67 @@ export function parsePluginList(text) {
     if (cur && kv) cur[kv[1].toLowerCase()] = kv[2].trim();
   }
   return plugins;
+}
+
+// v1.8 §4.2.3: tool-name prefix Claude Code gives an MCP server: mcp__<name>__ with every character
+// outside [A-Za-z0-9_-] replaced by "_". Measured for manual servers (figma → mcp__figma__) and
+// claude.ai connectors (claude.ai Notion → mcp__claude_ai_Notion__); the plugin form
+// (plugin:figma:figma → mcp__plugin_figma_figma__) is an assumption until seen in a session.
+export const toolPrefixFor = serverName => `mcp__${String(serverName).replace(/[^A-Za-z0-9_-]/g, '_')}__`;
+// Prefixes a Figma connection can have on this machine; checked against the hook matchers even when
+// the connection is not configured now (a plugin added later must still be guarded).
+export const KNOWN_FIGMA_PREFIXES = ['mcp__figma__', 'mcp__plugin_figma_figma__', 'mcp__claude_ai_Figma__', 'mcp__plugin_design_figma__'];
+const WRITE_PATH_TOOLS = ['use_figma', 'create_new_file', 'upload_assets'];
+
+// Does each write-path hook (and the logging hook) match <prefix><tool> for every prefix? Matchers are
+// tested anchored (the stricter reading). use_figma not covered is a problem; the other write tools
+// are only blocked by the hook during an active run, so a gap there is reported as a notice.
+export function matcherCoverage(root, prefixes = KNOWN_FIGMA_PREFIXES) {
+  const settings = JSON.parse(fs.readFileSync(path.join(root, '.claude', 'settings.json'), 'utf8'));
+  const res = { problems: [], notices: [], checked: [...new Set(prefixes)] };
+  const matchers = (event, script) => (settings.hooks?.[event] || []).filter(h => h.hooks?.some(x => script.test(x.command))).map(h => h.matcher || '');
+  const covers = (list, name) => list.some(m => { try { return new RegExp(`^(?:${m})$`).test(name); } catch { return false; } });
+  for (const [event, script] of [['PreToolUse', /pre-figma-call\.mjs/], ['PostToolUse', /post-figma-call\.mjs/], ['PostToolUseFailure', /post-figma-call\.mjs/]]) {
+    const list = matchers(event, script);
+    for (const p of res.checked) for (const t of WRITE_PATH_TOOLS) {
+      if (covers(list, p + t)) continue;
+      (t === 'use_figma' ? res.problems : res.notices).push(`${event} hook matcher does not cover ${p}${t}`);
+    }
+  }
+  const log = matchers('PostToolUse', /log-figma-call\.mjs/);
+  for (const p of res.checked) if (!covers(log, `${p}get_metadata`)) res.notices.push(`logging hook does not cover ${p}* (metrics only)`);
+  return res;
+}
+
+// v1.8 §4.2.2: the latest official plugin version is the "version" of .claude-plugin/plugin.json in
+// figma/mcp-server-guide (main branch; read 2.2.126 on 2026-10-03).
+export const LATEST_PLUGIN_URL = process.env.FIGMA_UI_PLUGIN_LATEST_URL || 'https://raw.githubusercontent.com/figma/mcp-server-guide/main/.claude-plugin/plugin.json';
+
+export function compareVersions(a, b) {
+  const pa = String(a).split(/[.+-]/).map(n => parseInt(n, 10) || 0);
+  const pb = String(b).split(/[.+-]/).map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) < (pb[i] || 0) ? -1 : 1;
+  return 0;
+}
+
+// Pure: the version check result recorded in capabilities.server.pluginVersion.
+export function pluginVersionStatus({ name = null, installed = null, latest = null, checkedAt = nowIso(), source = LATEST_PLUGIN_URL, latestError = null } = {}) {
+  const synced = /@synced$/.test(name || '');
+  const status = !installed ? 'not_installed' : !latest ? 'latest_unknown' : compareVersions(installed, latest) < 0 ? 'outdated' : 'current';
+  const note = status === 'latest_unknown' ? `無法確認是否為最新版${latestError ? `（${latestError}）` : ''}；不擋 run`
+    : status === 'outdated' && synced ? 'plugin 由 claude.ai 帳號同步（@synced），本機不一定能自行升級' : undefined;
+  return { name, installed, latest, status, checkedAt, synced, source, ...(note ? { note } : {}) };
+}
+
+export async function fetchLatestPluginVersion({ url = LATEST_PLUGIN_URL, timeoutMs = 8000, fetchImpl = globalThis.fetch } = {}) {
+  try {
+    const res = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!res.ok) return { latest: null, error: `HTTP ${res.status}` };
+    const doc = await res.json();
+    return typeof doc?.version === 'string' ? { latest: doc.version } : { latest: null, error: 'plugin.json has no version' };
+  } catch (err) {
+    return { latest: null, error: err?.name === 'TimeoutError' ? 'timeout' : String(err?.message || err) };
+  }
 }
 
 // Each write-path hook must be present (the logging-only hook does not count).
@@ -70,7 +137,9 @@ export function readPluginRecord(home = os.homedir()) {
   for (const [name, v] of Object.entries(entries)) {
     if (!/^figma@/.test(name)) continue;
     const rec = Array.isArray(v) ? v[0] : v;
-    return { name, version: rec?.version ?? null };
+    // v1.8 §4.2.2: the plugin directory's own .claude-plugin/plugin.json wins when it can be read
+    const own = rec?.installPath ? readJson(path.join(rec.installPath, '.claude-plugin', 'plugin.json')) : null;
+    return { name, version: own?.version ?? rec?.version ?? null };
   }
   return { name: null, version: null };
 }
@@ -153,6 +222,7 @@ function fullDiagnosis(root, claudeVersion) {
   if (Object.values(report.hooks).some(v => !v)) problems.push('project hooks missing from .claude/settings.json');
   if (!report.dependencies) problems.push('dependencies not installed; run npm install');
   report.problems = problems;
+  report.figmaPrefixes = servers.map(s => ({ server: s.name, toolPrefix: toolPrefixFor(s.name), health: s.health }));
   return report;
 }
 
@@ -172,6 +242,21 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     report.problems = [...(Object.values(report.hooks).some(v => !v) ? ['project hooks missing from .claude/settings.json'] : []), ...(report.dependencies ? [] : ['dependencies not installed; run npm install'])];
     if (report.problems.length) { report = fullDiagnosis(root, claudeVersion); decision.reuse = false; decision.reason = 'local re-check failed; ran the full diagnosis'; }
   } else report = fullDiagnosis(root, claudeVersion);
+  // v1.8: checked on every call (also when the diagnosis is reused): the latest version can change
+  // without any local change, and the matchers must cover every known and configured prefix.
+  const installedPlugin = report.figmaPlugin?.version ? { name: report.figmaPlugin.name, version: report.figmaPlugin.version } : fingerprint.figmaPlugin;
+  const latest = process.argv.includes('--offline') ? { latest: null, error: 'offline (--offline)' } : await fetchLatestPluginVersion();
+  report.pluginVersion = pluginVersionStatus({ name: installedPlugin?.name ?? null, installed: installedPlugin?.version ?? null, latest: latest.latest, latestError: latest.error });
+  const coverage = matcherCoverage(root, [...KNOWN_FIGMA_PREFIXES, ...(report.figmaPrefixes || []).map(p => p.toolPrefix)]);
+  report.hookMatcherCoverage = coverage;
+  if (coverage.problems.length) report.problems = [...(report.problems || []), ...coverage.problems];
+  const pv = report.pluginVersion;
+  report.notices = [
+    ...(pv.note ? [`Figma plugin: ${pv.note}`] : []),
+    ...(pv.status === 'outdated' ? [`Figma plugin ${pv.installed} < latest ${pv.latest}: run-context lists "upgrade first or run on this version" first at Intake`] : []),
+    ...coverage.notices,
+    ...((report.figmaPrefixes || []).length > 1 ? [`several Figma connections: ${report.figmaPrefixes.map(p => p.toolPrefix).join(', ')}; the user picks one for the run (capabilities.server.toolPrefix)`] : []),
+  ];
   const checkedAt = nowIso();
   if (!decision.reuse) atomicWriteJson(cacheFile, { version: CACHE_VERSION, fingerprint, fingerprintDigest: digest(fingerprint), sessionId, report, checkedAt });
   report.diagnosis = {

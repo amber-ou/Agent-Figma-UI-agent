@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appendJsonl, readJsonl, operationStates, runDirFor } from './hooks/lib.mjs';
-import { projectRoot, nowIso } from './state-store.mjs';
+import { projectRoot, nowIso, readJson, atomicWriteJson } from './state-store.mjs';
 import { validateSchema, loadRun, decisionStatus, validateRun } from './validate-artifacts.mjs';
 
 const journalOf = dir => path.join(dir, 'operations.jsonl');
@@ -55,7 +55,7 @@ export function planOperation(dir, op) {
 // noChange: the read-back confirmed the write changed no node (e.g. a precondition guard returned a
 // conflict). Only allowed when created and mutated IDs are both empty; later evidence checks then treat
 // the write as having no effect instead of an unknown one (M4).
-export function verifyOperation(dir, operationId, { evidenceRefs = [], fingerprint, createdNodeIds, mutatedNodeIds, note, noChange = false } = {}) {
+export function verifyOperation(dir, operationId, { evidenceRefs = [], fingerprint, createdNodeIds, mutatedNodeIds, note, noChange = false, entity } = {}) {
   const { ops } = readOperations(dir);
   const op = ops.get(operationId);
   if (!op) throw new Error(`unknown operation ${operationId}`);
@@ -68,7 +68,61 @@ export function verifyOperation(dir, operationId, { evidenceRefs = [], fingerpri
   if (mutatedNodeIds) patch.mutatedNodeIds = mutatedNodeIds;
   if (note || noChange) patch.effectSummary = { partial: false, ...(noChange ? { noChange: true } : {}), ...(note ? { note } : {}) };
   appendJsonl(journalOf(dir), patch);
+  if (op.mode === 'write' && !noChange) {
+    const verified = { ...op, ...patch };
+    recordLedgerEntity(dir, verified, { entity });
+    upgradeNativeWrite(dir, verified);
+  }
   return patch;
+}
+
+// v1.8 (§20): ledger.entities is written on verify, so the handoff lists the created / modified nodes
+// without a manual edit. One entity per logicalKey: its root is the given entity.nodeId, else the first
+// created node, else the first mutated node; the other IDs become childNodeIds. The node type is only
+// what the caller read back (entity.type); without it the entity keeps type "UNKNOWN" (never guessed).
+const FINGERPRINT = /^fp[0-9]+:[0-9a-f]{8}$/;
+export function recordLedgerEntity(dir, op, { entity = {} } = {}) {
+  const file = path.join(dir, 'ledger.json');
+  const ledger = readJson(file);
+  if (!ledger) return null;
+  const ids = [...(op.createdNodeIds || []), ...(op.mutatedNodeIds || [])];
+  const nodeId = entity.nodeId || ids[0];
+  if (!nodeId) return null;
+  const entities = [...(ledger.entities || [])];
+  const at = entities.findIndex(e => e.logicalKey === op.logicalKey && e.active);
+  const prev = at >= 0 ? entities[at] : {};
+  const children = [...new Set([...(prev.childNodeIds || []), ...(entity.childNodeIds || []), ...ids])].filter(id => id !== nodeId);
+  const next = {
+    logicalKey: op.logicalKey,
+    nodeId,
+    type: entity.type || (prev.nodeId === nodeId && prev.type) || 'UNKNOWN',
+    fileKey: op.fileKey,
+    active: true,
+    ...(children.length ? { childNodeIds: children } : {}),
+    ...(FINGERPRINT.test(op.fingerprint || '') ? { agentFingerprint: op.fingerprint } : prev.agentFingerprint && prev.nodeId === nodeId ? { agentFingerprint: prev.agentFingerprint } : {}),
+    lastOperationId: op.operationId,
+  };
+  if (at >= 0) entities[at] = next; else entities.push(next);
+  const updated = { ...ledger, entities, lastVerifiedOperationId: op.operationId, updatedAt: nowIso() };
+  const errors = validateSchema('ledger', updated);
+  if (errors.length) throw new Error(`${op.operationId} verified, but ledger.entities could not be updated: ${errors.join('; ')}`);
+  atomicWriteJson(file, updated);
+  return next;
+}
+
+// v1.8 (§20): the first write of a run may probe nativeWrite (basis history, nativeWriteReady). Once
+// that write is read back and verified, nativeWrite becomes verified for this run automatically.
+export function upgradeNativeWrite(dir, op) {
+  const file = path.join(dir, 'capabilities.json');
+  const caps = readJson(file);
+  const w = caps?.features?.nativeWrite;
+  if (!w || w.status === 'verified') return null;
+  const nativeWrite = { status: 'verified', basis: 'this_run', evidence: [op.operationId, ...(op.evidenceRefs || [])], checkedAt: nowIso(), notes: `verified by ${op.operationId} (read back${op.evidenceRefs?.length ? ` in ${op.evidenceRefs.join(', ')}` : ''})${w.notes ? `; before: ${w.notes}` : ''}` };
+  const updated = { ...caps, features: { ...caps.features, nativeWrite } };
+  const errors = validateSchema('capabilities', updated);
+  if (errors.length) throw new Error(`${op.operationId} verified, but nativeWrite could not be upgraded: ${errors.join('; ')}`);
+  atomicWriteJson(file, updated);
+  return nativeWrite;
 }
 
 function assertNoTouchedIds(operationId, ids) {

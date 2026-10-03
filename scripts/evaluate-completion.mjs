@@ -6,10 +6,10 @@
 // Usage: node scripts/evaluate-completion.mjs <runDir> [--write]
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateRun, validateSchema, decisionStatus, evidenceCoversCell, inputDigest, evaluationIsCurrent } from './validate-artifacts.mjs';
+import { validateRun, validateSchema, decisionStatus, decisionResolved, evidenceCoversCell, inputDigest, evaluationIsCurrent } from './validate-artifacts.mjs';
 import { atomicWriteJson, nowIso } from './state-store.mjs';
 
-export const RULE_VERSION = '12.1@1.7';
+export const RULE_VERSION = '12.1@1.8';
 const GATES = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7'];
 const ALWAYS_PASS = new Set(['G1', 'G2', 'G6', 'G7']);
 const UNRESOLVED_OPS = new Set(['dispatched', 'unknown_outcome']);
@@ -80,9 +80,13 @@ export function evaluateCompletion(plan, audit, ledger, now = new Date().toISOSt
   if (flow && flow.status !== 'confirmed') flag('flow not confirmed', 'awaiting_user');
   const openUnknowns = (flow?.unknowns || []).filter(u => u.status === 'open');
   if (openUnknowns.length) flag(`open flow questions: ${openUnknowns.map(u => u.id).join(', ')}`, 'awaiting_user');
-  // v1.4 DEC-08: pending and skipped design decisions are unanswered (G7); skipped ones are listed to
-  // the user at the end of the run, never decided by the agent.
-  const openDecisions = (plan.designDecisions || []).map(d => [d.id, decisionStatus(d)]).filter(([, s]) => s !== 'answered');
+  // v1.4 DEC-08, v1.8 INVARIANT-28: pending decisions and skips the agent recorded are unanswered (G7)
+  // and are listed to the user at the end of the run. A skip the user chose (skippedBy: user) is the
+  // user's answer and resolved; a skipped decision without skippedBy (before v1.8) counts as agent.
+  const openDecisions = (plan.designDecisions || []).filter(d => !decisionResolved(d)).map(d => {
+    const s = decisionStatus(d);
+    return [d.id, s === 'skipped' ? `skipped(by ${d.skippedBy || 'agent'})` : s];
+  });
   if (openDecisions.length) flag(`unanswered design decisions: ${openDecisions.map(([id, s]) => `${id}=${s}`).join(', ')}`, 'awaiting_user');
 
   // 4. design tasks: no open critical/major finding affecting delivery

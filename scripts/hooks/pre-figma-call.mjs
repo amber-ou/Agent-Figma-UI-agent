@@ -45,6 +45,23 @@ try {
 
   if (!active) pass();
 
+  // v1.8 §4.2.3 / INVARIANT-27: one Figma connection per run. A write through another prefix, or any
+  // write before Preflight recorded capabilities.server.toolPrefix, is blocked; a read through another
+  // prefix is only recorded (the account check does not cover that connection).
+  const prefix = toolName.slice(0, toolName.lastIndexOf('__') + 2);
+  const caps = readJson(path.join(runDirFor(root, active.runId), 'capabilities.json'));
+  const runPrefix = caps?.server?.toolPrefix || null;
+  const isWrite = !toolName.endsWith('__use_figma') || header?.mode === 'write';
+  if (isWrite && !runPrefix) {
+    deny(`figma-ui: capabilities.server.toolPrefix is not recorded for run ${active.runId}; finish Preflight (pick the Figma connection and check its account with whoami) before any write`);
+  }
+  if (isWrite && prefix !== runPrefix) {
+    deny(`figma-ui: ${toolName} goes through the Figma connection ${prefix}, but run ${active.runId} uses ${runPrefix} (capabilities.server.toolPrefix). Writes must use the connection whose account was checked (INVARIANT-27); call ${runPrefix}${toolName.slice(prefix.length)} instead`);
+  }
+  if (runPrefix && prefix !== runPrefix) {
+    logEvent(root, { event: 'PreToolUse:otherConnection', toolName, toolUseId: input.tool_use_id, activeRun: active.runId, runPrefix, prefix, note: 'read through a Figma connection other than this run\'s; recorded only' });
+  }
+
   if (!toolName.endsWith('__use_figma')) {
     deny(`figma-ui: ${toolName} is not enabled for run ${active.runId} (M1 only routes writes through use_figma with an op header)`);
   }

@@ -369,6 +369,44 @@
         }
       },
       "additionalProperties": false
+    },
+    "pluginVersionChoice": {
+      "description": "v1.8 §4.2.2: the user's answer to 'upgrade first, or run on the current version' when the local Figma plugin is older than the latest. Valid for this run only; a new run asks again.",
+      "type": "object",
+      "required": [
+        "installed",
+        "latest",
+        "choice",
+        "decidedAt"
+      ],
+      "properties": {
+        "installed": {
+          "type": "string"
+        },
+        "latest": {
+          "type": "string"
+        },
+        "choice": {
+          "enum": [
+            "upgrade_first",
+            "use_current",
+            "wait_for_sync"
+          ]
+        },
+        "synced": {
+          "type": "boolean"
+        },
+        "decisionRef": {
+          "$ref": "common.schema.json#/$defs/localId"
+        },
+        "confirmation": {
+          "$ref": "common.schema.json#/$defs/rowConfirmation"
+        },
+        "decidedAt": {
+          "$ref": "common.schema.json#/$defs/dateTime"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,

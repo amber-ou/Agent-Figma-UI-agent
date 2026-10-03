@@ -1,6 +1,6 @@
 # Runbook：/figma-ui 日常操作與故障處理
 
-Spec v1.6 · 適用於本機 Claude Code（Windows 實測）· 最後更新 2026-09-29（M4）
+Spec v1.8 · 適用於本機 Claude Code（Windows 實測）· 最後更新 2026-10-03（v1.8）
 
 規範以 `FIGMA_UI_AGENT_SPEC.md` 為準，流程細節在 `.claude/skills/figma-ui/SKILL.md` 與 `references/`。本文件只寫**遇到狀況時照做的步驟**。
 
@@ -22,7 +22,8 @@ Spec v1.6 · 適用於本機 Claude Code（Windows 實測）· 最後更新 2026
 
 - **Plan 結束前不會寫入 Figma。** 待決的項目會一次列成**預填清單**（v1.7 DEC-09）：
   - agent 有建議的列，答案欄已填好並標「建議，請確認」；需要你決定的列留空。
-  - 你可以一次確認全部，也可以逐列修改或填寫。留空的列 agent 不會自己填，你說略過就略過。
+  - 你可以一次確認全部，也可以逐列修改或填寫。留空的列 agent 不會自己填，你說略過就略過。v1.8 起，你明確略過的題目算「已回答」，不會讓 run 卡在 `awaiting_user`；只有 agent 自己標成略過、你還沒看過的題目才算待答。
+  - 只影響動態行為的事（Toast 停留幾秒、能否手動關閉、動畫、手勢）不會問你，handoff 會列為「未定義，交由實作決定」（v1.8 DEC-11）。
   - 確認前不會寫入受影響的部分。
   - 產品還沒有對比政策時，政策題排在第一列。
 - **寫入只在 brief 授權的範圍**，而且放在本 run 的 Section（`figma-ui / <run-id>`）。
@@ -41,6 +42,8 @@ node scripts/run-report.mjs metrics <run-id>                 # 階段時間、�
 node scripts/state-store.mjs release <run-id>                # 釋放鎖（每個 run 結束一定要做）
 node scripts/product-policy.mjs show <productId>             # 看產品政策（v1.7）
 node scripts/product-policy.mjs validate --against-git       # 檢查政策檔（不含網址／fileKey、history 只附加）
+node scripts/artifact-skeleton.mjs <contract> <run-id>       # 印出通過 schema 的 artifact 骨架與範例（v1.8）
+node scripts/verify-installation.mjs [--offline]             # 安裝診斷、plugin 版本、hooks matcher 涵蓋（v1.8）
 node --test "tests/**/*.test.mjs"                            # 全部測試（不要用 node --test tests/）
 ```
 
@@ -69,12 +72,36 @@ Windows PowerShell 如果擋下 `npm`，改用 `npm.cmd install`，或先執行 
 - **政策在 run 期間被改過**：`validate-artifacts` 和 `run-context` 會提示 digest 不同；請 agent 重新套用並確認。
 - **不會寫進 Claude Code 記憶**：run 決策和產品政策都不寫入 `~/.claude/projects/…/memory/` 或 `CLAUDE.md`（INVARIANT-26）。如果你發現有，請刪除並告訴 agent。
 
+### 1.6 Figma plugin 版本題（v1.8，§4.2.2）
+
+本機 Figma plugin 比官方最新版（`figma/mcp-server-guide` 的 `.claude-plugin/plugin.json`）舊時，每個 run 的 Intake 預填清單**第一列**都會問一次。答案只對這個 run 有效，下次 run 還會再問（你已確認要這樣）。
+
+| 你看到的題目 | 怎麼回答 | 之後會怎樣 |
+|---|---|---|
+| 「先升級，還是這次照舊版跑？」（一般安裝的 plugin） | `upgrade_first`：先停下來升級；`use_current`：這次照舊版跑 | 升級後重開 Claude Code，再跑 `node scripts/verify-installation.mjs --force` 確認版本號；依 spec §19 重跑工具契約與最小整合測試，結果記入 `references/runtime-probes.md`。版本號以實際讀到的為準 |
+| 「要等帳號同步更新，還是這次照舊版跑？」（`figma@synced`） | `wait_for_sync`：這次先不跑；`use_current`：這次照舊版跑 | 見下方「synced plugin」 |
+| 摘要只有一行「無法確認 Figma plugin 是否為最新版」 | 不用回答 | 查不到最新版（例如沒有網路）時只提示，不擋 run |
+
+答案記在 `brief.pluginVersionChoice`。想自己看版本：`node scripts/verify-installation.mjs` 輸出的 `pluginVersion`（installed、latest、status、synced）。沒有網路時加 `--offline`，結果會是 `latest_unknown`。
+
+**synced plugin 無法在本機升級**：`figma@synced` 是 claude.ai 帳號同步下來的 plugin，本機的 `claude plugin` 指令不一定能升級它；重開 Claude Code 也不會變（2026-10-03 實測仍是 2.2.118，官方最新 2.2.126）。不要在本機另裝一份 `figma` plugin 來「升級」：那會多出第二個 Figma 連線（見 1.7），OAuth 也要另外授權。等帳號同步更新後，`verify-installation.mjs` 會讀到新版本號，題目就不再出現。
+
+### 1.7 有多個 Figma 連線時（v1.8，§4.2.3）
+
+同一台電腦可能有好幾個 Figma MCP 連線：手動加入的 `figma`（工具前綴 `mcp__figma__`）、Figma plugin 帶入的連線、claude.ai 連接器（`mcp__claude_ai_Figma__`），以及其他 plugin（例如 `design` plugin）各自註冊的連線。每個連線的 OAuth 是分開的，可能登入不同帳號。
+
+- Preflight 會用 `node scripts/preflight.mjs connections …` 列出所有 Figma 前綴。只有一個就直接用；有多個時，預填清單會列一題讓你選，預填的是 `whoami` 帳號檢查通過的那個。
+- 選定的前綴記在 `capabilities.server.toolPrefix`。這個 run 的帳號檢查只對它有效；run 進行中，**經其他前綴送出的寫入會被 hook 擋下**，讀取只記錄。
+- 怎麼選：選登入「擁有目標檔案、且有 Full seat」帳號的那個連線。不確定時，分別對各連線呼叫 `whoami` 比對；不要為了統一名稱刪掉你自己加的連線。
+- `verify-installation.mjs` 的 `hookMatcherCoverage` 會檢查 hooks 是否涵蓋所有已知與已設定的前綴；`problems` 有內容時先修 `.claude/settings.json` 再跑 run。
+
 ## 2. 帳號與權限恢復
 
 每個 run 都會在 Preflight 呼叫 `whoami`，再執行 `node scripts/preflight.mjs diagnose <whoami.json> [targetPlanRef]`。
 
 | 症狀 | 原因 | 處理 |
 |---|---|---|
+| diagnose 回 `unrecognized_format`（exit 3，「格式不符」） | 存下來的 whoami 回應找不到 plans 陣列 | 這**不是**帳號問題。把 `whoami` 回應原樣存檔再跑（原始回應、外層包裝、扁平 `{plans:[…]}` 都接受） |
 | diagnose 回 `blocked`：`no Full seat…` | 目標 plan 只有 View／Dev seat，不能寫入 | 在 Figma 取得 Full seat，或換成擁有檔案的帳號（依下方步驟）；只讀的 audit 任務不受影響 |
 | diagnose 回 `blocked`：`not a member of the target plan` | 登入的是別的帳號 | 依下方「切換帳號」 |
 | 讀取回報「沒有 edit access／存取被拒」 | 帳號或 seat 不對 | **不要重試讀取**，因為會耗用配額；先做 `whoami`，再依下方步驟處理 |
@@ -99,6 +126,8 @@ email 和 handle 不會寫進任何檔案（CAP-03）。
 
 | 阻擋原因（訊息開頭 `figma-ui:`） | 處理 |
 |---|---|
+| `capabilities.server.toolPrefix is not recorded …`（v1.8） | Preflight 還沒記錄這個 run 用哪個 Figma 連線：完成第 1.7 節的選擇與 `whoami` 檢查，寫入 `capabilities.json` |
+| `… goes through the Figma connection …, but run … uses …`（v1.8） | 寫入走了另一個 Figma 連線。改用訊息裡指定的工具名稱；**不要**把 `toolPrefix` 改成別的連線來繞過，那個連線的帳號沒檢查過 |
 | `missing op header` | 腳本第一行要是 `// figma-ui run=<run-id> op=<id> mode=read\|write` |
 | `op header run=… does not match active run` | 標頭的 run-id 要和 `state-store.mjs active` 顯示的一致 |
 | `… is not enabled for run …` | 有進行中的 run 時，寫入只能走 `use_figma` |
@@ -112,7 +141,7 @@ email 和 handle 不會寫進任何檔案（CAP-03）。
 | `operation … must exist in the journal with status=planned` | 先用 `operation-journal.mjs plan` 記錄 planned |
 | `planned operation … must have mode=write and fileKey=…` | planned 紀錄的 mode 或 fileKey 寫錯了，重新 plan 一筆正確的 |
 | `operation … has no basisRefs` | planned 紀錄要引用依據：決策、componentMap 或 pattern |
-| `operation-journal plan` 本身拒絕（`build gate: …`） | Build 邊界沒通過：用 `validate-artifacts.mjs … --stage build` 看缺什麼。常見原因是 plan 或 flow 未確認、決策未回答、文案 pending。M4 起，新 run 的第一個寫入可以兼作 nativeWrite 探測：先前 run 已驗證過（`basis: history`）就能規劃，驗證後要改成本 run 的 `verified` |
+| `operation-journal plan` 本身拒絕（`build gate: …`） | Build 邊界沒通過：用 `validate-artifacts.mjs … --stage build` 看缺什麼。常見原因是 plan 或 flow 未確認、決策未回答、文案 pending。M4 起，新 run 的第一個寫入可以兼作 nativeWrite 探測：先前 run 已驗證過（`basis: history`）就能規劃；v1.8 起它讀回 `verify` 成功後會自動升級成本 run 的 `verified`，不用手動改 |
 
 run 結束沒有釋放鎖時，hook 會繼續擋下本專案所有沒有 op 標頭的 Figma 呼叫：執行 `state-store.mjs release <run-id>`。
 
