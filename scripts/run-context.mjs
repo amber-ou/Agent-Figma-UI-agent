@@ -33,8 +33,10 @@ export function runContext(dir, mode = 'continue', { root, pluginVersion } = {})
       if (d.source === 'product_policy') continue; // listed under applied, never asked (POL-03)
       if (st === 'answered') confirmed.push(`${d.id} (${d.source})`);
       else if (decisionResolved(d)) confirmed.push(`${d.id} (skipped by the user)`); // v1.8 INVARIANT-28
-      else ask.push({ kind: 'design_decision', item: d.id, status: st, question: d.question });
+      else ask.push({ kind: 'design_decision', item: d.id, status: st, question: d.question, ...(d.dependsOn ? { dependsOn: d.dependsOn } : {}) });
     }
+    // v1.9 DEC-12: the scoped delegation is reused by continue on the same run, never by a new run
+    for (const a of (plan.decisions || []).filter(x => x.delegation)) confirmed.push(`${a.id} delegation (${a.delegation.allowedKinds.join(', ')}; this run only)`);
     const flow = plan.flow;
     if (flow?.status === 'confirmed') confirmed.push(`flow (${flow.level})`);
     else if (flow) ask.push({ kind: 'flow', item: 'confirm the flow judgement', level: flow.level });
@@ -101,6 +103,8 @@ export function runContext(dir, mode = 'continue', { root, pluginVersion } = {})
     if (journal.nextStep === 'verify') next.push(`read back and verify: ${journal.awaitingVerification.join(', ')}`);
     next.push('read back ledger entities (existence, ownership marker, fingerprint); ask only about what changed');
   } else if (journal.nextStep === 'verify') next.push(`read back and verify: ${journal.awaitingVerification.join(', ')}`);
+  // v1.9 §14: a change asked after the handoff is one rework round
+  if (mode === 'continue' && ledger?.completionEvaluatedAt) next.unshift('this run was already handed off: record the change first with run-report.mjs rework <run-id> <request> (§14)');
 
   const guidance = {
     new: 'Prefill what the request already states; ask the product first if it is not stated, apply its product policy and say so in one line, then ask only the missing items as one prefilled list (DEC-09). Nothing from earlier runs is reused without the user saying so.',

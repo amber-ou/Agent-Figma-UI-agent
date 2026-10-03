@@ -10,6 +10,7 @@
 //   node scripts/run-report.mjs phase <run-id> <phase>
 //   node scripts/run-report.mjs ask <run-id> <questionCount> [--prefilled N] [--blank M]   (v1.7 DEC-09 rows)
 //   node scripts/run-report.mjs answered <run-id>
+//   node scripts/run-report.mjs rework <run-id> <request...>   (v1.9: a change asked after a handoff)
 //   node scripts/run-report.mjs metrics <run-id>
 //   node scripts/run-report.mjs handoff <run-id> [--write]
 import fs from 'node:fs';
@@ -17,10 +18,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { projectRoot, runDirFor, atomicWriteJson, nowIso, readJson } from './state-store.mjs';
 import { readJsonl, stateDir } from './hooks/lib.mjs';
-import { loadRun, validateSchema, decisionStatus, decisionResolved, evidenceCoversCell, evaluationIsCurrent } from './validate-artifacts.mjs';
+import { loadRun, validateSchema, decisionStatus, decisionResolved, evidenceCoversCell, evaluationIsCurrent, scopedDelegation, bundledWithDirection } from './validate-artifacts.mjs';
 import { suggestFromRun } from './product-policy.mjs';
 
-export const SPEC_VERSION = '1.8';
+export const SPEC_VERSION = '1.9';
 const PHASES = ['intake', 'preflight', 'discover', 'plan', 'build', 'validate', 'handoff', 'reconcile'];
 
 function updateLedger(dir, fn) {
@@ -72,6 +73,17 @@ export function recordAnswered(dir, at = nowIso()) {
     if (open < 0) throw new Error('no open question round');
     rounds[open] = { ...rounds[open], answeredAt: at };
     return { ...l, questionRounds: rounds };
+  });
+}
+
+// v1.9 §14: a change the user asks for after the run was handed off (continue on an evaluated run) is
+// one rework round. Recorded when continue starts, before the change is planned.
+export function recordRework(dir, request, at = nowIso()) {
+  if (!request || !String(request).trim()) throw new Error('rework needs the requested change');
+  return updateLedger(dir, l => {
+    if (!l.completionEvaluatedAt) throw new Error('the run was not handed off yet (no completionEvaluatedAt); a change before handoff is not rework');
+    const rounds = l.reworkRounds || [];
+    return { ...l, reworkRounds: [...rounds, { id: `rw-${String(rounds.length + 1).padStart(3, '0')}`, requestedAt: at, request: String(request).trim(), previousResult: l.status ?? null }] };
   });
 }
 
@@ -172,10 +184,18 @@ export function runMetrics(dir, { root = projectRoot(), events: given } = {}) {
     skippedByUser: dd.filter(d => decisionStatus(d) === 'skipped' && d.skippedBy === 'user').length,
     skippedByAgent: dd.filter(d => decisionStatus(d) === 'skipped' && d.skippedBy !== 'user').length,
     undefinedBehaviors: (run.plan.undefinedBehaviors || []).length,
+    // v1.9 §14: decisions the user actually judged (not DEC-03 summary items, product policy, delegated
+    // details or sub-choices accepted with their direction); scoped delegations (DEC-12); direction
+    // proposals (DEC-13).
+    substantive: dd.filter(d => d.source === 'user' && !d.delegation && decisionResolved(d) && !bundledWithDirection(d)).length,
+    delegatedDetails: dd.filter(d => d.delegation && scopedDelegation(run.plan, d.delegation.decisionRef)).length,
+    directionProposals: dd.filter(d => d.kind === 'direction').length,
   } : null;
   if (!decisions) unknown.push('decisions (no plan.json)');
+  const reworks = Array.isArray(ledger.reworkRounds) ? ledger.reworkRounds.length : null;
+  if (reworks === null) unknown.push('rework rounds (no ledger.reworkRounds)');
 
-  return { runId, phases, tools, journal, questions, decisions, unknown, note: 'executionLayer depends on where the run ran; offline fixtures prove the computation, not any speed-up.' };
+  return { runId, phases, tools, journal, questions, decisions, reworks, unknown, note: 'executionLayer depends on where the run ran; offline fixtures prove the computation, not any speed-up.' };
 }
 
 // ---------------- handoff ----------------
@@ -233,6 +253,30 @@ export function implementationDefinedSection(plan) {
   L.push('- 使用者明確略過的決策（相關元素未建立，DEC-08）：');
   if (!skipped.length) L.push('  - 無');
   for (const d of skipped) L.push(`  - ${d.id}：${d.question}${d.context ? `（${d.context}）` : ''} → 影響：畫面上不建立這項決策的元素；需要時由實作或下一個 run 決定`);
+  L.push('');
+  return L;
+}
+
+// v1.9 §15 item 13: delegated details (DEC-12), draft copy (DEC-14), external requirements (EXT-01) and
+// common-rule checks that failed, need review or were not tested (§9.6).
+export function delegationSection(plan, inventory, audit) {
+  const L = ['## 委派、擬稿與外部規範', ''];
+  const delegated = (plan?.designDecisions || []).filter(d => d.delegation && scopedDelegation(plan, d.delegation.decisionRef));
+  L.push('- agent 依委派決定的細節（DEC-12；要改可用 continue）：');
+  if (!delegated.length) L.push('  - 無');
+  for (const d of delegated) L.push(`  - ${d.id}［${d.kind || '?'}］${d.question}：${d.answer}（方向 ${d.directionRef || '?'}，授權 ${d.delegation.decisionRef}）`);
+  const drafts = (plan?.screens || []).flatMap(s => (s.copy || []).filter(c => c.origin === 'draft').map(c => ({ s, c })));
+  L.push('- 擬稿文案（DEC-14；確認後仍標示為擬稿）：');
+  if (!drafts.length) L.push('  - 無');
+  for (const { s, c } of drafts) L.push(`  - ${s.screenKey}/${c.id}（${c.role}）「${c.text}」：${c.status === 'confirmed' ? `使用者已確認${c.decisionRef ? `（${c.decisionRef}）` : ''}` : '**待確認**'}`);
+  const reqs = inventory?.externalRequirements || [];
+  L.push('- 外部規範（EXT-01）：');
+  if (!reqs.length) L.push('  - 無');
+  for (const r of reqs) L.push(`  - ${r.id} ${r.subject}：${r.status === 'verified' ? `已查核（${r.url}，${r.checkedAt}）` : `**未驗證**${r.url ? `（${r.url}）` : ''}`}：${r.requirement}${r.inference ? `；本案推論：${r.inference}` : ''}${r.status === 'unverified' && r.affectsDelivery ? '；本次交付依賴此項' : ''}${r.decisionRef ? `；處理方式 ${r.decisionRef}` : ''}`);
+  const rc = (audit?.ruleChecks || []).filter(x => ['fail', 'needs_review', 'not_tested'].includes(x.status));
+  L.push('- 共通規則檢查中 fail／needs_review／not_tested 的項目（§9.6）：');
+  if (!rc.length) L.push(`  - ${audit?.ruleChecks ? '無' : '未記錄（audit 沒有 ruleChecks）'}`);
+  for (const x of rc) L.push(`  - ${x.ruleId} ${x.status}${x.nodeIds?.length ? `（${x.nodeIds.join('、')}）` : ''}${x.reason ? `：${x.reason}` : ''}${x.findingRef ? `；finding ${x.findingRef}` : ''}${x.verification ? `；驗證方式：${x.verification}` : ''}`);
   L.push('');
   return L;
 }
@@ -301,6 +345,8 @@ export function renderHandoff(dir, { root = projectRoot(), metrics } = {}) {
 
   L.push(...implementationDefinedSection(plan));
 
+  L.push(...delegationSection(plan, run.inventory, audit));
+
   L.push('## 待決與未驗證', '');
   const open = [];
   for (const q of ledger.pendingQuestions || []) open.push(`待答問題 ${q.id}：${q.question}`);
@@ -334,7 +380,7 @@ export function renderHandoff(dir, { root = projectRoot(), metrics } = {}) {
   L.push('## 量測', '');
   L.push(`- 階段：${m.phases.length ? m.phases.map(p => `${p.phase} ${fmtMs(p.durationMs)}`).join('、') : 'unknown'}`);
   L.push(`- 工具：${m.tools ? `read ${m.tools.attributedByRun.read + m.tools.attributedByTimeWindow.read}、write ${m.tools.attributedByRun.write + m.tools.attributedByTimeWindow.write}、截圖 ${m.tools.attributedByRun.screenshot + m.tools.attributedByTimeWindow.screenshot}；工具時間 ${fmtMs(m.tools.toolTimeMs)}；截斷 ${m.tools.truncatedResponses}；失敗 ${m.tools.failures}` : 'unknown'}；重試 ${m.journal.retries}、對帳 ${m.journal.reconciled}`);
-  L.push(`- 提問：${m.questions ? `${m.questions.rounds} 輪、${m.questions.questions} 題${m.questions.prefilledRows != null || m.questions.blankRows != null ? `（預填 ${m.questions.prefilledRows ?? 'unknown'}、留空 ${m.questions.blankRows ?? 'unknown'}）` : ''}；使用者等待 ${fmtMs(m.questions.userWaitMs)}` : 'unknown'}；實質設計決策（使用者回答）${m.decisions ? m.decisions.answeredByUser : 'unknown'}${m.decisions ? `；確認方式（設計決策與範圍／授權列合計）：照預填 ${m.decisions.prefilledConfirmed}、改過 ${m.decisions.userModified}、自己填 ${m.decisions.userFilled}、略過 ${m.decisions.userSkipped}` : ''}`);
+  L.push(`- 提問：${m.questions ? `${m.questions.rounds} 輪、${m.questions.questions} 題${m.questions.prefilledRows != null || m.questions.blankRows != null ? `（預填 ${m.questions.prefilledRows ?? 'unknown'}、留空 ${m.questions.blankRows ?? 'unknown'}）` : ''}；使用者等待 ${fmtMs(m.questions.userWaitMs)}` : 'unknown'}；實質決策 ${m.decisions ? m.decisions.substantive : 'unknown'}（委派 ${m.decisions ? m.decisions.delegatedDetails : 'unknown'}、方向方案 ${m.decisions ? m.decisions.directionProposals : 'unknown'}）；返工 ${m.reworks ?? 'unknown'}${m.decisions ? `；確認方式（設計決策與範圍／授權列合計）：照預填 ${m.decisions.prefilledConfirmed}、改過 ${m.decisions.userModified}、自己填 ${m.decisions.userFilled}、略過 ${m.decisions.userSkipped}` : ''}`);
   if (m.unknown.length) L.push(`- 未記錄（不是 0）：${m.unknown.join('；')}`);
   L.push('');
   return L.join('\n');
@@ -342,13 +388,14 @@ export function renderHandoff(dir, { root = projectRoot(), metrics } = {}) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [cmd, runId, ...rest] = process.argv.slice(2);
-  const usage = 'usage: run-report.mjs phase <run-id> <phase> | ask <run-id> <questionCount> [--prefilled N] [--blank M] | answered <run-id> | metrics <run-id> | handoff <run-id> [--write]';
+  const usage = 'usage: run-report.mjs phase <run-id> <phase> | ask <run-id> <questionCount> [--prefilled N] [--blank M] | answered <run-id> | rework <run-id> <request...> | metrics <run-id> | handoff <run-id> [--write]';
   if (!cmd || !runId) { console.error(usage); process.exit(2); }
   const dir = runDirFor(projectRoot(), runId);
   try {
     if (cmd === 'phase') console.log(JSON.stringify(recordPhase(dir, rest[0]).phaseHistory.at(-1)));
     else if (cmd === 'ask') { const opt = n => { const i = rest.indexOf(n); return i >= 0 ? rest[i + 1] : undefined; }; console.log(JSON.stringify(recordQuestionRound(dir, rest[0], undefined, { prefilled: opt('--prefilled'), blank: opt('--blank') }).questionRounds.at(-1))); }
     else if (cmd === 'answered') console.log(JSON.stringify(recordAnswered(dir).questionRounds.findLast(r => r.answeredAt)));
+    else if (cmd === 'rework') console.log(JSON.stringify(recordRework(dir, rest.join(' ')).reworkRounds.at(-1)));
     else if (cmd === 'metrics') console.log(JSON.stringify(runMetrics(dir), null, 2));
     else if (cmd === 'handoff') {
       const text = renderHandoff(dir);

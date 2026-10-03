@@ -185,6 +185,41 @@
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9-]*#(policies/accessibility.contrast|rules/[a-z0-9][a-z0-9-]*)$",
       "description": "v1.7 §7.5: <productId>#policies/<item> or <productId>#rules/<id>; must resolve in product-policies/<productId>.json"
+    },
+    "decisionKind": {
+      "description": "v1.9 DEC-12/13: what a design decision is about. direction = a bundled direction proposal (DEC-13); size, spacing, alignment, component_width and placeholder_size are the kinds a run may delegate (DEC-12).",
+      "enum": [
+        "direction",
+        "size",
+        "spacing",
+        "alignment",
+        "component_width",
+        "placeholder_size",
+        "other"
+      ]
+    },
+    "delegableKind": {
+      "description": "v1.9 DEC-12: the only kinds a scoped delegation may allow.",
+      "enum": [
+        "size",
+        "spacing",
+        "alignment",
+        "component_width",
+        "placeholder_size"
+      ]
+    },
+    "excludedTopic": {
+      "description": "v1.9 DEC-12/13: topics that are never delegated and never bundled into a direction proposal (copy, brand assets, external requirements, new tokens or components, raw-value exceptions, platform, write scope).",
+      "enum": [
+        "copy",
+        "brand_asset",
+        "external_requirement",
+        "new_token",
+        "new_component",
+        "raw_value_exception",
+        "platform",
+        "write_scope"
+      ]
     }
   }
 }

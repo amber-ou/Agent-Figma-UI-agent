@@ -1,6 +1,6 @@
 # Runbook：/figma-ui 日常操作與故障處理
 
-Spec v1.8 · 適用於本機 Claude Code（Windows 實測）· 最後更新 2026-10-03（v1.8）
+Spec v1.9 · 適用於本機 Claude Code（Windows 實測）· 最後更新 2026-10-03（v1.9）
 
 規範以 `FIGMA_UI_AGENT_SPEC.md` 為準，流程細節在 `.claude/skills/figma-ui/SKILL.md` 與 `references/`。本文件只寫**遇到狀況時照做的步驟**。
 
@@ -26,6 +26,9 @@ Spec v1.8 · 適用於本機 Claude Code（Windows 實測）· 最後更新 2026
   - 只影響動態行為的事（Toast 停留幾秒、能否手動關閉、動畫、手勢）不會問你，handoff 會列為「未定義，交由實作決定」（v1.8 DEC-11）。
   - 確認前不會寫入受影響的部分。
   - 產品還沒有對比政策時，政策題排在第一列。
+  - v1.9：有來源時 agent 先唯讀探索再一次問完。版型、背景這類同一方向的選擇合成一個**方向方案**；方案下面有一行**委派授權**（尺寸、留白、對齊、元件寬度、佔位尺寸交給 agent 決定並驗證，只限本 run）。你同意後這些細節不再逐題問，Plan 摘要與 handoff 會列出 agent 的選擇，要改用 `continue`。文案、品牌素材、外部規範、新增 token／元件、平台、寫入範圍永遠另列。
+  - agent 擬的文字標「擬稿」，你確認前不會寫入；你說「放」但沒給文字時，agent 會另外問文字，不拿題目裡的舉例當答案。
+  - 涉及 LINE／Apple／Google 登入、平台規範或支付時，agent 會先查官方文件；讀不到會標「未驗證」並問你怎麼處理。
 - **寫入只在 brief 授權的範圍**，而且放在本 run 的 Section（`figma-ui / <run-id>`）。
 - **每個寫入都會另外讀回驗證**，不以寫入時的回應為準。
 - **完成與否只看 `evaluate-completion.mjs` 的結果。** 你把未完成的 run「接受為測試成功」時，只會記錄 `userAcceptance`，run 的狀態不會變成 complete。
@@ -38,7 +41,8 @@ node scripts/run-context.mjs <run-id> continue|resume        # 還需要問什�
 node scripts/validate-artifacts.mjs design-runs/<run-id> --stage intake|plan|build   # 階段驗證
 node scripts/evaluate-completion.mjs design-runs/<run-id> --write                    # 唯一的完成判定
 node scripts/run-report.mjs handoff <run-id> --write         # 從 artifacts 產生 handoff.md
-node scripts/run-report.mjs metrics <run-id>                 # 階段時間、工具次數、提問與決策統計
+node scripts/run-report.mjs metrics <run-id>                 # 階段時間、工具次數、提問與決策統計（v1.9：實質決策、委派、方向方案、返工）
+node scripts/run-report.mjs rework <run-id> <修改摘要>       # handoff 後再要求修改時記一次返工（v1.9）
 node scripts/state-store.mjs release <run-id>                # 釋放鎖（每個 run 結束一定要做）
 node scripts/product-policy.mjs show <productId>             # 看產品政策（v1.7）
 node scripts/product-policy.mjs validate --against-git       # 檢查政策檔（不含網址／fileKey、history 只附加）

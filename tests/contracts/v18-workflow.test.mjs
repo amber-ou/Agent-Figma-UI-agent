@@ -29,7 +29,7 @@ const dd = (id, over = {}) => ({ id, question: `question ${id}`, options: ['A', 
 
 // ---------------- T72 ----------------
 test('T72: a skip the user chose resolves the decision; an agent skip and a legacy skip stay open (INVARIANT-28)', () => {
-  assert.equal(RULE_VERSION, '12.1@1.8');
+  assert.equal(RULE_VERSION, '12.1@1.9');
   const base = evaluateRun(copyM1()).evaluation.result;
   assert.equal(base, 'complete_with_exceptions', 'the fixture run is complete before adding decisions');
 

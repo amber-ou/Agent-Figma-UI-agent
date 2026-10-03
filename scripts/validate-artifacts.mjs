@@ -524,9 +524,19 @@ export function buildReadiness(run, { isDecision } = {}) {
       if (open.length) errors.push(`build: flow unknowns still open: ${open.join(', ')}; ask before building the affected screens`);
     }
     for (const s of plan.screens || []) {
-      const pending = (s.copy || []).filter(c => c.status !== 'confirmed').map(c => c.id);
+      const unconfirmed = (s.copy || []).filter(c => c.status !== 'confirmed');
+      const drafts = unconfirmed.filter(c => c.origin === 'draft').map(c => c.id);
+      const pending = unconfirmed.filter(c => c.origin !== 'draft').map(c => c.id);
+      if (drafts.length) errors.push(`build: screen ${s.screenKey} has draft copy (擬稿) ${drafts.join(', ')} the user has not confirmed (INVARIANT-30, DEC-14)`);
       if (pending.length) errors.push(`build: screen ${s.screenKey} has unconfirmed copy ${pending.join(', ')}; build with confirmed text, not placeholders`);
     }
+    // v1.9 EXT-01: a delivery that depends on an unverified requirement needs the user's decision first
+    for (const r of run.inventory?.externalRequirements || []) {
+      if (r.status === 'unverified' && r.affectsDelivery && !r.decisionRef) errors.push(`build: external requirement ${r.id} (${r.subject}) is unverified and this delivery depends on it; ask the user how to proceed (EXT-01)`);
+    }
+    // v1.9 §8.1 6b: keys not checked for import fail in the middle of Build
+    const unchecked = (plan.importChecks || []).filter(ic => ic.status === 'not_checked').map(ic => ic.id);
+    if (unchecked.length) errors.push(`build: import not checked for ${unchecked.join(', ')}; check it before Build (§8.1 6b)`);
   }
   if (!capabilities) errors.push('build: capabilities.json is required');
   else {
@@ -539,10 +549,151 @@ export function buildReadiness(run, { isDecision } = {}) {
   return errors;
 }
 
+// ---- v1.9 question flow phase 1 and common rules (§7.4 DEC-12–15, §8.1 EXT-01 / 6b, §9.6, §10.3, §20) ----
+// Errors block; notices are hints for runs written before v1.9 (the fields are optional, schemaVersion
+// stays 1.2).
+export const DELEGABLE_KINDS = ['size', 'spacing', 'alignment', 'component_width', 'placeholder_size'];
+export const EXCLUDED_TOPICS = ['copy', 'brand_asset', 'external_requirement', 'new_token', 'new_component', 'raw_value_exception', 'platform', 'write_scope'];
+
+// DEC-12: the run's scoped delegation (a plan.decisions entry with delegation.allowedKinds), if any.
+export function scopedDelegation(plan, ref) {
+  const auth = (plan?.decisions || []).find(d => d.id === ref);
+  return auth?.delegation ? auth : null;
+}
+
+// DEC-13: a sub-choice accepted together with its direction is not a separate substantive decision.
+export function bundledWithDirection(d) {
+  return Boolean(d.dependsOn) && d.confirmedWith === 'direction';
+}
+
+const textIn = (needle, ...hay) => hay.some(h => typeof h === 'string' && needle && h.includes(needle));
+
+export function validateV19(run, { stage = 'final' } = {}) {
+  const errors = [];
+  const notices = [];
+  const { plan, inventory, audit } = run;
+  const dds = new Map((plan?.designDecisions || []).map(d => [d.id, d]));
+  const decisions = new Map((plan?.decisions || []).map(d => [d.id, d]));
+  const isDecision = id => dds.has(id) || decisions.has(id);
+  const requirements = new Map((inventory?.externalRequirements || []).map(r => [r.id, r]));
+
+  if (plan) {
+    for (const d of plan.designDecisions || []) {
+      // DEC-12 / INVARIANT-29: a delegated detail stays inside the run's authorised kinds, never touches
+      // an excluded topic and belongs to a confirmed direction. Checking that the IDs exist is not enough.
+      const auth = d.delegation ? scopedDelegation(plan, d.delegation.decisionRef) : null;
+      if (auth) {
+        const allowed = auth.delegation.allowedKinds || [];
+        const excluded = new Set([...EXCLUDED_TOPICS, ...(auth.delegation.excludedKinds || [])]);
+        if (!d.kind) errors.push(`designDecision ${d.id}: delegated under ${auth.id} without kind; a scoped delegation covers only ${allowed.join(', ')} (DEC-12)`);
+        else if (!DELEGABLE_KINDS.includes(d.kind) || !allowed.includes(d.kind)) errors.push(`designDecision ${d.id}: kind ${d.kind} is not delegated by ${auth.id} (allowed: ${allowed.join(', ')}); ask it in the prefilled list (DEC-12, INVARIANT-29)`);
+        if (d.topic && excluded.has(d.topic)) errors.push(`designDecision ${d.id}: topic ${d.topic} can never be delegated (copy, brand assets, external requirements, new tokens or components, raw-value exceptions, platform and write scope stay with the user, DEC-12)`);
+        if (!d.directionRef) errors.push(`designDecision ${d.id}: delegated detail without directionRef; it must belong to a confirmed direction (INVARIANT-29)`);
+      }
+      if (d.directionRef) {
+        const dir = dds.get(d.directionRef);
+        if (!dir || dir.kind !== 'direction') errors.push(`designDecision ${d.id}: directionRef ${d.directionRef} is not a kind:direction design decision (INVARIANT-29)`);
+        else if (decisionStatus(dir) !== 'answered') errors.push(`designDecision ${d.id}: direction ${dir.id} is not confirmed; details cannot be decided inside an unconfirmed direction (INVARIANT-29)`);
+      }
+      // DEC-13: sub-choices bundle only design choices of the same direction.
+      if (d.dependsOn) {
+        const dir = dds.get(d.dependsOn);
+        if (!dir || dir.kind !== 'direction') errors.push(`designDecision ${d.id}: dependsOn ${d.dependsOn} is not a kind:direction design decision (DEC-13)`);
+        if (d.kind === 'direction') errors.push(`designDecision ${d.id}: a direction cannot be a sub-choice of another direction (DEC-13)`);
+        if (d.topic && EXCLUDED_TOPICS.includes(d.topic)) errors.push(`designDecision ${d.id}: ${d.topic} cannot be bundled into direction ${d.dependsOn}; platform, write scope, brand assets, copy and external requirements are separate rows (DEC-13)`);
+        if (dir && decisionStatus(d) === 'answered') {
+          if (decisionStatus(dir) !== 'answered') errors.push(`designDecision ${d.id}: answered while its direction ${dir.id} is not confirmed (DEC-13)`);
+          else if (d.confirmedWith === 'direction' && dir.confirmation === 'user_modified') errors.push(`designDecision ${d.id}: the user changed direction ${dir.id}; ask its sub-choices as single rows (confirmedWith: row), do not confirm them with the bundle (DEC-13)`);
+        }
+      }
+      for (const ref of d.requirementRefs || []) {
+        if (!inventory) notices.push(`designDecision ${d.id}: requirementRef ${ref} resolves against inventory.json (not written yet)`);
+        else if (!requirements.has(ref)) errors.push(`designDecision ${d.id}: requirementRef ${ref} not found in inventory.externalRequirements`);
+      }
+    }
+    for (const a of (plan.decisions || []).filter(x => x.delegation)) {
+      const missing = EXCLUDED_TOPICS.filter(t => !(a.delegation.excludedKinds || []).includes(t));
+      if (missing.length) notices.push(`decision ${a.id}: delegation does not list ${missing.join(', ')} as excluded; they are excluded anyway (DEC-12), list them so the user sees the boundary`);
+    }
+
+    // DEC-14 / INVARIANT-30: user copy is the user's own words, never the example inside a question.
+    let legacyCopy = 0;
+    for (const s of plan.screens || []) for (const c of s.copy || []) {
+      const label = `screen ${s.screenKey} copy ${c.id}`;
+      if (!c.origin) { legacyCopy++; continue; }
+      if (c.origin === 'user' && c.sourceRef && isDecision(c.sourceRef)) {
+        const dd = dds.get(c.sourceRef);
+        const own = dd ? dd.answer : decisions.get(c.sourceRef).decision;
+        if (!textIn(c.text, own)) {
+          const fromQuestion = dd && textIn(c.text, dd.question, dd.context, dd.recommendation, ...(dd.options || []));
+          errors.push(`${label}: origin user but "${c.text}" is not in the answer of ${c.sourceRef}${fromQuestion ? '; it only appears in the question or its options — an example in the question is not the user\'s text (mark it draft and confirm it, INVARIANT-30)' : ''}`);
+        }
+      }
+      if (c.decisionRef && !isDecision(c.decisionRef)) errors.push(`${label}: decisionRef ${c.decisionRef} not found in plan decisions`);
+      else if (c.origin === 'draft' && c.status === 'confirmed' && dds.has(c.decisionRef) && decisionStatus(dds.get(c.decisionRef)) !== 'answered') errors.push(`${label}: draft confirmed through ${c.decisionRef}, which is not answered (INVARIANT-30)`);
+    }
+    if (legacyCopy) notices.push(`${legacyCopy} copy item(s) without origin (written before v1.9, DEC-14): handoff cannot tell drafts from the user's text`);
+
+    // §8.1 step 6b: component and style keys are checked for import before Plan, not during Build.
+    const reuse = (plan.componentMap || []).filter(c => c.decision === 'reuse');
+    const componentMap = new Map((plan.componentMap || []).map(c => [c.id, c]));
+    if (plan.importChecks) {
+      for (const ic of plan.importChecks) {
+        if (ic.componentMapRef && !componentMap.has(ic.componentMapRef)) errors.push(`importCheck ${ic.id}: componentMapRef ${ic.componentMapRef} not found`);
+        if (ic.listedToUserRef && !isDecision(ic.listedToUserRef)) errors.push(`importCheck ${ic.id}: listedToUserRef ${ic.listedToUserRef} not found`);
+        if (ic.status === 'not_importable' && plan.status === 'confirmed' && !ic.listedToUserRef) errors.push(`importCheck ${ic.id}: not importable and the fallback was not listed to the user before confirming the plan (§8.1 6b)`);
+      }
+      for (const c of reuse.filter(c => c.source?.kind === 'published_library')) {
+        if (!plan.importChecks.some(ic => ic.componentMapRef === c.id)) errors.push(`componentMap ${c.id}: no importCheck; confirm the key imports into the output file before Plan (§8.1 6b)`);
+      }
+    } else if (reuse.length) notices.push('plan.importChecks missing (before v1.9): import of component and style keys was not checked before Plan (§8.1 6b)');
+
+    // §10.3: fonts of every instance the plan creates come from its main component.
+    if (inventory) {
+      const checks = inventory.componentFontChecks;
+      if (checks) {
+        const installed = new Set((inventory.fonts || []).map(f => `${f.family}/${f.style}`));
+        for (const ch of checks) {
+          if (!componentMap.has(ch.componentMapRef)) errors.push(`componentFontCheck ${ch.componentMapRef}: not found in plan.componentMap`);
+          for (const f of ch.fonts) if (!installed.has(`${f.family}/${f.style}`)) errors.push(`componentFontCheck ${ch.componentMapRef}: font ${f.family} ${f.style} is not in inventory.fonts (record whether it is installed, §10.3)`);
+        }
+        for (const c of reuse) {
+          const mine = checks.filter(ch => ch.componentMapRef === c.id);
+          if (!mine.some(ch => ch.source === 'main_component')) errors.push(`componentMap ${c.id}: fonts not read from the main component${mine.length ? ' (a reference instance may carry font overrides a new instance does not get)' : ''} (§10.3)`);
+        }
+      } else if (reuse.length) notices.push('inventory.componentFontChecks missing (before v1.9): fonts of new instances were not read from their main components (§10.3)');
+    }
+  }
+
+  // EXT-01: verified requirements carry their source; unverified ones are never facts.
+  const seen = new Set();
+  for (const r of inventory?.externalRequirements || []) {
+    if (seen.has(r.id)) errors.push(`duplicate externalRequirement id ${r.id}`);
+    seen.add(r.id);
+    if (r.decisionRef && plan && !isDecision(r.decisionRef)) errors.push(`externalRequirement ${r.id}: decisionRef ${r.decisionRef} not found in plan decisions`);
+  }
+
+  // §9.6 ruleChecks: never a replacement for gates or the completion rule.
+  if (audit?.ruleChecks && stage === 'final') {
+    const findings = new Set((audit.findings || []).map(f => f.id));
+    const exceptions = new Set((audit.acceptedExceptions || []).map(x => x.id));
+    const ivr = audit.implementationVerificationRequired || [];
+    for (const rc of audit.ruleChecks) {
+      const label = `ruleCheck ${rc.ruleId}${rc.nodeIds?.length ? ` (${rc.nodeIds.join(', ')})` : ''}`;
+      if (rc.status === 'fail' && rc.affectsDelivery === undefined) errors.push(`${label}: fail must say whether it affects delivery (a fail that does becomes a finding, §9.6)`);
+      if (rc.findingRef && !findings.has(rc.findingRef)) errors.push(`${label}: findingRef ${rc.findingRef} not found in audit.findings`);
+      if (rc.exceptionRef && !exceptions.has(rc.exceptionRef) && !isDecision(rc.exceptionRef)) errors.push(`${label}: exceptionRef ${rc.exceptionRef} not found`);
+      if (rc.status === 'not_tested' && !ivr.some(x => x.includes(rc.ruleId))) errors.push(`${label}: not_tested must be listed in implementationVerificationRequired (it is not a pass, §9.6)`);
+    }
+  }
+  return { errors, notices };
+}
+
 // ---- v1.7 product policies (§4.6, §7.5, §9.5, §12.1, §20) ----
 // Errors block; notices are hints (runs created before v1.7, policy changed during the run).
 const CONTRAST_PRECHECK = new Set(['text_contrast', 'non_text_contrast']);
 const isContrastFinding = f => /contrast/i.test(f.category || '');
+const isContrastRuleCheck = rc => [rc.reason, rc.verification, rc.before, rc.after].some(v => v != null && /contrast|對比|\b\d+(\.\d+)?:1\b/i.test(typeof v === 'string' ? v : JSON.stringify(v)));
 
 export function validateProductPolicy(run, { stage = 'final', root } = {}) {
   const errors = [];
@@ -587,6 +738,8 @@ export function validateProductPolicy(run, { stage = 'final', root } = {}) {
   if (contrast.decided && contrast.required === false) {
     for (const c of plan?.accessibilityPrecheck || []) if (CONTRAST_PRECHECK.has(c.kind)) errors.push(`accessibilityPrecheck ${c.id}: product policy ${contrast.policyRef} says contrast is not checked; remove contrast items (other accessibility items stay)`);
     for (const f of audit?.findings || []) if (isContrastFinding(f)) errors.push(`finding ${f.id}: product policy ${contrast.policyRef} says contrast is not checked; no contrast findings (§9.5)`);
+    // v1.9 §9.6 (T94): common rules never bring contrast back (SYS-08 checks modes without contrast)
+    for (const rc of audit?.ruleChecks || []) if (isContrastRuleCheck(rc)) errors.push(`ruleCheck ${rc.ruleId}: product policy ${contrast.policyRef} says contrast is not checked; common rules do not add contrast items (§9.6)`);
     if (audit && stage === 'final' && g5 && !g5Refs.includes(contrast.policyRef)) errors.push(`gate G5: record contrast as not_applicable with policyRef ${contrast.policyRef} (other accessibility items still decide G5)`);
   }
   if (g5Refs.length && (!contrast.decided || contrast.required !== false)) errors.push('gate G5: contrast is not_applicable by policy, but this run\'s product has no policy accessibility.contrast.required = false');
@@ -599,8 +752,9 @@ export function validateRun(dir, opts = {}) {
   const schemaErrors = validateRunSchemas(run, { ...opts, stage });
   const { errors: semanticErrors, deferred } = validateRunSemantics(run, { stage });
   const policy = validateProductPolicy(run, { stage, root: opts.root });
-  semanticErrors.push(...policy.errors);
-  return { ok: schemaErrors.length === 0 && semanticErrors.length === 0, stage, schemaErrors, semanticErrors, deferred, notices: policy.notices, run };
+  const v19 = validateV19(run, { stage });
+  semanticErrors.push(...policy.errors, ...v19.errors);
+  return { ok: schemaErrors.length === 0 && semanticErrors.length === 0, stage, schemaErrors, semanticErrors, deferred, notices: [...policy.notices, ...v19.notices], run };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

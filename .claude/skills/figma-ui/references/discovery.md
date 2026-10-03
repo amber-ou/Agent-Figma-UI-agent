@@ -1,4 +1,4 @@
-# Discover（spec §6、§8.1，v1.6 範圍化）
+# Discover（spec §6、§8.1，v1.6 範圍化；v1.9 外部規範與可匯入性）
 
 目標：找出**本次需要的**元件、variables、styles、字型與版面 pattern，寫入 `inventory.json`。只有任務本身要求時才盤點整個檔案或 library。
 
@@ -54,10 +54,60 @@
   2. **準備使用的元件內部實際使用的字型**（v1.7，§10.3）：對 componentMap 每個主元件 id 呼叫 `figmaUiComponentFonts([...])`，它讀主元件本身的文字節點（含巢狀 instance），**不建立 instance**（唯讀腳本不得建立暫時節點）。M4 只比對了參考畫面，漏掉 Status Bar 主元件內的 SF Pro Text，直到 Validate 才發現。本機已有兩份清單時，也可以用 `node scripts/quality-metrics.mjs fonts <required.json> <available.json>`。
 - 未安裝：**不換字型**，也不在 `loadFontAsync` 失敗後改用其他字型。記 `inherited_baseline`（`baselineRef` 指向 `plan.baseline.observations`），在 Plan 列給使用者並記 `listedToUserRef`。只有使用者決定替換時才可填 `substitutedWith`。
 - 截圖時仍要確認沒有缺字或方框（第一次真實任務：Status Bar 的 SF Pro Text 未安裝，Figma 以替代字型顯示）。
+- **比對範圍包含所有會新建的 instance（v1.9，§10.3）**：對 componentMap 中每個準備新建 instance 的項目，讀其**主元件**的字型（不論來源 library 是否找得到；remote 元件用既有 instance 的 `getMainComponentAsync()` 取得主元件 id），記入 `inventory.componentFontChecks`：
+
+  ```json
+  {"componentMapRef": "cmap-StatusBar", "mainComponentNodeId": "<主元件 id>", "source": "main_component",
+   "fonts": [{"family": "SF Pro Text", "style": "Semibold"}], "evidenceRefs": ["rd-0004"]}
+  ```
+
+  每個字型也要在 `inventory.fonts` 記安裝狀態。**不能以參考畫面上 instance 的現況代替**：run `ui-20261003-001` 參考畫面的 Status Bar 已 override 成已安裝的 SF Pro，新建 instance 卻回到主元件的 SF Pro Text（未安裝）。validator 會拒絕只有 `source: reference_instance` 的紀錄。
 
 ## 4b. 品牌資產（REQ-04，v1.4）
 
 參考畫面裡的其他品牌名稱或 logo 記下來，不直接複製；新畫面的產品名稱與 logo 以使用者指定為準，不確定時列為設計決策。
+
+## 4c. 外部規範（EXT-01，v1.9，§8.1 第 6a 步）
+
+**觸發條件**：需求涉及第三方品牌、平台或法規，例如第三方登入（LINE、Apple、Google、Facebook）、原生平台介面規範（iOS HIG、Material）、支付（Apple Pay、Google Pay、信用卡品牌標誌）、地圖或商店徽章。
+
+**做法**：
+
+1. 找**官方**文件（品牌的開發者網站或設計指南），實際讀取內容；用 WebFetch 等工具讀不到時，不以記憶或二手文章代替。
+2. 每筆記入 `inventory.externalRequirements`：
+
+   | 欄位 | 內容 |
+   |---|---|
+   | `id` | `ext-01`… |
+   | `subject` | 例如「LINE Login button」 |
+   | `url` | 官方文件網址；讀不到時為 null |
+   | `checkedAt` | 查核時間；讀不到時為 null |
+   | `appliesWhen` | 適用條件，例如「畫面提供 LINE 登入」 |
+   | `requirement` | 條文所述要求（照文件，不加推論） |
+   | `inference` | 本案推論，例如「現有 DS Button 不符合，需官方色與 logo」 |
+   | `status` | `verified`：實際讀到官方文件；`unverified`：讀不到或只有二手資料 |
+   | `sourceKind` | `official`／`secondary`／`none`（`verified` 必須是 `official`） |
+   | `affectsDelivery` | 本次交付是否依賴它 |
+   | `decisionRef` | 使用者對未驗證項目或資源核准的決定 |
+
+3. **`verified`**：適用的要求直接成為設計約束。不符合要求的樣式**不能列為平等的候選**（run `ui-20261003-001` 的 dd-03 把不符合 LINE 規範的深藍按鈕列為建議）。是否允許新增資源（官方色 style、官方 logo 元件）或以寫死值例外處理，是另一個需要使用者核准的問題（不能委派，DEC-12）。
+4. **`unverified`**：不能寫成事實（INVARIANT-16）；清單上標「未驗證」，由使用者決定怎麼處理。本次交付依賴它（`affectsDelivery: true`）時，Build 邊界要求先有使用者的決定（`decisionRef`）；只影響未來上線的要求可以在已核准的草稿範圍內繼續，handoff 標明未解決。
+5. handoff 第 13 項會列出查核結果與未驗證項目。
+
+## 4d. 可匯入性與隱藏子節點（v1.9，§8.1 第 6b 步）
+
+**Plan 之前**確認 componentMap 與要套用的 style 都能在**目標檔**取得，記入 `plan.importChecks`：
+
+```json
+{"id": "imp-01", "kind": "component_set", "componentMapRef": "cmap-Button", "key": "<key>", "method": "import_by_key", "status": "importable", "evidenceRefs": ["rd-0005"]}
+{"id": "imp-02", "kind": "style", "styleName": "Subtitle/Subtitle 2", "method": "existing_style_on_screen", "status": "not_importable",
+ "fallback": "從參考畫面已套用該 style 的節點讀 textStyleId 沿用", "listedToUserRef": "dec-015"}
+```
+
+- 匯入不到時改用畫面上已在使用的同一份 style 或 instance，並在 Plan 列給使用者（`listedToUserRef`）；不要在 Build 中途才發現（run `ui-20261003-001` 的 op-0002）。
+- 確認匯入是唯讀探測：`import*ByKeyAsync` 會被 hook 視為寫入，不能在 `mode=read` 腳本裡呼叫。可匯入性以「既有節點上讀到的 key 與 library 發佈狀態一致」或在本 run 授權的 sandbox 以 write operation 做最小探測確認；探測方式寫在 `method`／`evidenceRefs`。
+- `not_checked` 不能過 Build 邊界。
+- **隱藏子節點**：需要操作 instance 內被隱藏的子節點（例如未顯示的 icon 位置）時，先用 `snippets/discover-helpers.js` 的 `figmaUiHiddenChildren(instance)` 唯讀探測讀取方式拿不拿得到。實測結果與原因記在 `references/runtime-probes.md`；原因沒查明就標為假設。
 
 ## 5. 版面 pattern（§6.6）
 
