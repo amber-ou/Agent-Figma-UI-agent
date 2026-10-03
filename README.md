@@ -1,6 +1,6 @@
 # Agent-Figma-UI-agent
 
-在 Claude Code 中透過官方 Figma MCP 讀取既有 library／components／variables，直接在 Figma 繪製與延伸原生 UI 的 agent。目前規格為 v1.8；M0–M4 與 v1.7（產品政策、記憶分層、預填清單）已完成並經真實 run 驗證（`docs/history/v1.7-summary.md`）。v1.8 修正略過題目的判定、動態行為不問、溝通語言、skill 使用規則、plugin 版本檢查與固定 Figma 連線；實作指令見 `CC_BUILD_PROMPT.md`。
+在 Claude Code 中透過官方 Figma MCP 讀取既有 library／components／variables，直接在 Figma 繪製與延伸原生 UI 的 agent。目前規格為 v1.9；M0–M4、v1.7（產品政策、記憶分層、預填清單）與 v1.8（略過題目判定、動態行為不問、溝通語言、skill 規則、plugin 版本檢查、固定 Figma 連線）已完成，第一個正式需求 run 判定 complete。v1.9 是提問架構改版的第一階段：方向由使用者確認、細節可委派給 agent，並加入外部規範檢查；實作指令見 `CC_BUILD_PROMPT.md`。
 
 啟動：在 Claude Code 輸入 `/figma-ui <需求>`；續改 `/figma-ui continue <run-id> <調整>`；恢復 `/figma-ui resume <run-id>`。詳見 [docs/setup.md](docs/setup.md)，遇到狀況看 [docs/runbook.md](docs/runbook.md)。
 

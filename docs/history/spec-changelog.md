@@ -1,6 +1,20 @@
-# 規格變更紀錄（v1.1–v1.7）
+# 規格變更紀錄（v1.1–v1.8）
 
-從 `FIGMA_UI_AGENT_SPEC.md` 移出：v1.1–v1.6 於 v1.7 移出，v1.7 於 v1.8 移出。內容保留原文，章節編號、檔案路徑與「本版」等用語指當時的版本；歷史文件已移到 `docs/history/` 與 `docs/research/`。最新一版的變更紀錄在主規格第 20.3 節。
+從 `FIGMA_UI_AGENT_SPEC.md` 移出：v1.1–v1.6 於 v1.7 移出，v1.7 於 v1.8 移出，v1.8 於 v1.9 移出。內容保留原文，章節編號、檔案路徑與「本版」等用語指當時的版本；歷史文件已移到 `docs/history/` 與 `docs/research/`。最新一版的變更紀錄在主規格第 20.3 節。
+
+## v1.8 變更紀錄
+
+依 v1.7 的真實 run（`docs/history/v1.7-summary.md`，run `ui-20261002-001`）與使用者 2026-10-03 的決定修訂。v1.1–v1.7 的變更紀錄在 `docs/history/spec-changelog.md`。
+
+- 第 7.4 節：DEC-08 的 `skippedBy`：使用者明確略過算已解決，agent 標記的略過仍待答（INVARIANT-28）；DEC-09 範圍與授權類的列也記 `confirmation`；DEC-11 動態行為不問，handoff 列為「未定義，交由實作決定」。
+- 第 7.2 節：ASK-08 提問、回報、交接一律用繁體中文。
+- 第 4.7 節（新增）：skill 使用規則，分成必用、有條件、只當參考、排除四類。
+- 第 4.2.2 節（新增）：Figma plugin 版本檢查；本機仍是 2.2.118（synced），官方最新 2.2.126。
+- 第 4.2.3 節（新增）：固定使用同一個 Figma 連線，hook 阻擋走其他連線的寫入（INVARIANT-27）；本機目前只有一個 Figma 連線。
+- 第 12.1、15 節：G7 依 `skippedBy` 判定；handoff 第 12 項。
+- 第 20 節：v1.7 run 中需要手動補救的自動化問題；`plan.decisions.confirmation`、`skippedBy`、`capabilities.server.toolPrefix`／`pluginVersion`。
+- 第 13.2 節：T72–T81；第 17 節：v1.7 完成、v1.8 列、待辦更新。
+- 保留不變：所有寫入保護、品質門檻、產品政策機制；run artifacts 的 schemaVersion `1.2`（只新增選填欄位與 enum 值）。
 
 ## v1.7 變更紀錄
 

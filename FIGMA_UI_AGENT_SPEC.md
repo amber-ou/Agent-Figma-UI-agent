@@ -1,6 +1,6 @@
 # Figma UI Design Agent — Claude Code 建置規格
 
-版本：1.8 · 研究基準日：2026-09-27 · 修訂／補充查核日：2026-09-28、2026-09-29（v1.1–v1.6）、2026-10-02（v1.7）、2026-10-03（v1.8） · 語言：繁體中文
+版本：1.9 · 研究基準日：2026-09-27 · 修訂／補充查核日：2026-09-28、2026-09-29（v1.1–v1.6）、2026-10-02（v1.7）、2026-10-03（v1.8、v1.9） · 語言：繁體中文
 
 文件性質：可交付實作的產品／技術規格；不是已完成的 agent，也不是已通過實機測試的證明。
 
@@ -29,7 +29,7 @@
 | Skill 使用（v1.8，使用者已確認） | 必用、有條件、只當參考、排除四類 | 第 4.7 節 |
 | 設計系統缺口 | 先報告並詢問，再決定 wrap／新增／調整需求 | 預設不自行建立另一套 tokens 或元件庫 |
 | 互動原則 | 發生阻礙、設計來源衝突或需改變範圍時先問使用者 | 不用靜默降級掩蓋失敗 |
-| 設計決策，已確認（v1.2） | DS、既有 pattern 或使用者指示未決定的設計選擇（例如是否使用漸層）**一律詢問**，agent 不自行決定 | 第 7.4 節；plan 的 designDecisions 不得有 agent 自訂來源 |
+| 設計決策，已確認（v1.2，v1.9 修訂） | DS、既有 pattern 或使用者指示未決定的設計選擇（例如是否使用漸層）**一律詢問**，agent 不自行決定。v1.9：使用者確認方向後，可把方向內的尺寸、留白、對齊等細節交給 agent（每個 run 給一次）；文案、品牌、外部規範、新增資源、例外、平台與權限仍要問 | 第 7.4 節 DEC-12–15；plan 的 designDecisions 不得有 agent 自訂來源 |
 | 執行環境，已確認（v1.2） | 使用者本機的 Claude Code | 本機安裝 Figma plugin／remote MCP 與 OAuth；hooks 在本機執行 |
 | 人機協作，已確認（v1.2） | 使用者可能在 agent 工作期間同時編輯同一 Figma 檔 | 第 11.2 節；以衝突偵測＋不覆寫處理，不宣稱能鎖住人 |
 | M1 測試檔，已確認（v1.2） | 使用者提供可寫測試檔與唯讀 library | 第 17.1 節 |
@@ -710,7 +710,7 @@ pattern 盤點寫入 inventory.json 的 `patterns`，範圍以本次需求為限
 
 使用者已確認：agent 在「怎麼做出好設計」上不自行做決定，一律轉成問題。
 
-`DEC-01` **定義。**設計決策是任何會影響畫面外觀、資訊層級或使用體驗，且未被下列來源明確決定的選擇：本次使用者指示、已確認的 brief／先前決策、指定 DS（元件、variables、styles）、已盤點並在 plan 中確認的既有 pattern（第 6.6 節）。
+`DEC-01` **定義。**（v1.9：使用者確認方向後，方向內可委派類型的細節依 DEC-12 由 agent 決定並驗證；其餘仍依本節詢問。）設計決策是任何會影響畫面外觀、資訊層級或使用體驗，且未被下列來源明確決定的選擇：本次使用者指示、已確認的 brief／先前決策、指定 DS（元件、variables、styles）、已盤點並在 plan 中確認的既有 pattern（第 6.6 節）。
 
 `DEC-02` **必問範例（非完整清單）：**是否使用漸層、陰影、插圖、背景裝飾；強調色或狀態色的使用位置；DS 未涵蓋的間距、圓角、字級；多個候選元件的選擇；版面結構與資訊排序的取捨（例如表格或卡片、分頁或 tab）；長文字採換行或截斷；空狀態、錯誤狀態的呈現方式與文案語氣；圖示選擇；響應式時要隱藏或收合哪些內容；修正視覺缺陷時有多種合理修法。
 
@@ -722,7 +722,7 @@ pattern 盤點寫入 inventory.json 的 `patterns`，範圍以本次需求為限
 
 `DEC-06` **資料化與強制。**每個決策寫入 `plan.designDecisions`：`id`、`question`、`options`、`recommendation`（可空）、`answer`、`source`（`user | ds | existing_pattern | brief | product_policy`；`product_policy` 為 v1.7 新增，必須附可解析的 `policyRef`）、`evidenceRefs`、`decidedAt`。`source` 不允許 agent 自訂值；`designDecisions` 與 `plan.decisions`（範圍、例外、授權等決策）分開保存，但共用 ID 命名空間，decisionRef 可指向兩者。每個 write operation 必須以 `basisRefs` 引用其依據（pattern ID、designDecision ID、componentMap／variableMap 項目）。validator 拒絕 `answer` 為空卻被引用的決策，也拒絕沒有依據的 write operation。這只能檢查「有沒有引用依據」，無法證明腳本內容完全符合依據；後者由 Validate 階段的結構與視覺檢查補足。
 
-`DEC-07`（v1.4）**授權採用建議。**使用者可以針對某個 run 明確授權「設計決策一律採用 agent 的建議」，例如測試 run。此時：
+`DEC-07`（v1.4，v1.9 補充：DEC-12 是本節的限定範圍版本，正式使用優先採用 DEC-12）**授權採用建議。**使用者可以針對某個 run 明確授權「設計決策一律採用 agent 的建議」，例如測試 run。此時：
 
 - 每題仍要產生選項與建議；使用者授權後，`answer` 為建議值，`source` 記為 `user`，並以 `delegation` 欄位註明授權的 decisionRef 與範圍（僅限該 run）。
 - 授權只對該 run 有效，不延續到之後的 run（INVARIANT-01）；`continue` 同一 run 時沿用，開新 run 必須重新取得。
@@ -759,6 +759,41 @@ v1.8 起 `skipped` 要記 `skippedBy`：
 - 這些項目在 handoff 的互動說明列為「未定義，交由實作決定」，並寫出需要決定的是什麼。
 - 動態行為會改變靜態畫面時（例如要不要畫出關閉按鈕），只就畫面上看得到的部分提問。
 - 這是通用規則，不是任何產品的政策。
+
+`DEC-12`（v1.9）**限定範圍的細節委派（B 模式）。**使用者已確認（2026-10-03）：方向由使用者確認，核准方向內的細節由 agent 決定並驗證。依據是外部研究 `docs/research/question-flow-architecture-review.md` 第 9.4 節，沿用 DEC-07 的機制但縮小範圍。
+
+- **每個 run 給一次**：在方向確認（DEC-13）時加一行「核准方向內的尺寸、留白、對齊、元件寬度、佔位尺寸交給 agent 決定並驗證」。使用者確認後記成 `plan.decisions` 的一筆授權，`scope: run`。不變成產品政策，也不延續到新 run（INVARIANT-18）。
+- **可以委派的類型（`kind`）**：`size`（尺寸）、`spacing`（留白）、`alignment`（對齊）、`component_width`（元件寬度）、`placeholder_size`（佔位尺寸）。必須在 DS 的範圍內（既有 style、間距或元件屬性）並符合已核准的方向。
+- **一律不能委派**：文案內容（DEC-14）、品牌素材、外部規範合規（EXT-01）、新增 token 或元件、寫死數值的例外、平台、寫入範圍與權限。這些仍依 DEC-09 列入預填清單或依第 7.1 節確認。
+- 委派的決定記成 designDecision：`source: user`、`delegation` 指向該授權，並寫 `kind` 與 `directionRef`（指向 DEC-13 的方向決定）。validator 檢查 `kind` 在授權列出的類型內、不屬於排除類型、`directionRef` 指向已確認的方向（INVARIANT-29）。只檢查 ID 存在不夠。
+- 委派的決定不出現在預填清單；Plan 確認時以一段摘要列出 agent 選了什麼，Handoff 同樣列出，使用者之後要改可以用 `continue`。
+- 使用者沒有給委派時，回到 DEC-09 逐項列出（A 模式）。
+
+`DEC-13`（v1.9）**方向打包確認。**同一個方向的相依選擇合成一個方案確認，取代零碎的單題：
+
+- 方案寫出畫面目的、主要操作、整體版型、引用的來源（參考畫面、pattern）、和參考畫面的差異，以及為什麼選這個參考（有其他候選時一併列出）。
+- 方案內只能包「同一個方向」的設計選擇，例如版型與背景、主體區塊的組成。**平台、寫入範圍、品牌素材、文案內容、外部規範不能藏進方案**，要另列。
+- 使用者接受方案，方案內的子選擇一起確認；使用者換方向時，才把該方向的子選擇展開成單題。
+- 記成一筆 designDecision（`kind: direction`），方案內的子選擇以 `dependsOn` 指向它。這是 ASK-07「不把大型規格表包成一題」的例外：允許的是同一方向的整合，不是把不同性質的問題合併。
+
+`DEC-14`（v1.9）**文案來源分類。**畫面文字依來源分成三種，記在 `screens[].copy[].origin`：
+
+- `existing`：既有正式文案，引用來源畫面或文件。
+- `user`：使用者提供的文字（需求或回答中寫明的）。
+- `draft`：agent 擬稿。必須明標「擬稿」並列入預填清單，使用者確認後才能把 `status` 改為 confirmed；確認後仍保留 `origin: draft`，讓 handoff 看得出這段文字是擬稿。
+- Build 邊界照舊只接受 confirmed 文案（INVARIANT-30）。沒有授權時不新增需求沒提到的文案元素（例如 slogan）；要新增，先問要不要放，再問寫什麼。
+- 「要不要放某段文字」和「寫什麼」是兩題：使用者回答「放」之後，文案內容仍要另外確認，不能把題目裡的舉例當成答案（run `ui-20261003-001` 的 dd-08）。
+
+`DEC-15`（v1.9）**決策分流順序。**每個未知項目依序判斷，前一步能解決就不往下：
+
+1. 和本次需求相關嗎？不相關就不列。
+2. 能用工具或官方文件查明嗎？能就先查（EXT-01），不讓使用者猜。
+3. 已有決定嗎？指示、brief、產品政策、DS、已確認 pattern 已決定的，只列摘要（DEC-03）。
+4. 在本 run 的委派範圍內嗎？是就由 agent 決定並驗證（DEC-12）。
+5. 會影響本次結果嗎？不影響就記錄、不打斷（例如動態行為，DEC-11）。
+6. 以上都不是，才變成問題：改變目的或主要結構的，用方向方案（DEC-13）；缺使用者持有的事實的，留空詢問；來源衝突或超出權限的，阻擋相依工作並詢問。
+
+不以模型自評的信心或「高風險」標籤代替這個順序。
 
 ### 7.5 產品政策（P0，v1.7 新增）
 
@@ -833,6 +868,11 @@ BUILD/VALIDATE → RECONCILE → 局部修正 → VALIDATE
 4. 讀可用 library，依回傳 continuation／offset 分頁，不假設第一頁完整。
 5. 搜尋尚未解析的 components、variables、styles；用單一意圖的短查詢。`search_design_system` 每次只送 1 個 query（實測 server 會把多筆裁成 1 筆）；library 未啟用時搜尋為空，不代表資源不存在。
 6. 依第 6.6 節盤點相近畫面的版面 pattern。
+6a. **外部規範檢查（v1.9，EXT-01）**：需求涉及第三方品牌、平台或法規時觸發，例如 LINE 登入、Apple／Google 登入、原生平台介面規範、支付。每筆記入 `inventory.externalRequirements`：`id`、`subject`、`url`、`checkedAt`、適用條件、條文所述要求、本案推論，以及 `status`（`verified`：實際讀到官方文件；`unverified`：讀不到或只有二手資料）。
+   - `verified` 且適用的要求直接成為設計約束：不符合要求的樣式不能列為平等的候選（run `ui-20261003-001` 的 dd-03 就把不符合 LINE 官方規範的深藍按鈕列為建議）。是否允許新增資源或突破 DS 限制，是另一個需要使用者核准的問題。
+   - `unverified` 的要求不能寫成事實（INVARIANT-16）；在清單中標明「未驗證」，由使用者決定怎麼處理。
+   - 只影響未來上線、不影響本次交付的要求，可以在已核准的草稿範圍內繼續，handoff 標明未解決；本次交付依賴它時要先處理。
+6b. **可匯入性與子節點探測（v1.9）**：Plan 之前先確認 componentMap、style 引用的 key 都能在目標檔匯入；匯入不到時改用畫面上已在使用的同一份 style 或 instance，並在 Plan 列出，不在 Build 中途才發現（run `ui-20261003-001` 的 op-0002）。需要操作 instance 內被隱藏的子節點時，先確認讀取方式拿得到它們（同一 run 的 op-0004 因找不到隱藏的圖示位置而失敗；原因推測為搜尋預設略過隱藏的 instance 子節點，**未驗證**，要記入 `runtime-probes.md`）。
 7. 產出 `component-map`：reuse／wrap_proposed／new_proposed／blocked，各項需有理由；未經當次允許，不執行 proposed 項。
 
 只讀 local variables 得到空陣列，不足以排除 remote library variables。唯讀權限的 library 元件仍可能允許匯入使用；「不能修改主元件」不等於「不能重用 instance」。
@@ -958,6 +998,7 @@ BUILD/VALIDATE → RECONCILE → 局部修正 → VALIDATE
 - **元件沒有 TEXT property 時**，改文字只能 override instance 內層文字節點：先載入該節點實際使用的字型，只改 `characters`，不 detach；override 需記入 operation 與結構證據。
 - **本機未安裝的字型（v1.4）：**元件或參考畫面使用的字型不一定裝在執行 agent 的電腦上（第一次真實任務：Status Bar 的 SF Pro Text 未安裝，Figma 以替代字型顯示）。Preflight／Discover 要以 `listAvailableFontsAsync()` 比對會用到的字型；未安裝時不得擅自換字型，也不得對該文字 `loadFontAsync` 失敗後改用其他字型，記為 `inherited_baseline` 並在 Plan 列出，由使用者決定。截圖檢查仍要確認沒有缺字。
 - **元件內部的字型（v1.7，M4 發現）：**字型比對要涵蓋準備使用的元件**內部**實際使用的字型，不能只看參考畫面的文字節點。M4 漏掉了 Status Bar 元件裡的 SF Pro Text（未安裝），直到 Validate 才發現；應在 Discover 比對、在 Plan 列出。
+- **比對範圍包含所有會新建的 instance（v1.9）：**run `ui-20261003-001` 又漏了同一個問題。參考畫面上的 Status Bar 已把字型 override 成已安裝的 SF Pro，但新建 instance 會回到主元件的 SF Pro Text。字型比對要對每個準備新建的 instance 讀其**主元件**的字型（不論來源 library 是否找得到），不能以參考畫面上 instance 的現況代替。
 - **FILL 平分寬度不保證相等（v1.3 實測）：**兩個 FILL 子元素的實際寬度會受內容最小寬度影響（M1 為 131／129）。要求等寬時，建好後量測；不相等就回報，由使用者決定接受、改做法或查原因。
 - node names 表達用途，例如 `Members/Header/InviteAction`；既有名字不必批次重命名。
 - 在空白區域放新 top-level frames，不覆蓋既有畫布。
@@ -1312,8 +1353,17 @@ finding.status 為 `open | resolved | accepted`，origin 為 `introduced | regre
 | T79 | 本機 plugin 比官方最新版舊；查不到最新版；plugin 為 synced | 舊版時在 Intake 最前面提問，答案只限本 run；查不到時只提示不擋；synced 時選項註明 | 4.2.2 |
 | T80 | active run 期間經另一個 Figma 連線前綴送出寫入；`toolPrefix` 尚未記錄 | hook 阻擋並說明；讀取只記錄 | 4.2.3、4.5、INVARIANT-27 |
 | T81 | 本 run 的回覆語言 | 提問、回報、交接為繁體中文；技術名詞與 ID 保留原文 | 7.2 ASK-08 |
+| T82 | 本 run 有委派授權；agent 決定的細節屬於可委派類型且有 directionRef | validator 通過；Plan 摘要與 handoff 列出 agent 的選擇 | 7.4 DEC-12、INVARIANT-29 |
+| T83 | 委派的決定屬於排除類型（文案、品牌、新增元件、raw 例外等）、kind 不在授權內，或 directionRef 未確認 | validator 拒絕 | 7.4 DEC-12、INVARIANT-29 |
+| T84 | 新 run 沒有給委派 | 細節回到預填清單逐項確認；不沿用前一個 run 的委派 | 7.4 DEC-12、INVARIANT-18 |
+| T85 | 方向方案包含平台、寫入範圍、品牌素材或文案 | validator 拒絕把這些放進 `kind: direction` 的子選擇 | 7.4 DEC-13 |
+| T86 | 使用者換方向 | 該方向的子選擇展開成單題；未換時隨方案一起確認 | 7.4 DEC-13 |
+| T87 | 文案 `origin: draft` 未確認；需求沒提到的文案元素；使用者回答「放」但沒給文字 | Build 邊界拒絕未確認擬稿；新增元素先問；文字另外確認，不以舉例當答案 | 7.4 DEC-14、INVARIANT-30 |
+| T88 | 需求涉及第三方品牌規範（例如 LINE 登入） | Discover 記 externalRequirements（url、checkedAt、status）；verified 時不把不符合的樣式列為平等候選；unverified 時標明未驗證 | 8.1 EXT-01 |
+| T89 | componentMap 或 style 的 key 在目標檔匯入不到 | Plan 前發現並列出替代方式，不在 Build 中途失敗 | 8.1 第 6b 步 |
+| T90 | 新建 instance 的主元件用了未安裝的字型，參考畫面上的 instance 已 override | Discover 依主元件字型發現並在 Plan 列出 | 10.3 |
 
-**v1.2 優先級：**P0 必測為 T02–T08、T10、T11、T13、T15、T16、T21–T27、T29、T31–T33、T35、T38–T41；v1.3 新增 T43–T46 與 v1.4 新增 T47–T51 與 v1.6 新增 T52–T60 與 v1.7 新增 T61–T71 與 v1.8 新增 T72–T81 皆為 P0（T61–T63 已在 M4 實作並有離線測試；T81 為行為規則，以 skill 文字與真實 run 檢查，不寫離線測試）。其餘（T01、T09、T12、T14、T17–T20、T28、T30、T34、T36、T37、T42）為 P1，仍保留在 fixture 層逐步補齊；不得因為列 P1 就在交付報告中省略其狀態。
+**v1.2 優先級：**P0 必測為 T02–T08、T10、T11、T13、T15、T16、T21–T27、T29、T31–T33、T35、T38–T41；v1.3 新增 T43–T46 與 v1.4 新增 T47–T51 與 v1.6 新增 T52–T60 與 v1.7 新增 T61–T71 與 v1.8 新增 T72–T81 與 v1.9 新增 T82–T90 皆為 P0（T61–T63 已在 M4 實作並有離線測試；T81 為行為規則，以 skill 文字與真實 run 檢查，不寫離線測試）。其餘（T01、T09、T12、T14、T17–T20、T28、T30、T34、T36、T37、T42）為 P1，仍保留在 fixture 層逐步補齊；不得因為列 P1 就在交付報告中省略其狀態。
 
 ### 13.3 基準任務
 
@@ -1337,6 +1387,7 @@ finding.status 為 `open | resolved | accepted`，origin 為 `introduced | regre
 - 設定 run 的工具呼叫與時間提醒門檻；接近門檻先報告，不暗中刪減驗證。
 - **最低量測（v1.6）：**每個 run 記錄階段時間（`ledger.phaseHistory`）、工具讀／寫／截圖次數與耗時、截斷與失敗、重試與對帳、提問輪數與題數、使用者等待時間、實質設計決策數。使用者等待時間與工具執行時間分開計算；缺資料標 unknown，不填 0。資料來自既有 hooks（`.figma-ui/hook-events.jsonl`，另有只記錄、不阻擋的 `log-figma-call.mjs` 涵蓋所有 Figma 工具，不存工具內容）、journal 與 ledger；不新增遠端呼叫、不建外部遙測，也不要求使用者填表（`scripts/run-report.mjs metrics`）。效能比較用三類相近任務：局部樣式修改、既有 pattern 延伸一頁、含分支／狀態的新流程。
 - **已知量測缺口（v1.7，M4）：**任務 A 有 8 次工具呼叫沒有記到耗時；次數剛好等於截圖次數，**推測**（未驗證）是 `get_screenshot` 不在記錄耗時的 hook 範圍內。重開 Claude Code 後環境診斷顯示 `session unknown`，沿用判斷只能靠時間窗。兩者都要先在本機查明原因再修。
+- **v1.9 量測：**另記實質決策數（使用者實際要判斷的題目，不含照摘要確認的項目）、委派決定數、方向方案數、返工次數（交付後被要求修改的次數）。研究建議的目標是成熟產品的常見任務約 2–4 個實質決策，只是試行目標，不為了達成數字而漏問。
 - 固定時間 SLA 需先有基準數據。第一版不承諾「30 秒產出專業 UI」之類無證據數字。
 - 進度更新說明已完成成果、已知問題與下一步，不逐條朗讀每個 API。
 
@@ -1356,6 +1407,7 @@ finding.status 為 `open | resolved | accepted`，origin 為 `introduced | regre
 10. 恢復方式與下一步必要操作。
 11. （v1.7）本 run 套用的產品政策，以及產品政策建議（POL-05）；沒有建議時寫「無」。
 12. （v1.8）「未定義，交由實作決定」的動態行為項目（DEC-11），以及使用者明確略過的決策與其影響（DEC-08）。
+13. （v1.9）agent 依委派決定的細節（DEC-12）、標為擬稿的文案（DEC-14）、外部規範的查核結果與未驗證項目（EXT-01）。
 
 完成回覆保持簡潔，但不能省略阻礙。若使用者只要 Figma UI，不額外輸出無關的前端專案。
 
@@ -1389,7 +1441,8 @@ finding.status 為 `open | resolved | accepted`，origin 為 `introduced | regre
 | M5 選配 | capture、Code Connect、code implementation | 另行驗收，不阻塞已完成 P0 |
 | v1.6 流程精簡 | 階段式驗證、證據對應、按需 flow、範圍化 Discover、按需環境診斷、精簡 handoff 與最低量測 | 離線測試通過（`docs/history/workflow-simplification-record.md`）；M4 任務 A 是第一次真實驗證，並修正了第一次寫入死結與無改動寫入的問題 |
 | v1.7 產品政策與記憶分層 | 第 4.6 節四層存放、第 7.5 節產品政策、DEC-09 預填清單、DEC-10 政策題優先、T64–T71 | **已完成（2026-10-03）：**135 個離線測試通過；真實 run `ui-20261002-001` 確認政策套用、預填清單與 Handoff 政策建議，判定 `awaiting_user`（略過題目的規格缺口，v1.8 修正）。見 `docs/history/v1.7-summary.md` |
-| v1.8 流程修正與 skill 規則 | 略過題目的判定、動態行為不問、溝通語言、skill 使用規則、plugin 版本檢查、固定 Figma 連線、v1.7 run 的自動化問題、T72–T81 | 離線測試通過；下一個真實 run 確認。指令見 `CC_BUILD_PROMPT.md` |
+| v1.8 流程修正與 skill 規則 | 略過題目的判定、動態行為不問、溝通語言、skill 使用規則、plugin 版本檢查、固定 Figma 連線、v1.7 run 的自動化問題、T72–T81 | **已完成（2026-10-03）：**146 個離線測試通過；第一個正式需求 run `ui-20261003-001`（Aiwow App 首頁）判定 `complete` |
+| v1.9 提問架構第一階段 | DEC-12 限定範圍的細節委派、DEC-13 方向打包、DEC-14 文案來源、DEC-15 分流順序、EXT-01 外部規範檢查、可匯入性探測、字型比對範圍、T82–T90 | 離線測試通過；下一個正式需求確認實質決策數下降且品質不變。指令見 `CC_BUILD_PROMPT.md` |
 
 CC 完成建置時必須提供：已建立檔案、安裝／使用方式、已跑測試與結果、未跑項目及原因、已知限制、第一個真實任務的啟動範例。不得僅交一份 prompt 然後宣稱整個 agent 已完成。
 
@@ -1418,7 +1471,10 @@ M1 缺權限或素材時，可繼續 M2/M3 的離線部分，但不得把未驗�
 | 項目 | 歸屬 | 說明 |
 |---|---|---|
 | 產品政策與預填清單的實作 | 已完成（v1.7） | `docs/history/v1.7-summary.md` |
-| v1.8 修正與 skill 規則的實作 | v1.8 建置 | `CC_BUILD_PROMPT.md` |
+| v1.8 修正與 skill 規則的實作 | 已完成 | `docs/history/v1.8-summary.md` |
+| v1.9 提問架構第一階段的實作 | v1.9 建置 | `CC_BUILD_PROMPT.md` |
+| 提問架構第二階段 | 第一階段試用後評估 | 產品依檔案對應判斷、library 與輸出位置的持續設定、plugin 版本只記錄不問、未解事項只擋相依區域；都會推翻使用者先前的決定，需重新確認（`docs/research/question-flow-architecture-review.md` 第 9.2 節） |
+| `ui-20261003-001` 的 LINE 登入按鈕 | 使用者同意修改 | 目前是 DS 深藍 Button 加 LINE 圖示，可能不符合 LINE 官方登入按鈕規範；以 `continue` 改成官方樣式，需先核准新增資源 |
 | Figma plugin 升級到 2.2.126 | 等帳號同步 | 本機 `figma@synced` 仍是 2.2.118（第 4.2.2 節）；升級後重跑工具契約與最小整合測試 |
 | `skill-creator` 評測 | 使用者決定之後再建 | 第 4.7 節 |
 | 截斷後以所有權標記找回節點 | 待實測（原任務 C） | 寫入回應被截斷後，從 Section 內的所有權標記找回節點並對帳；目前只有離線測試 |
@@ -1450,7 +1506,7 @@ M2 以 M1 已實作的 `scripts/hooks/*`、`scripts/evaluate-completion.mjs` 與
 
 以下為 CC 撰寫 skill／agent 時的語意基線；應搭配程式化驗證，不把自然語言當作權限隔離器：
 
-> 你是以既有設計系統延伸 UI 的 agent，在 Claude Code 中操作 Figma。手動啟動新任務時，先確認產品／平台、參考及 DS 來源、輸出位置和修改邊界；需求沒寫產品或 library 時主動詢問，確定產品後自動套用該產品的政策；continue 沿用已確認範圍，resume 先對帳。先讀既有元件、變數、樣式、版面 pattern 與使用情境，再用真實工具 schema 建立原生設計；不臆造工具、IDs、字型或資產。預設 strict reuse，新增 DS 資產或改變方案前先問。DS、既有 pattern、產品政策或使用者指示沒有決定的設計選擇（例如是否使用漸層），一律詢問使用者，不自行決定：同階段的問題列成預填清單，有建議的填好供確認，需要使用者決定的留空。產品政策題（例如對比）優先問，每個產品只問一次。本次需求的決策只留在本 run，不寫進產品政策、通用規則或 Claude Code 的記憶；可能長期適用的項目在交付時列成建議，由使用者決定。只影響動態行為的問題不問，交付時列為未定義；使用者明確略過的題目算已解決。提問、回報與交付一律用繁體中文。執行期間只用規格允許的 skill，排除會自行補假設或產出非原生 Figma 的 skill。使用者可能同時編輯同一檔案：寫入前在同一腳本內驗證目標未被改動，偵測到改動就停止並詢問，絕不覆寫。區分 inherited baseline 與本次新增／regression，不擅自重構來源 library。變數有效值優先由已驗證 runtime 對 consumer 解析。設計寫入採單 writer 與 journal，未知結果先對帳；唯讀 audit 不寫入畫布。按當次 requiredCells 提供結構與視覺證據，局部修正只重驗受影響範圍。完成以第 12.1 節判定，不用自評分數代替證據；交付連結、資源沿用、檢查報告、必要互動說明、限制與恢復點。
+> 你是以既有設計系統延伸 UI 的 agent，在 Claude Code 中操作 Figma。手動啟動新任務時，先確認產品／平台、參考及 DS 來源、輸出位置和修改邊界；需求沒寫產品或 library 時主動詢問，確定產品後自動套用該產品的政策；continue 沿用已確認範圍，resume 先對帳。先讀既有元件、變數、樣式、版面 pattern 與使用情境，再用真實工具 schema 建立原生設計；不臆造工具、IDs、字型或資產。預設 strict reuse，新增 DS 資產或改變方案前先問。DS、既有 pattern、產品政策或使用者指示沒有決定的設計選擇（例如是否使用漸層），一律詢問使用者，不自行決定：同階段的問題列成預填清單，有建議的填好供確認，需要使用者決定的留空。產品政策題（例如對比）優先問，每個產品只問一次。本次需求的決策只留在本 run，不寫進產品政策、通用規則或 Claude Code 的記憶；可能長期適用的項目在交付時列成建議，由使用者決定。只影響動態行為的問題不問，交付時列為未定義；使用者明確略過的題目算已解決。提問、回報與交付一律用繁體中文。執行期間只用規格允許的 skill，排除會自行補假設或產出非原生 Figma 的 skill。使用者確認方向並給予委派時，方向內的尺寸、留白、對齊等細節由你決定並驗證，交付時列出；文案、品牌、外部規範、新增資源與權限仍要問。涉及第三方規範時先查官方文件，不把不符合規範的樣式當成平等選項。使用者可能同時編輯同一檔案：寫入前在同一腳本內驗證目標未被改動，偵測到改動就停止並詢問，絕不覆寫。區分 inherited baseline 與本次新增／regression，不擅自重構來源 library。變數有效值優先由已驗證 runtime 對 consumer 解析。設計寫入採單 writer 與 journal，未知結果先對帳；唯讀 audit 不寫入畫布。按當次 requiredCells 提供結構與視覺證據，局部修正只重驗受影響範圍。完成以第 12.1 節判定，不用自評分數代替證據；交付連結、資源沿用、檢查報告、必要互動說明、限制與恢復點。
 
 ## 19. 版本與維護
 
@@ -1485,6 +1541,15 @@ brief 依 `stage=intake | confirmed` 驗證；intake 可有 null／問題，conf
 - `run-report.mjs` 進入同一階段時不重複記錄，避免負的耗時。
 - `plan.decisions` 新增選填的 `confirmation`；designDecision 新增 `skippedBy`（`user | agent`），`confirmation` 新增 `user_skipped`。
 - `capabilities.server` 新增 `toolPrefix`（第 4.2.3 節）與 plugin 版本檢查結果 `pluginVersion`（installed、latest、checkedAt、synced）。
+
+**v1.9 契約補充：**
+
+- designDecision 新增選填欄位：`kind`（`direction | size | spacing | alignment | component_width | placeholder_size | other`）、`directionRef`、`dependsOn`。
+- `plan.decisions` 的委派授權新增 `delegation.allowedKinds` 與 `delegation.excludedKinds`。
+- validator 檢查：委派決定的 `kind` 在 `allowedKinds` 內、不在排除清單；`directionRef` 指向已確認的 `kind: direction` 決定；`kind: direction` 的子選擇不能涉及平台、寫入範圍、品牌素材、文案。
+- `screens[].copy[]` 新增 `origin`（`existing | user | draft`）；`draft` 在確認前不能過 Build 邊界。
+- `inventory` 新增 `externalRequirements[]`（id、subject、url、checkedAt、appliesWhen、requirement、inference、status）。
+- 舊 run 沒有這些欄位時只提示，不拒絕；schemaVersion 維持 `1.2`。
 
 **產品政策契約（v1.7）：**`product-policy.schema.json`，schemaVersion `1.0`，獨立於 run artifacts 的 `1.2`。Required：schemaVersion、productId、displayName、policies、rules、history。檢查：`productId` 與檔名一致；每個政策項目與規則都有 `decidedBy: "user"`、`decidedAt`、`origin`；規則 ID 不重複；不含 `figma.com` 網址或 `fileKey`／`fileUrl` 欄位；`history` 只能附加。本機檔 `.figma-ui/products/<productId>.local.json` 只驗證格式，不進 git。run 的 `policyRef` 必須解析到政策檔中存在的項目；`brief.product.policyDigest` 和目前政策檔不同時，validator 提示政策在 run 期間改過，需要重新確認套用結果。
 
@@ -1529,22 +1594,22 @@ INVARIANT-25: 套用產品政策前必須確定本次的產品；需求沒寫產
 INVARIANT-26: run 的決策、只限本次的規則與產品政策不得寫入 Claude Code 的自動記憶、CLAUDE.md 或通用規則。
 INVARIANT-27: active run 期間所有 Figma 寫入必須走 Preflight 記錄的同一個連線；帳號檢查只對該連線有效。
 INVARIANT-28: 只有使用者看過並明確略過的決策才算已解決；agent 標記的略過仍是待答。
+INVARIANT-29: agent 依委派決定的細節必須屬於本 run 授權的類型、不屬於排除類型，並指向已確認的方向；委派不跨 run。
+INVARIANT-30: 擬稿文案在使用者確認前不得進入 write；不得把題目中的舉例當成使用者提供的文字。
 ```
 
 INVARIANT-01 和第 7.5 節的關係（v1.7）：產品政策是使用者對整個產品明確做的決定，不是「上次 run 的選擇」；平台、DS 與 library 仍每次確認（REQ-01、REQ-06）。
 
 這些應至少以 contract／fixture tests 驗證。prompt 可以描述規則，但程式化 validator 才能攔下可判定的違規狀態。
 
-### 20.3 v1.8 變更紀錄
+### 20.3 v1.9 變更紀錄
 
-依 v1.7 的真實 run（`docs/history/v1.7-summary.md`，run `ui-20261002-001`）與使用者 2026-10-03 的決定修訂。v1.1–v1.7 的變更紀錄在 `docs/history/spec-changelog.md`。
+依第一個正式需求 run `ui-20261003-001`（Aiwow App 首頁，判定 `complete`）、外部研究 `docs/research/question-flow-architecture-review.md`（第 9 節依 v1.8 核對），以及使用者 2026-10-03 的決定修訂。這是提問架構改版的第一階段；第二階段待試用後評估。v1.1–v1.8 的變更紀錄在 `docs/history/spec-changelog.md`。
 
-- 第 7.4 節：DEC-08 的 `skippedBy`：使用者明確略過算已解決，agent 標記的略過仍待答（INVARIANT-28）；DEC-09 範圍與授權類的列也記 `confirmation`；DEC-11 動態行為不問，handoff 列為「未定義，交由實作決定」。
-- 第 7.2 節：ASK-08 提問、回報、交接一律用繁體中文。
-- 第 4.7 節（新增）：skill 使用規則，分成必用、有條件、只當參考、排除四類。
-- 第 4.2.2 節（新增）：Figma plugin 版本檢查；本機仍是 2.2.118（synced），官方最新 2.2.126。
-- 第 4.2.3 節（新增）：固定使用同一個 Figma 連線，hook 阻擋走其他連線的寫入（INVARIANT-27）；本機目前只有一個 Figma 連線。
-- 第 12.1、15 節：G7 依 `skippedBy` 判定；handoff 第 12 項。
-- 第 20 節：v1.7 run 中需要手動補救的自動化問題；`plan.decisions.confirmation`、`skippedBy`、`capabilities.server.toolPrefix`／`pluginVersion`。
-- 第 13.2 節：T72–T81；第 17 節：v1.7 完成、v1.8 列、待辦更新。
-- 保留不變：所有寫入保護、品質門檻、產品政策機制；run artifacts 的 schemaVersion `1.2`（只新增選填欄位與 enum 值）。
+- 第 7.4 節：DEC-12 限定範圍的細節委派（B 模式，每個 run 給一次，INVARIANT-29）；DEC-13 方向打包確認；DEC-14 文案來源分類（INVARIANT-30）；DEC-15 決策分流順序；DEC-01、DEC-07 加註。
+- 第 8.1 節：EXT-01 外部規範檢查；第 6b 步可匯入性與隱藏子節點探測。
+- 第 10.3 節：字型比對包含所有會新建 instance 的主元件字型。
+- 第 14、15 節：實質決策數、委派數、返工次數；handoff 第 13 項。
+- 第 13.2 節：T82–T90；第 17 節：v1.8 完成、v1.9 列、第二階段與 LINE 按鈕修正列入待辦。
+- 第 20 節：`kind`、`directionRef`、`dependsOn`、委派的允許與排除類型、`copy.origin`、`inventory.externalRequirements`。
+- 保留不變：寫入保護、產品確認、library 每次確認、plugin 版本每次問、全域 Build 邊界。這些屬第二階段，未經使用者重新確認不改。
